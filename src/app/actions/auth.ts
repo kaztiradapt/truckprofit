@@ -11,6 +11,10 @@ const credentialsSchema = z.object({
   password: z.string().min(12, "Пароль должен содержать минимум 12 символов"),
 });
 
+const emailSchema = z.object({
+  email: z.email("Введите корректный email").trim().toLowerCase(),
+});
+
 function loginError(message: string): never {
   redirect(`/login?error=${encodeURIComponent(message)}`);
 }
@@ -19,13 +23,34 @@ function registerError(message: string): never {
   redirect(`/register?error=${encodeURIComponent(message)}`);
 }
 
+function resendConfirmationPage(email: string, message: string): never {
+  redirect(`/resend-confirmation?email=${encodeURIComponent(email)}&message=${encodeURIComponent(message)}`);
+}
+
+function confirmationRedirectTo(origin: string | null): string | undefined {
+  return origin ? `${origin}/auth/confirm` : undefined;
+}
+
+function isUnconfirmedEmailError(message: string): boolean {
+  return /email not confirmed|email_not_confirmed/i.test(message);
+}
+
+function isExistingUserError(message: string): boolean {
+  return /already (?:registered|exists)|user_already_exists/i.test(message);
+}
+
 export async function signIn(formData: FormData): Promise<void> {
   const parsed = credentialsSchema.safeParse({ email: formData.get("email"), password: formData.get("password") });
   if (!parsed.success) loginError("Проверьте email и пароль.");
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) loginError("Не удалось войти. Проверьте email и пароль.");
+  if (error) {
+    if (isUnconfirmedEmailError(error.message)) {
+      resendConfirmationPage(parsed.data.email, "Email ещё не подтверждён. Отправьте новое письмо и откройте ссылку из него.");
+    }
+    loginError("Не удалось войти. Проверьте email и пароль.");
+  }
   redirect("/dashboard");
 }
 
@@ -42,15 +67,35 @@ export async function signUp(formData: FormData): Promise<void> {
     ...parsed.data,
     options: {
       data: { full_name: displayName },
-      emailRedirectTo: origin ? `${origin}/auth/confirm` : undefined,
+      emailRedirectTo: confirmationRedirectTo(origin),
     },
   });
-  if (error) registerError("Не удалось создать аккаунт. Возможно, этот email уже используется.");
+  if (error) {
+    if (isExistingUserError(error.message)) {
+      resendConfirmationPage(parsed.data.email, "Аккаунт уже создан. Если email ещё не подтверждён, отправьте новое письмо.");
+    }
+    registerError("Не удалось создать аккаунт. Попробуйте ещё раз.");
+  }
 
   if (!data.session) {
     redirect("/login?message=Подтвердите%20email%2C%20затем%20войдите.");
   }
   redirect("/onboarding");
+}
+
+export async function resendConfirmation(formData: FormData): Promise<void> {
+  const parsed = emailSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) resendConfirmationPage("", "Введите корректный email.");
+
+  const origin = (await headers()).get("origin");
+  const supabase = await createClient();
+  await supabase.auth.resend({
+    type: "signup",
+    email: parsed.data.email,
+    options: { emailRedirectTo: confirmationRedirectTo(origin) },
+  });
+
+  redirect("/login?message=Если%20аккаунт%20существует%2C%20письмо%20для%20подтверждения%20отправлено.%20Проверьте%20Входящие%20и%20Спам.");
 }
 
 export async function signOut(): Promise<void> {

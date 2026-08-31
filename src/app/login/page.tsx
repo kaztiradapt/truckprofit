@@ -16,6 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <label>Пароль<input name="password" type="password" autoComplete="current-password" minLength={12} required /></label>
           <button type="submit">Войти</button>
         </form>
+        <p className="muted">Не получили письмо для подтверждения? <a href="/resend-confirmation">Отправить повторно</a></p>
         <p className="muted">Первый раз здесь? <a href="/register">Создать аккаунт собственника</a></p>
       </section>
     </main>

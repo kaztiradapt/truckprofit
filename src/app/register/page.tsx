@@ -16,7 +16,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
           <label>Пароль<input name="password" type="password" autoComplete="new-password" minLength={12} required /></label>
           <button type="submit">Создать аккаунт</button>
         </form>
-        <p className="muted">Уже есть аккаунт? <a href="/login">Войти</a></p>
+        <p className="muted">Уже есть аккаунт? <a href="/login">Войти</a> или <a href="/resend-confirmation">отправить подтверждение повторно</a>.</p>
       </section>
     </main>
   );
