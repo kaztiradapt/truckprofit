@@ -33,8 +33,13 @@ export function DriverInviteButton({ driverId }: { driverId: string }) {
   if (invitation) {
     return (
       <div className="driver-invite-result">
+        {invitation.link ? (
+          <a className="telegram-open-link" href={invitation.link} target="_blank" rel="noreferrer">
+            Открыть Telegram
+          </a>
+        ) : null}
         <code>{invitation.link ?? invitation.token}</code>
-        <button type="button" className="tiny-button" onClick={copyInvitation}>Скопировать</button>
+        <button type="button" className="tiny-button" onClick={copyInvitation}>Скопировать ссылку</button>
         <small>Действует до {new Intl.DateTimeFormat("ru-KZ", { dateStyle: "short", timeStyle: "short" }).format(new Date(invitation.expiresAt))}</small>
         {message ? <span className="inline-message">{message}</span> : null}
       </div>
