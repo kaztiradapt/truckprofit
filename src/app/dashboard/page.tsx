@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { signOut } from "@/app/actions/auth";
-import { completeTrip, createDriver, createIncome, createTrip, createVehicle, recalculateTripPnl, reviewExpense } from "@/app/actions/owner";
+import { completeTrip, configureTelegramMiniApp, createDriver, createIncome, createTrip, createVehicle, recalculateTripPnl, reviewExpense } from "@/app/actions/owner";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { DriverInviteButton } from "./driver-invite-button";
 
@@ -27,11 +27,11 @@ function statusLabel(value: string) {
   return ({ DRAFT: "Черновик", ACTIVE: "В рейсе", COMPLETED: "Закрыт", CANCELLED: "Отменён" } as Record<string, string>)[value] ?? value;
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
   const data = await getDashboardData();
   if (data === "UNAUTHENTICATED") redirect("/login");
   if (data === "NO_ORGANIZATION") redirect("/onboarding");
-  const error = (await searchParams).error;
+  const { error, message } = await searchParams;
   const canOperate = data.role === "OWNER" || data.role === "MANAGER";
   const today = new Date().toISOString().slice(0, 10);
   const latestTrip = data.trips[0] ?? null;
@@ -58,6 +58,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="sidebar-note">
           <span>{data.organization.name}</span>
           <small>{data.vehicles.length} авто · {data.organization.baseCurrency}</small>
+          {canOperate ? <form action={configureTelegramMiniApp}><input type="hidden" name="organization_id" value={data.organization.id} /><button className="sidebar-mini-app" type="submit">Кнопка Telegram</button></form> : null}
           <form action={signOut}><button className="sidebar-signout" type="submit">Выйти</button></form>
         </div>
       </aside>
@@ -69,6 +70,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </header>
 
         {error ? <p className="form-error" role="alert">{error}</p> : null}
+        {message ? <p className="form-success" role="status">{message}</p> : null}
 
         <div className={data.pendingExpenses.length ? "signal signal-warning" : "signal"}>
           <div><span className="signal-dot" />{data.pendingExpenses.length ? `${data.pendingExpenses.length} расход(а) ждут проверки` : "Все расходы проверены"}</div>

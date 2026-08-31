@@ -102,6 +102,34 @@ export async function createDriver(formData: FormData): Promise<void> {
   revalidatePath("/dashboard");
 }
 
+export async function configureTelegramMiniApp(formData: FormData): Promise<void> {
+  const parsed = z.object({ organizationId: uuid }).safeParse({
+    organizationId: formData.get("organization_id"),
+  });
+  if (!parsed.success) dashboardError("Не удалось определить компанию.");
+  await requireOperator(parsed.data.organizationId);
+
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) dashboardError("Telegram-бот не настроен на сервере.");
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/setChatMenuButton`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      menu_button: {
+        type: "web_app",
+        text: "Открыть кабинет",
+        web_app: { url: "https://fleet-economics.vercel.app/dashboard" },
+      },
+    }),
+    cache: "no-store",
+  });
+  const result = await response.json() as { ok?: boolean; description?: string };
+  if (!response.ok || !result.ok) dashboardError("Telegram не принял настройку кнопки. Попробуйте ещё раз.");
+
+  redirect("/dashboard?message=Кнопка%20«Открыть%20кабинет»%20включена%20у%20Telegram-бота.");
+}
+
 export async function createTrip(formData: FormData): Promise<void> {
   const parsed = z.object({
     organizationId: uuid,

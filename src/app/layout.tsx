@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./styles.css";
+import { TelegramWebAppBridge } from "./telegram-web-app-bridge";
 
 export const metadata: Metadata = {
   title: {
@@ -15,7 +16,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ru">
-      <body>{children}</body>
+      <body>
+        <TelegramWebAppBridge />
+        {children}
+      </body>
     </html>
   );
 }
