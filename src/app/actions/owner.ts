@@ -1,0 +1,165 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+
+import { createClient } from "@/lib/supabase/server";
+
+const uuid = z.uuid();
+const money = z.coerce.number().positive().finite().max(999_999_999);
+const text = (min: number, max = 160) => z.string().trim().min(min).max(max);
+const organizationInput = z.object({
+  name: text(2),
+  slug: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,62}$/),
+  currency: z.string().trim().regex(/^[A-Z]{3}$/),
+});
+
+function dashboardError(message: string): never {
+  redirect(`/dashboard?error=${encodeURIComponent(message)}`);
+}
+
+async function getAuthenticatedUser() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
+  if (error || !userId) redirect("/login");
+  return { supabase, userId };
+}
+
+async function requireOperator(organizationId: string) {
+  const { supabase, userId } = await getAuthenticatedUser();
+  const { data, error } = await supabase
+    .from("organization_memberships")
+    .select("role, status")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
+  if (error || !data || !["OWNER", "MANAGER"].includes(data.role)) dashboardError("Недостаточно прав для этого действия.");
+  return supabase;
+}
+
+export async function createOrganization(formData: FormData): Promise<void> {
+  const parsed = organizationInput.safeParse({
+    name: formData.get("name"),
+    slug: formData.get("slug"),
+    currency: formData.get("currency"),
+  });
+  if (!parsed.success) redirect("/onboarding?error=Проверьте%20название%2C%20код%20и%20валюту.");
+
+  const { supabase } = await getAuthenticatedUser();
+  const { error } = await supabase.rpc("bootstrap_organization_with_owner", {
+    input_name: parsed.data.name,
+    input_slug: parsed.data.slug,
+    input_currency: parsed.data.currency,
+    input_timezone: "Asia/Qostanay",
+  });
+  if (error) redirect("/onboarding?error=Не%20удалось%20создать%20организацию.%20Возможно%2C%20код%20уже%20занят.");
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
+}
+
+export async function createVehicle(formData: FormData): Promise<void> {
+  const parsed = z.object({
+    organizationId: uuid,
+    displayName: text(2),
+    plateNumber: text(3, 32),
+    makeModel: z.string().trim().max(160),
+    fuelNorm: z.string().trim(),
+  }).safeParse({
+    organizationId: formData.get("organization_id"), displayName: formData.get("display_name"), plateNumber: formData.get("plate_number"), makeModel: formData.get("make_model"), fuelNorm: formData.get("fuel_norm"),
+  });
+  if (!parsed.success) dashboardError("Проверьте данные машины.");
+  const fuelNorm = parsed.data.fuelNorm ? Number(parsed.data.fuelNorm.replace(",", ".")) : null;
+  if (fuelNorm !== null && (!Number.isFinite(fuelNorm) || fuelNorm <= 0 || fuelNorm > 200)) dashboardError("Норма топлива должна быть от 0 до 200 л/100 км.");
+
+  const supabase = await requireOperator(parsed.data.organizationId);
+  const { error } = await supabase.from("vehicles").insert({
+    organization_id: parsed.data.organizationId,
+    display_name: parsed.data.displayName,
+    plate_number: parsed.data.plateNumber.toUpperCase(),
+    make_model: parsed.data.makeModel || null,
+    fuel_norm_l_per_100km: fuelNorm,
+  });
+  if (error) dashboardError("Не удалось сохранить машину. Проверьте, не повторяется ли госномер.");
+  revalidatePath("/dashboard");
+}
+
+export async function createDriver(formData: FormData): Promise<void> {
+  const parsed = z.object({ organizationId: uuid, displayName: text(2) }).safeParse({
+    organizationId: formData.get("organization_id"), displayName: formData.get("display_name"),
+  });
+  if (!parsed.success) dashboardError("Введите имя водителя.");
+  const supabase = await requireOperator(parsed.data.organizationId);
+  const { error } = await supabase.from("drivers").insert({
+    organization_id: parsed.data.organizationId,
+    display_name: parsed.data.displayName,
+    status: "ACTIVE",
+  });
+  if (error) dashboardError("Не удалось сохранить водителя.");
+  revalidatePath("/dashboard");
+}
+
+export async function createTrip(formData: FormData): Promise<void> {
+  const parsed = z.object({
+    organizationId: uuid,
+    vehicleId: uuid,
+    driverId: z.string().trim(),
+    title: text(3),
+    originCity: text(2),
+    destinationCity: text(2),
+    loadState: z.enum(["LOADED", "EMPTY", "UNKNOWN"]),
+    startedAt: z.string().date(),
+  }).safeParse({
+    organizationId: formData.get("organization_id"), vehicleId: formData.get("vehicle_id"), driverId: formData.get("driver_id"), title: formData.get("title"),
+    originCity: formData.get("origin_city"), destinationCity: formData.get("destination_city"), loadState: formData.get("load_state"), startedAt: formData.get("started_at"),
+  });
+  if (!parsed.success) dashboardError("Проверьте данные рейса.");
+  const driverId = parsed.data.driverId ? uuid.safeParse(parsed.data.driverId) : null;
+  if (driverId && !driverId.success) dashboardError("Выберите водителя из списка.");
+
+  const supabase = await requireOperator(parsed.data.organizationId);
+  const { error } = await supabase.rpc("create_trip_with_first_leg", {
+    p_organization_id: parsed.data.organizationId,
+    p_vehicle_id: parsed.data.vehicleId,
+    p_driver_id: driverId?.data ?? null,
+    p_title: parsed.data.title,
+    p_origin_city: parsed.data.originCity,
+    p_destination_city: parsed.data.destinationCity,
+    p_load_state: parsed.data.loadState,
+    p_started_at: `${parsed.data.startedAt}T00:00:00.000Z`,
+  });
+  if (error) dashboardError("Не удалось создать рейс. Проверьте машину и водителя.");
+  revalidatePath("/dashboard");
+}
+
+export async function createIncome(formData: FormData): Promise<void> {
+  const parsed = z.object({
+    organizationId: uuid,
+    tripId: uuid,
+    customerName: z.string().trim().max(160),
+    amount: money,
+    currency: z.string().trim().regex(/^[A-Z]{3}$/),
+    expectedPaymentAt: z.string().trim(),
+    comment: z.string().trim().max(1000),
+  }).safeParse({
+    organizationId: formData.get("organization_id"), tripId: formData.get("trip_id"), customerName: formData.get("customer_name"), amount: String(formData.get("amount") ?? "").replace(",", "."),
+    currency: formData.get("currency"), expectedPaymentAt: formData.get("expected_payment_at"), comment: formData.get("comment"),
+  });
+  if (!parsed.success || (parsed.data.expectedPaymentAt && !z.string().date().safeParse(parsed.data.expectedPaymentAt).success)) {
+    dashboardError("Проверьте сумму и дату ожидаемой оплаты.");
+  }
+  const supabase = await requireOperator(parsed.data.organizationId);
+  const { error } = await supabase.rpc("record_owner_income", {
+    p_organization_id: parsed.data.organizationId,
+    p_trip_id: parsed.data.tripId,
+    p_customer_name: parsed.data.customerName || null,
+    p_amount: parsed.data.amount,
+    p_currency: parsed.data.currency,
+    p_expected_payment_at: parsed.data.expectedPaymentAt || null,
+    p_comment: parsed.data.comment || null,
+  });
+  if (error) dashboardError("Не удалось сохранить доход.");
+  revalidatePath("/dashboard");
+}
