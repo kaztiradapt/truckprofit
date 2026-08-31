@@ -8,8 +8,34 @@ export type DashboardData = {
   organization: { id: string; name: string; baseCurrency: string };
   role: MembershipRole;
   vehicles: Array<{ id: string; displayName: string; plateNumber: string; status: string }>;
-  drivers: Array<{ id: string; displayName: string; status: string }>;
-  trips: Array<{ id: string; title: string; status: string; vehicleName: string; driverName: string | null; startedAt: string | null; pnl: { managementProfitMinor: number; totalKm: number } | null }>;
+  drivers: Array<{ id: string; displayName: string; status: string; telegramLinked: boolean }>;
+  trips: Array<{
+    id: string;
+    title: string;
+    status: string;
+    vehicleName: string;
+    driverName: string | null;
+    startedAt: string | null;
+    legs: Array<{
+      id: string;
+      sequenceNo: number;
+      originCity: string;
+      destinationCity: string;
+      loadState: string;
+      startOdometerKm: number | null;
+      endOdometerKm: number | null;
+      distanceKm: number | null;
+    }>;
+    pnl: {
+      revenueMinor: number;
+      totalExpensesMinor: number;
+      driverCompensationMinor: number;
+      managementProfitMinor: number;
+      totalKm: number;
+      loadedKm: number;
+      emptyKm: number;
+    } | null;
+  }>;
   pendingExpenses: Array<{ id: string; categoryName: string; tripTitle: string | null; amount: number; currency: string; occurredAt: string; comment: string | null }>;
   totals: { revenue: number; expenses: number; profit: number; totalKm: number; emptyMileagePct: number | null };
 };
@@ -22,7 +48,35 @@ type MembershipRow = {
   organizations: { name: string; base_currency: string } | { name: string; base_currency: string }[] | null;
 };
 
-type PnlRow = { trip_id: string; management_profit_minor: number | string; total_km: number };
+type PnlRow = {
+  trip_id: string;
+  revenue_minor: number | string;
+  total_expenses_minor: number | string;
+  driver_compensation_minor: number | string;
+  management_profit_minor: number | string;
+  total_km: number;
+  loaded_km: number;
+  empty_km: number;
+};
+
+type TripRow = {
+  id: string;
+  title: string;
+  status: string;
+  started_at: string | null;
+  vehicles: { display_name: string } | { display_name: string }[] | null;
+  drivers: { display_name: string } | { display_name: string }[] | null;
+  trip_legs: Array<{
+    id: string;
+    sequence_no: number;
+    origin_city: string;
+    destination_city: string;
+    load_state: string;
+    start_odometer_km: number | string | null;
+    end_odometer_km: number | string | null;
+    distance_km: number | string | null;
+  }>;
+};
 
 function asOne<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
@@ -51,11 +105,11 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
 
   const [vehiclesResult, driversResult, tripsResult, summariesResult, pendingExpensesResult, pnlResult] = await Promise.all([
     supabase.from("vehicles").select("id, display_name, plate_number, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
-    supabase.from("drivers").select("id, display_name, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
-    supabase.from("trips").select("id, title, status, started_at, vehicles(display_name), drivers(display_name)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(12),
+    supabase.from("drivers").select("id, display_name, status, telegram_user_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
+    supabase.from("trips").select("id, title, status, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(12),
     supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id),
     supabase.from("expenses").select("id, amount, currency, occurred_at, comment, expense_categories(display_name), trips(title)").eq("organization_id", membership.organization_id).eq("review_status", "PENDING").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(12),
-    supabase.from("pnl_snapshots").select("trip_id, management_profit_minor, total_km").eq("organization_id", membership.organization_id).eq("is_current", true),
+    supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
   ]);
   for (const result of [vehiclesResult, driversResult, tripsResult, summariesResult]) {
     if (result.error) throw new Error(result.error.message);
@@ -69,8 +123,13 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   }
 
   const pnlByTrip = new Map((pnlResult.data as PnlRow[] ?? []).map((item) => [item.trip_id, {
+    revenueMinor: Number(item.revenue_minor),
+    totalExpensesMinor: Number(item.total_expenses_minor),
+    driverCompensationMinor: Number(item.driver_compensation_minor),
     managementProfitMinor: Number(item.management_profit_minor),
     totalKm: Number(item.total_km),
+    loadedKm: Number(item.loaded_km),
+    emptyKm: Number(item.empty_km),
   }]));
 
   const summaries = summariesResult.data ?? [];
@@ -81,14 +140,29 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
     organization: { id: membership.organization_id, name: organization.name, baseCurrency: organization.base_currency },
     role: membership.role,
     vehicles: (vehiclesResult.data ?? []).map((vehicle) => ({ id: vehicle.id, displayName: vehicle.display_name, plateNumber: vehicle.plate_number, status: vehicle.status })),
-    drivers: (driversResult.data ?? []).map((driver) => ({ id: driver.id, displayName: driver.display_name, status: driver.status })),
-    trips: (tripsResult.data ?? []).map((trip) => ({
+    drivers: (driversResult.data ?? []).map((driver) => ({
+      id: driver.id,
+      displayName: driver.display_name,
+      status: driver.status,
+      telegramLinked: driver.telegram_user_id !== null,
+    })),
+    trips: ((tripsResult.data ?? []) as unknown as TripRow[]).map((trip) => ({
       id: trip.id,
       title: trip.title,
       status: trip.status,
       vehicleName: asOne(trip.vehicles)?.display_name ?? "Без машины",
       driverName: asOne(trip.drivers)?.display_name ?? null,
       startedAt: trip.started_at,
+      legs: (trip.trip_legs ?? []).sort((left, right) => left.sequence_no - right.sequence_no).map((leg) => ({
+        id: leg.id,
+        sequenceNo: leg.sequence_no,
+        originCity: leg.origin_city,
+        destinationCity: leg.destination_city,
+        loadState: leg.load_state,
+        startOdometerKm: leg.start_odometer_km === null ? null : Number(leg.start_odometer_km),
+        endOdometerKm: leg.end_odometer_km === null ? null : Number(leg.end_odometer_km),
+        distanceKm: leg.distance_km === null ? null : Number(leg.distance_km),
+      })),
       pnl: pnlByTrip.get(trip.id) ?? null,
     })),
     pendingExpenses: (pendingExpensesResult.data ?? []).map((expense) => ({

@@ -6,7 +6,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <p className="eyebrow">Fleet Economics</p>
+        <p className="eyebrow">TruckProfit</p>
         <h1>Экономика вашего парка</h1>
         <p className="lead">Войдите как собственник, менеджер или водитель.</p>
         {error ? <p className="form-error" role="alert">{error}</p> : null}

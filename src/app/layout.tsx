@@ -2,8 +2,14 @@ import type { Metadata } from "next";
 import "./styles.css";
 
 export const metadata: Metadata = {
-  title: "Fleet Economics",
-  description: "Unit economics for small transport fleets",
+  title: {
+    default: "TruckProfit",
+    template: "%s · TruckProfit",
+  },
+  description: "Экономика рейсов и автопарка для транспортной компании",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -13,4 +19,3 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   );
 }
-
