@@ -99,10 +99,13 @@ td { font-size: 14px; }
 .driver-invite-result code { max-width: min(420px, 45vw); color: var(--green); font-size: 11px; overflow-wrap: anywhere; white-space: normal; text-align: right; }
 .driver-invite-result small, .inline-message { color: var(--muted); font-size: 11px; }
 .inline-error { color: #9b251b; font-size: 11px; }
-.telegram-open-link { display: inline-flex; min-height: 32px; align-items: center; justify-content: center; padding: 6px 11px; border-radius: 8px; background: #229ed9; color: #fff; font-size: 11px; font-weight: 800; text-decoration: none; }
-.telegram-open-link:hover { background: #1588be; }
+.invite-ready { color: var(--green); font-size: 11px; font-weight: 800; }
+.invite-buttons { display: flex; gap: 6px; }
+.telegram-share-link { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; padding: 7px 12px; border-radius: 8px; background: #229ed9; color: #fff; font-size: 11px; font-weight: 800; text-decoration: none; }
+.telegram-share-link:hover { background: #1588be; }
 .tiny-button { min-height: 28px; padding: 5px 9px; border: 1px solid #bfcfc7; border-radius: 7px; background: #fff; color: var(--green); font-size: 11px; font-weight: 750; }
 .tiny-button:hover { background: var(--green-soft); }
+.badge-connected { background: #dff5e8; color: #17623f; }
 .review-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 7px; }
 .review-actions form { display: inline; }
 .review-actions button { min-height: 30px; padding: 5px 8px; font-size: 12px; }

@@ -8,7 +8,7 @@ export type DashboardData = {
   organization: { id: string; name: string; baseCurrency: string };
   role: MembershipRole;
   vehicles: Array<{ id: string; displayName: string; plateNumber: string; status: string }>;
-  drivers: Array<{ id: string; displayName: string; status: string; telegramLinked: boolean }>;
+  drivers: Array<{ id: string; displayName: string; status: string; telegramLinked: boolean; pendingInviteExpiresAt: string | null }>;
   trips: Array<{
     id: string;
     title: string;
@@ -103,13 +103,14 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   const organization = asOne(membership.organizations);
   if (!organization) throw new Error("Active membership has no organization");
 
-  const [vehiclesResult, driversResult, tripsResult, summariesResult, pendingExpensesResult, pnlResult] = await Promise.all([
+  const [vehiclesResult, driversResult, tripsResult, summariesResult, pendingExpensesResult, pnlResult, invitesResult] = await Promise.all([
     supabase.from("vehicles").select("id, display_name, plate_number, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, display_name, status, telegram_user_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("trips").select("id, title, status, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(12),
     supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id),
     supabase.from("expenses").select("id, amount, currency, occurred_at, comment, expense_categories(display_name), trips(title)").eq("organization_id", membership.organization_id).eq("review_status", "PENDING").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(12),
     supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
+    supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()),
   ]);
   for (const result of [vehiclesResult, driversResult, tripsResult, summariesResult]) {
     if (result.error) throw new Error(result.error.message);
@@ -118,7 +119,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   // The web release may reach Vercel a few moments before the additive SQL migration.
   // Keep the current owner dashboard readable during that short window; any other
   // error still surfaces instead of being hidden.
-  for (const result of [pendingExpensesResult, pnlResult]) {
+  for (const result of [pendingExpensesResult, pnlResult, invitesResult]) {
     if (result.error && !["42P01", "42703"].includes(result.error.code ?? "")) throw new Error(result.error.message);
   }
 
@@ -133,6 +134,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   }]));
 
   const summaries = summariesResult.data ?? [];
+  const pendingInvitesByDriver = new Map((invitesResult.data ?? []).map((invite) => [invite.driver_id, invite.expires_at]));
   const totalKm = summaries.reduce((sum, item) => sum + Number(item.total_km ?? 0), 0);
   const emptyKm = summaries.reduce((sum, item) => sum + Number(item.empty_km ?? 0), 0);
 
@@ -145,6 +147,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       displayName: driver.display_name,
       status: driver.status,
       telegramLinked: driver.telegram_user_id !== null,
+      pendingInviteExpiresAt: pendingInvitesByDriver.get(driver.id) ?? null,
     })),
     trips: ((tripsResult.data ?? []) as unknown as TripRow[]).map((trip) => ({
       id: trip.id,
