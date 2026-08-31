@@ -111,6 +111,12 @@ function invitationCode(context: DriverBotContext): string | null {
   return match?.[1]?.trim() || null;
 }
 
+function commandArguments(context: DriverBotContext, command: string): string[] {
+  const text = context.message?.text ?? "";
+  const match = text.match(new RegExp(`^/${command}(?:@\\w+)?(?:\\s+(.+))?$`, "i"));
+  return match?.[1]?.trim().split(/\s+/).filter(Boolean) ?? [];
+}
+
 export function createDriverBot(token: string, repository: DriverBotRepository): Bot<DriverBotContext> {
   const bot = new Bot<DriverBotContext>(token);
 
@@ -193,6 +199,46 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
   bot.command("done", async (context) => {
     context.session.receipt = undefined;
     await showMenu(context, "Готово.");
+  });
+  bot.command("legstart", async (context) => {
+    const driver = await findDriver(context);
+    if (!driver) return;
+    const [rawOdometer, rawLoadState] = commandArguments(context, "legstart");
+    const odometerKm = rawOdometer ? parsePositiveNumber(rawOdometer) : null;
+    const loadState = rawLoadState?.toUpperCase();
+    if (odometerKm === null || !Number.isInteger(odometerKm) || (loadState !== "LOADED" && loadState !== "EMPTY")) {
+      await context.reply("Формат: /legstart 523840 loaded или /legstart 523840 empty");
+      return;
+    }
+    const trip = await findTrip(context, driver);
+    if (!trip) return;
+    await repository.startAssignedLeg({
+      organizationId: trip.organizationId,
+      driverId: trip.driverId,
+      tripId: trip.id,
+      odometerKm,
+      loadState,
+    });
+    await showMenu(context, `Плечо начато: ${odometerKm} км, ${loadState === "LOADED" ? "с грузом" : "порожняком"}.`);
+  });
+  bot.command("legfinish", async (context) => {
+    const driver = await findDriver(context);
+    if (!driver) return;
+    const [rawOdometer] = commandArguments(context, "legfinish");
+    const odometerKm = rawOdometer ? parsePositiveNumber(rawOdometer) : null;
+    if (odometerKm === null || !Number.isInteger(odometerKm)) {
+      await context.reply("Формат: /legfinish 525050");
+      return;
+    }
+    const trip = await findTrip(context, driver);
+    if (!trip) return;
+    await repository.finishAssignedLeg({
+      organizationId: trip.organizationId,
+      driverId: trip.driverId,
+      tripId: trip.id,
+      odometerKm,
+    });
+    await showMenu(context, `Плечо завершено: ${odometerKm} км.`);
   });
 
   bot.on("callback_query:data", async (context) => {

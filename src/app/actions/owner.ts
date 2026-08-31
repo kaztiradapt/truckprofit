@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import { calculateAndPublishTripPnl } from "@/server/trip-pnl-service";
 
 const uuid = z.uuid();
 const money = z.coerce.number().positive().finite().max(999_999_999);
@@ -161,5 +162,57 @@ export async function createIncome(formData: FormData): Promise<void> {
     p_comment: parsed.data.comment || null,
   });
   if (error) dashboardError("Не удалось сохранить доход.");
+  revalidatePath("/dashboard");
+}
+
+export async function reviewExpense(formData: FormData): Promise<void> {
+  const parsed = z.object({
+    organizationId: uuid,
+    expenseId: uuid,
+    decision: z.enum(["APPROVED", "REJECTED"]),
+  }).safeParse({
+    organizationId: formData.get("organization_id"),
+    expenseId: formData.get("expense_id"),
+    decision: formData.get("decision"),
+  });
+  if (!parsed.success) dashboardError("Проверьте решение по расходу.");
+  const supabase = await requireOperator(parsed.data.organizationId);
+  const { error } = await supabase.rpc("review_expense", {
+    p_organization_id: parsed.data.organizationId,
+    p_expense_id: parsed.data.expenseId,
+    p_decision: parsed.data.decision,
+    p_note: null,
+  });
+  if (error) dashboardError("Не удалось проверить расход. Возможно, он уже обработан.");
+  revalidatePath("/dashboard");
+}
+
+export async function completeTrip(formData: FormData): Promise<void> {
+  const parsed = z.object({ organizationId: uuid, tripId: uuid }).safeParse({
+    organizationId: formData.get("organization_id"),
+    tripId: formData.get("trip_id"),
+  });
+  if (!parsed.success) dashboardError("Выберите рейс для закрытия.");
+  const supabase = await requireOperator(parsed.data.organizationId);
+  const { error } = await supabase.rpc("complete_trip_from_facts", {
+    p_organization_id: parsed.data.organizationId,
+    p_trip_id: parsed.data.tripId,
+  });
+  if (error) dashboardError("Рейс нельзя закрыть: завершите все плечи с одометром и статусом груза.");
+  revalidatePath("/dashboard");
+}
+
+export async function recalculateTripPnl(formData: FormData): Promise<void> {
+  const parsed = z.object({ organizationId: uuid, tripId: uuid }).safeParse({
+    organizationId: formData.get("organization_id"),
+    tripId: formData.get("trip_id"),
+  });
+  if (!parsed.success) dashboardError("Выберите рейс для расчёта.");
+  await requireOperator(parsed.data.organizationId);
+  try {
+    await calculateAndPublishTripPnl({ organizationId: parsed.data.organizationId, tripId: parsed.data.tripId });
+  } catch {
+    dashboardError("P&L пока не рассчитан: проверьте утверждение расходов, плечи рейса и настройку сервера.");
+  }
   revalidatePath("/dashboard");
 }

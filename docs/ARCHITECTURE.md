@@ -36,14 +36,14 @@ flowchart LR
 1. Driver выбирает «Добавить расход».
 2. Bot проверяет его `telegram_user_id`, роль `DRIVER` и активное назначение на рейс.
 3. Wizard получает категорию, сумму, валюту; для топлива — литры и одометр; опционально фото и геолокацию.
-4. API создаёт `expense` со статусом `RECORDED`, источником `TELEGRAM`, автором и audit event.
+4. API создаёт `expense` со статусом учёта `RECORDED`, но с финансовым review-статусом `PENDING`, источником, автором и audit event.
 5. Domain service пересчитывает read-model рейса/машины; bot возвращает подтверждение без внутренней маржи всей компании.
 
 ### Рейс и P&L
 
 1. Owner/Manager создаёт `trip` и один или несколько `trip_leg`.
 2. Доход и расходы привязываются к рейсу или плечу; общий расход может оставаться на уровне машины/организации.
-3. После closing review создаётся вычисляемый P&L: revenue, variable expenses, driver pay, estimated tax, profit, cost/km, profit/km, loaded/empty km.
+3. После closing review создаётся неизменяемый вычисляемый P&L snapshot: revenue, variable expenses, driver pay, estimated tax, profit, cost/km, profit/km, loaded/empty km. В расчёт входят только `APPROVED` расходы.
 4. Любая корректировка сохраняет автора, время, источник и причину; удаление финансовых фактов — soft delete.
 
 ## Доступ и конфиденциальность
@@ -59,4 +59,3 @@ flowchart LR
 - Вложения сначала получают storage key, затем связаны с расходом транзакционно.
 - Ошибки интеграции попадают в exception log с безопасным summary; повтор использует исходный idempotency key.
 - Денежные операции и зарплата не утверждаются AI или фоновым workflow.
-

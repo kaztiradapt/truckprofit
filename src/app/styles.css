@@ -39,6 +39,9 @@ td { font-size: 0.92rem; }
 .entity-list { display: grid; gap: 10px; list-style: none; margin: 16px 0 0; padding: 0; }
 .entity-list li { align-items: center; border-bottom: 1px solid #e6ebe8; display: flex; gap: 12px; justify-content: space-between; padding-bottom: 10px; }
 .entity-list small { color: #60716a; display: block; margin-top: 3px; }
+.review-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 7px; }
+.review-actions form { display: inline; }
+.review-actions button { font-size: 0.76rem; min-height: 30px; padding: 5px 8px; }
 .empty-state { color: #60716a; line-height: 1.5; margin: 16px 0 0; }
 
 .operations { margin-top: 32px; }

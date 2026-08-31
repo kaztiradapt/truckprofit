@@ -62,6 +62,8 @@ export interface DriverBotRepository {
   findActiveTrip(driver: DriverIdentity): Promise<ActiveTrip | null>;
   recordExpense(input: RecordExpenseInput): Promise<{ expenseId: string }>;
   recordOdometer(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm" | "occurredAt">): Promise<void>;
+  startAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm"> & { loadState: "LOADED" | "EMPTY" }): Promise<void>;
+  finishAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm">): Promise<void>;
   recordStatus(input: RecordStatusInput): Promise<void>;
   findPreliminaryCompensation(driver: DriverIdentity, tripId: string): Promise<PreliminaryCompensation | null>;
   uploadReceipt(upload: ReceiptUpload): Promise<void>;

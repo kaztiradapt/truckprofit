@@ -182,6 +182,29 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
     throwOnError(error);
   }
 
+  async startAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm"> & { loadState: "LOADED" | "EMPTY" }): Promise<void> {
+    if (input.odometerKm === undefined || !Number.isInteger(input.odometerKm)) throw new Error("A whole-kilometre odometer value is required");
+    const { error } = await this.client.rpc("driver_start_assigned_leg", {
+      p_organization_id: input.organizationId,
+      p_driver_id: input.driverId,
+      p_trip_id: input.tripId,
+      p_odometer_km: input.odometerKm,
+      p_load_state: input.loadState,
+    });
+    throwOnError(error);
+  }
+
+  async finishAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm">): Promise<void> {
+    if (input.odometerKm === undefined || !Number.isInteger(input.odometerKm)) throw new Error("A whole-kilometre odometer value is required");
+    const { error } = await this.client.rpc("driver_finish_assigned_leg", {
+      p_organization_id: input.organizationId,
+      p_driver_id: input.driverId,
+      p_trip_id: input.tripId,
+      p_odometer_km: input.odometerKm,
+    });
+    throwOnError(error);
+  }
+
   async recordStatus(input: RecordStatusInput): Promise<void> {
     const { error } = await this.client.rpc("record_telegram_vehicle_status", {
       p_organization_id: input.organizationId,

@@ -4,6 +4,10 @@ export type BotEnvironment = {
   supabaseServiceRoleKey: string;
 };
 
+export type TelegramWebhookEnvironment = BotEnvironment & {
+  telegramWebhookSecret: string;
+};
+
 function requireEnvironmentValue(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
@@ -19,4 +23,12 @@ export function readBotEnvironment(): BotEnvironment {
     supabaseUrl,
     supabaseServiceRoleKey: requireEnvironmentValue("SUPABASE_SERVICE_ROLE_KEY"),
   };
+}
+
+export function readTelegramWebhookEnvironment(): TelegramWebhookEnvironment {
+  const telegramWebhookSecret = requireEnvironmentValue("TELEGRAM_WEBHOOK_SECRET");
+  if (!/^[A-Za-z0-9_-]{1,256}$/.test(telegramWebhookSecret)) {
+    throw new Error("TELEGRAM_WEBHOOK_SECRET must contain only letters, digits, _ or -");
+  }
+  return { ...readBotEnvironment(), telegramWebhookSecret };
 }
