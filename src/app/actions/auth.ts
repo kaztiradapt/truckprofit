@@ -39,6 +39,13 @@ function isExistingUserError(message: string): boolean {
   return /already (?:registered|exists)|user_already_exists/i.test(message);
 }
 
+function resendErrorMessage(message: string): string {
+  if (/rate limit|email.*limit|too many requests/i.test(message)) {
+    return "Supabase временно ограничил отправку писем. Подождите до часа или настройте корпоративную почту для сервиса.";
+  }
+  return "Supabase не смог отправить письмо. Повторите попытку чуть позже.";
+}
+
 export async function signIn(formData: FormData): Promise<void> {
   const parsed = credentialsSchema.safeParse({ email: formData.get("email"), password: formData.get("password") });
   if (!parsed.success) loginError("Проверьте email и пароль.");
@@ -89,11 +96,12 @@ export async function resendConfirmation(formData: FormData): Promise<void> {
 
   const origin = (await headers()).get("origin");
   const supabase = await createClient();
-  await supabase.auth.resend({
+  const { error } = await supabase.auth.resend({
     type: "signup",
     email: parsed.data.email,
     options: { emailRedirectTo: confirmationRedirectTo(origin) },
   });
+  if (error) resendConfirmationPage(parsed.data.email, resendErrorMessage(error.message));
 
   redirect("/login?message=Если%20аккаунт%20существует%2C%20письмо%20для%20подтверждения%20отправлено.%20Проверьте%20Входящие%20и%20Спам.");
 }
