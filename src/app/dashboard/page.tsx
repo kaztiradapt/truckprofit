@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 
 import { signOut } from "@/app/actions/auth";
-import { completeTrip, configureTelegramMiniApp, createDriver, createIncome, createTrip, createVehicle, recalculateTripPnl, reviewExpense } from "@/app/actions/owner";
+import { completeTrip, createDriver, createIncome, createTrip, createVehicle, recalculateTripPnl, reviewExpense } from "@/app/actions/owner";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { DriverInviteButton } from "./driver-invite-button";
+import { TelegramMenuButton } from "./telegram-menu-button";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <div className="sidebar-note">
           <span>{data.organization.name}</span>
           <small>{data.vehicles.length} авто · {data.organization.baseCurrency}</small>
-          {canOperate ? <form action={configureTelegramMiniApp}><input type="hidden" name="organization_id" value={data.organization.id} /><button className="sidebar-mini-app" type="submit">Кнопка Telegram</button></form> : null}
+          {canOperate ? <TelegramMenuButton organizationId={data.organization.id} /> : null}
           <form action={signOut}><button className="sidebar-signout" type="submit">Выйти</button></form>
         </div>
       </aside>

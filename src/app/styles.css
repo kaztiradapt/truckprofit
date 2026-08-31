@@ -31,6 +31,8 @@ button { cursor: pointer; }
 .sidebar-signout:hover { color: #fff; background: transparent; }
 .sidebar-mini-app { width: 100%; min-height: 34px; padding: 7px 10px; border: 1px solid #496057; border-radius: 8px; background: #253730; color: #eaf2ee; font-size: 12px; font-weight: 750; }
 .sidebar-mini-app:hover { background: #31483f; }
+.sidebar-mini-app-control { display: grid; gap: 4px; margin-top: 7px; }
+.sidebar-mini-app-control small { color: #9baba4; font-size: 10px; }
 
 .content { width: min(1280px, 100%); padding: 42px 48px 56px; }
 .topbar { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
