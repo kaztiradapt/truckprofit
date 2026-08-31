@@ -34,7 +34,7 @@ export function DriverInviteButton({ driverId }: { driverId: string }) {
     return (
       <div className="driver-invite-result">
         {invitation.link ? (
-          <a className="telegram-open-link" href={invitation.link} target="_blank" rel="noreferrer">
+          <a className="telegram-open-link" href={invitation.link}>
             Открыть Telegram
           </a>
         ) : null}
