@@ -89,6 +89,17 @@ export type RecordStatusInput = {
   occurredAt: Date;
 };
 
+export type RecordLocationInput = {
+  organizationId: string;
+  driverId: string;
+  tripId: string;
+  latitude: number;
+  longitude: number;
+  horizontalAccuracyM: number | null;
+  occurredAt: Date;
+  telegramMessageId: number;
+};
+
 export type PreliminaryCompensation = {
   amountMinor: number;
   currency: string;
@@ -127,6 +138,7 @@ export interface DriverBotRepository {
   startAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm"> & { loadState: "LOADED" | "EMPTY" }): Promise<void>;
   finishAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm">): Promise<void>;
   recordStatus(input: RecordStatusInput): Promise<void>;
+  recordLocation(input: RecordLocationInput): Promise<void>;
   findPreliminaryCompensation(driver: DriverIdentity, tripId: string): Promise<PreliminaryCompensation | null>;
   uploadReceipt(upload: ReceiptUpload): Promise<void>;
 }

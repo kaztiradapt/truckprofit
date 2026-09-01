@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips } from "./driver-bot";
+import { formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips, normalizeLocationPoint } from "./driver-bot";
 
 describe("owner Telegram menu formatting", () => {
   it("renders an operational and financial summary", () => {
@@ -38,5 +38,16 @@ describe("owner Telegram menu formatting", () => {
     expect(message).toContain("Костанай → Алматы");
     expect(message).toContain("DAF 001");
     expect(message).toContain("Марат");
+  });
+
+  it("validates Telegram location coordinates and accuracy", () => {
+    expect(normalizeLocationPoint({ latitude: 53.2144, longitude: 63.6246, horizontalAccuracyM: 18.7 })).toEqual({
+      latitude: 53.2144,
+      longitude: 63.6246,
+      horizontalAccuracyM: 18.7,
+    });
+    expect(normalizeLocationPoint({ latitude: 91, longitude: 63.6246 })).toBeNull();
+    expect(normalizeLocationPoint({ latitude: 53.2144, longitude: 181 })).toBeNull();
+    expect(normalizeLocationPoint({ latitude: 53.2144, longitude: 63.6246, horizontalAccuracyM: 1501 })).toBeNull();
   });
 });

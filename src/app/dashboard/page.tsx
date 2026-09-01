@@ -26,6 +26,14 @@ function dateLabel(value: string | null) {
   return value ? new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium" }).format(new Date(value)) : "—";
 }
 
+function dateTimeLabel(value: string) {
+  return new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function openStreetMapUrl(latitude: number, longitude: number) {
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=12/${latitude}/${longitude}`;
+}
+
 function statusLabel(value: string) {
   return ({ DRAFT: "Черновик", ACTIVE: "В рейсе", COMPLETED: "Закрыт", CANCELLED: "Отменён" } as Record<string, string>)[value] ?? value;
 }
@@ -107,6 +115,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <div><p className="eyebrow">Последний рейс</p><h2>{latestTrip.title}</h2><p>{latestTrip.vehicleName} · {latestTrip.driverName ?? "Водитель не назначен"} · {dateLabel(latestTrip.startedAt)}</p></div>
               <span className="status">{statusLabel(latestTrip.status)}</span>
             </div>
+            {latestTrip.lastLocation ? <div className="trip-location">
+              <span><b>📍 Последняя геопозиция</b><small>{dateTimeLabel(latestTrip.lastLocation.recordedAt)} · {latestTrip.lastLocation.horizontalAccuracyM === null ? "точность не указана" : `точность около ${Math.round(latestTrip.lastLocation.horizontalAccuracyM)} м`}</small></span>
+              <a href={openStreetMapUrl(latestTrip.lastLocation.latitude, latestTrip.lastLocation.longitude)} target="_blank" rel="noreferrer">Открыть на карте</a>
+            </div> : null}
             <div className="trip-grid">
               <div className="route-panel">
                 {latestTrip.legs.length ? latestTrip.legs.map((leg, index) => (
@@ -168,7 +180,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>
           <div className="help-grid">
             <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль и водителя.</li><li>Создайте рейс, укажите маршрут и доход.</li><li>Подключите свой Telegram кнопкой выше.</li><li>Проверяйте расходы водителей и закрывайте рейс.</li><li>После закрытия рассчитайте P&amp;L.</li></ol></article>
-            <article className="panel"><h3>Водителю</h3><ol><li>Откройте персональную ссылку владельца и нажмите START.</li><li>В «Мой рейс» проверьте назначение.</li><li>Передавайте расходы, пробег и статус по кнопкам.</li><li>После расхода отправьте фото чека.</li><li>Предварительную оплату смотрите в «Моя зарплата».</li></ol></article>
+            <article className="panel"><h3>Водителю</h3><ol><li>Откройте персональную ссылку владельца и нажмите START.</li><li>В «Мой рейс» проверьте назначение.</li><li>Передавайте расходы, пробег, статус и геопозицию по кнопкам.</li><li>Геопозиция передаётся только после вашего нажатия и разрешения Telegram.</li><li>После расхода отправьте фото чека; оплату смотрите в «Моя зарплата».</li></ol></article>
             <article className="panel"><h3>Mini App</h3><ol><li>Откройте «Открыть кабинет» возле поля ввода в Telegram.</li><li>При первом запуске войдите тем же email владельца.</li><li>Все данные синхронизируются с ботом автоматически.</li><li>Для сложных операций используйте кабинет, для быстрых — меню бота.</li></ol></article>
           </div>
           <div className="faq-list">

@@ -157,9 +157,9 @@ export function TeamManagement({ organizationId, roles, staff }: { organizationI
       <div className="team-management-grid">
         <form className="panel stack-form" onSubmit={addStaff}>
           <div><p className="eyebrow">Новый сотрудник</p><h3>Пригласить в кабинет</h3></div>
-          <label>Имя<input name="display_name" placeholder="Дана" required /></label>
-          <label>Email<input type="email" name="email" placeholder="dana@company.kz" /></label>
-          <label>Telegram @тег<input name="telegram_username" placeholder="@dana_manager" /></label>
+          <label>Имя<input name="display_name" placeholder="Имя и фамилия сотрудника" required /></label>
+          <label>Email<input type="email" name="email" placeholder="employee@company.kz" /></label>
+          <label>Telegram @тег<input name="telegram_username" placeholder="@username" /></label>
           <label>Роль<select name="access_role_id" required defaultValue={roles[0]?.id ?? ""}><option value="" disabled>Выберите роль</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
           <small className="muted">Email даёт вход в Mini App. @тег создаёт персональную ссылку для привязки Telegram.</small>
           <button type="submit" disabled={busy === "staff" || !roles.length}>{busy === "staff" ? "Добавляю…" : "Добавить сотрудника"}</button>
@@ -167,7 +167,7 @@ export function TeamManagement({ organizationId, roles, staff }: { organizationI
 
         <form className="panel role-form" onSubmit={createRole}>
           <div><p className="eyebrow">Своя роль</p><h3>Настроить полномочия</h3></div>
-          <label>Название<input name="name" placeholder="Логист" required /></label>
+          <label>Название<input name="name" placeholder="Например: Логист" required /></label>
           <div className="permission-grid">{permissionOptions.map(([code, label]) => <label className={code === "DELETE_RECORDS" ? "permission-danger" : ""} key={code}><input type="checkbox" name="permissions" value={code} defaultChecked={code === "VIEW_DASHBOARD"} disabled={code === "VIEW_DASHBOARD"} />{label}{code === "VIEW_DASHBOARD" ? <input type="hidden" name="permissions" value={code} /> : null}</label>)}</div>
           <small className="muted">Удаление вынесено в отдельное право. У стандартного «Управляющего» оно выключено.</small>
           <button type="submit" disabled={busy === "role"}>{busy === "role" ? "Создаю…" : "Создать роль"}</button>

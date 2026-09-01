@@ -1,4 +1,4 @@
-import { Bot, Context, InlineKeyboard, session, type SessionFlavor } from "grammy";
+import { Bot, Context, InlineKeyboard, Keyboard, session, type SessionFlavor } from "grammy";
 
 import {
   advanceExpenseWizard,
@@ -27,6 +27,7 @@ type BotSession = {
   receipt?: PendingReceipt;
   odometer?: PendingOdometer;
   status?: PendingStatus;
+  locationPromptMessageId?: number;
   mode?: "OWNER" | "DRIVER";
   ownerAvailable?: boolean;
   driverAvailable?: boolean;
@@ -59,10 +60,12 @@ const MINI_APP_URL = "https://fleet-economics.vercel.app/dashboard";
 function driverMenu(ownerAvailable = false): InlineKeyboard {
   const keyboard = new InlineKeyboard()
     .text("Мой рейс", "menu:trip")
-    .text("Добавить расход", "menu:expense")
     .row()
+    .text("Добавить расход", "menu:expense")
     .text("Пробег", "menu:odometer")
+    .row()
     .text("Статус", "menu:status")
+    .text("📍 Геопозиция", "menu:location")
     .row()
     .text("Моя зарплата", "menu:pay")
     .text("❓ Помощь", "help:main");
@@ -184,6 +187,19 @@ function resetFlow(context: DriverBotContext): void {
   context.session.expense = undefined;
   context.session.odometer = undefined;
   context.session.status = undefined;
+  context.session.locationPromptMessageId = undefined;
+}
+
+export function normalizeLocationPoint(input: {
+  latitude: number;
+  longitude: number;
+  horizontalAccuracyM?: number;
+}): { latitude: number; longitude: number; horizontalAccuracyM: number | null } | null {
+  const accuracy = input.horizontalAccuracyM ?? null;
+  if (!Number.isFinite(input.latitude) || input.latitude < -90 || input.latitude > 90
+    || !Number.isFinite(input.longitude) || input.longitude < -180 || input.longitude > 180
+    || (accuracy !== null && (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 1500))) return null;
+  return { latitude: input.latitude, longitude: input.longitude, horizontalAccuracyM: accuracy };
 }
 
 function telegramUserId(context: DriverBotContext): number | null {
@@ -496,8 +512,8 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
         "1. Откройте персональную ссылку владельца и нажмите START.",
         "2. Проверьте назначение в «Мой рейс».",
         "3. Передавайте расход, пробег и статус кнопками.",
-        "4. После расхода отправьте фото чека.",
-        "5. Предварительный расчёт смотрите в «Моя зарплата».",
+        "4. В «📍 Геопозиция» нажмите «Отправить» и разрешите Telegram передать текущую точку.",
+        "5. После расхода отправьте фото чека; предварительный расчёт смотрите в «Моя зарплата».",
       ].join("\n"), helpMenu());
       return;
     }
@@ -644,6 +660,19 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       return;
     }
 
+    if (data === "menu:location") {
+      const trip = await findTrip(context, driver);
+      if (!trip) return;
+      resetFlow(context);
+      await clearPreviousMenu(context);
+      const sent = await context.reply(
+        `Передача геопозиции для рейса «${trip.title}». Нажмите кнопку ниже и разрешите Telegram отправить текущие координаты.`,
+        { reply_markup: new Keyboard().requestLocation("📍 Отправить геопозицию").resized().oneTime() },
+      );
+      context.session.locationPromptMessageId = sent.message_id;
+      return;
+    }
+
     if (data.startsWith("status:")) {
       const definition = statusDefinitions[data.replace("status:", "")];
       const trip = await findTrip(context, driver);
@@ -735,6 +764,47 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       return;
     }
     await context.reply(result.prompt);
+  });
+
+  bot.on("message:location", async (context) => {
+    if (context.session.mode === "OWNER") {
+      await showCurrentMenu(context, "Переключитесь в режим водителя, чтобы передать геопозицию рейса.");
+      return;
+    }
+    const driver = await findDriver(context);
+    if (!driver) return;
+    const trip = await findTrip(context, driver);
+    if (!trip) return;
+    const location = normalizeLocationPoint({
+      latitude: context.message.location.latitude,
+      longitude: context.message.location.longitude,
+      horizontalAccuracyM: context.message.location.horizontal_accuracy,
+    });
+    if (!location) {
+      await showDriverMenu(context, "Telegram передал некорректные координаты. Попробуйте ещё раз.");
+      return;
+    }
+    await repository.recordLocation({
+      organizationId: trip.organizationId,
+      driverId: trip.driverId,
+      tripId: trip.id,
+      ...location,
+      occurredAt: new Date(context.message.date * 1000),
+      telegramMessageId: context.message.message_id,
+    });
+    const promptMessageId = context.session.locationPromptMessageId;
+    context.session.locationPromptMessageId = undefined;
+    if (promptMessageId && context.chat?.id) {
+      try {
+        await context.api.deleteMessage(context.chat.id, promptMessageId);
+      } catch {
+        // Cleanup is best-effort; the saved point is not affected.
+      }
+    }
+    const accuracyText = location.horizontalAccuracyM === null
+      ? "точность не указана"
+      : `точность около ${Math.round(location.horizontalAccuracyM)} м`;
+    await showDriverMenu(context, `📍 Геопозиция сохранена для рейса «${trip.title}» (${accuracyText}).`);
   });
 
   bot.on("message:photo", async (context) => {

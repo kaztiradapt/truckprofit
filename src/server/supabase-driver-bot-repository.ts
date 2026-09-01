@@ -12,6 +12,7 @@ import type {
   PreliminaryCompensation,
   ReceiptUpload,
   RecordExpenseInput,
+  RecordLocationInput,
   RecordStatusInput,
   StaffIdentity,
 } from "../bot/repository";
@@ -464,6 +465,20 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
       p_load_state: input.loadState,
       p_location_text: input.locationText,
       p_recorded_at: input.occurredAt.toISOString(),
+    });
+    throwOnError(error);
+  }
+
+  async recordLocation(input: RecordLocationInput): Promise<void> {
+    const { error } = await this.client.rpc("record_telegram_trip_location", {
+      p_organization_id: input.organizationId,
+      p_driver_id: input.driverId,
+      p_trip_id: input.tripId,
+      p_latitude: input.latitude,
+      p_longitude: input.longitude,
+      p_horizontal_accuracy_m: input.horizontalAccuracyM,
+      p_recorded_at: input.occurredAt.toISOString(),
+      p_telegram_message_id: input.telegramMessageId,
     });
     throwOnError(error);
   }

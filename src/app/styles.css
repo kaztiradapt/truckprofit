@@ -67,6 +67,10 @@ button { cursor: pointer; }
 .trip-heading h2, .empty-trip h2 { margin: 5px 0 6px; font-size: 21px; letter-spacing: -.025em; }
 .trip-heading p:last-child, .empty-trip p:last-child { margin: 0; color: var(--muted); font-size: 13px; }
 .status { align-self: start; padding: 7px 10px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 12px; font-weight: 750; }
+.trip-location { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; padding: 12px 14px; border: 1px solid #cfe1d7; border-radius: 10px; background: var(--green-soft); }
+.trip-location span { display: grid; gap: 3px; }
+.trip-location small { color: var(--muted); font-size: 11px; }
+.trip-location a { color: var(--green); font-size: 12px; font-weight: 800; white-space: nowrap; }
 .trip-grid { padding-top: 24px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 44px; }
 .route-panel { display: grid; align-content: start; }
 .route-line { min-height: 65px; display: grid; grid-template-columns: 18px 1fr; gap: 13px; position: relative; }
@@ -253,6 +257,7 @@ td { font-size: 14px; }
   .metrics article { min-height: 118px; }
   .trip-card, .panel { padding: 19px; }
   .trip-heading { display: grid; }
+  .trip-location { align-items: flex-start; flex-direction: column; }
   .status { justify-self: start; }
   .economics { grid-template-columns: 1fr; }
   .auth-card { padding: 25px; }
