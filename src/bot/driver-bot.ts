@@ -103,7 +103,10 @@ function staffMenu(staff: StaffIdentity): InlineKeyboard {
     if (index % 2 === 1) keyboard.row();
   }
   if (buttons.length % 2 === 1) keyboard.row();
-  return keyboard.text("❓ Помощь", "help:main");
+  return keyboard
+    .webApp("🌐 Открыть кабинет", MINI_APP_URL)
+    .row()
+    .text("❓ Помощь", "help:main");
 }
 
 function helpMenu(): InlineKeyboard {
