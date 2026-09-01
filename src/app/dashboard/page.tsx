@@ -169,10 +169,51 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <div className="start-intro"><p className="eyebrow">End-to-end контур</p><h2>Провести настоящий рейс</h2><p>Организация уже подключена. Пройдите шаги по порядку — данные сохраняются в защищённом контуре компании.</p></div>
           <div className="workbench">
             <div className="workbench-status"><span className="ready" />Supabase, Telegram и расчётный слой подключены</div>
-            {canManageVehicles ? <form action={createVehicle} className="flow-card grid-form"><b>1. Автомобиль</b><input type="hidden" name="organization_id" value={data.organization.id} /><input name="display_name" placeholder="DAF 001" required /><input name="plate_number" placeholder="KZ 001 DEM" required /><input name="make_model" placeholder="DAF XF" /><input name="fuel_norm" inputMode="decimal" placeholder="30.5 л/100 км" /><button type="submit">Сохранить</button></form> : null}
-            {canManageTrips ? <form action={createTrip} className="flow-card grid-form"><b>2. Рейс</b><input type="hidden" name="organization_id" value={data.organization.id} /><input name="title" placeholder="Алматы → Москва" required /><select name="vehicle_id" required disabled={!data.vehicles.length}><option value="">Машина</option>{data.vehicles.map((item) => <option key={item.id} value={item.id}>{item.displayName} · {item.plateNumber}</option>)}</select><select name="driver_id"><option value="">Водитель позже</option>{data.drivers.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}</select><input name="origin_city" placeholder="Алматы" required /><input name="destination_city" placeholder="Москва" required /><select name="load_state" defaultValue="LOADED"><option value="LOADED">С грузом</option><option value="EMPTY">Порожний</option><option value="UNKNOWN">Неизвестно</option></select><input name="started_at" type="date" defaultValue={today} required /><button type="submit" disabled={!data.vehicles.length}>Создать</button></form> : null}
-            {canManageFinance ? <form action={createIncome} className="flow-card"><b>3. Доход</b><input type="hidden" name="organization_id" value={data.organization.id} /><input type="hidden" name="currency" value={data.organization.baseCurrency} /><select name="trip_id" required disabled={!data.trips.length}><option value="">Рейс</option>{data.trips.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><input name="customer_name" placeholder="Заказчик" /><input name="amount" inputMode="decimal" placeholder={`Сумма, ${data.organization.baseCurrency}`} required /><input name="expected_payment_at" type="date" /><input name="comment" placeholder="Комментарий" /><button type="submit" disabled={!data.trips.length}>Добавить</button></form> : null}
-            {canManageTrips || canManageFinance ? <div className="flow-card action-card"><b>4. Закрытие и P&amp;L</b>{canManageTrips ? <form action={completeTrip} className="inline-flow"><input type="hidden" name="organization_id" value={data.organization.id} /><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "ACTIVE")}><option value="">Активный рейс</option>{data.trips.filter((item) => item.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="submit" disabled={!data.trips.some((item) => item.status === "ACTIVE")}>Закрыть</button></form> : null}{canManageFinance ? <form action={recalculateTripPnl} className="inline-flow"><input type="hidden" name="organization_id" value={data.organization.id} /><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "COMPLETED")}><option value="">Закрытый рейс</option>{data.trips.filter((item) => item.status === "COMPLETED").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="submit" disabled={!data.trips.some((item) => item.status === "COMPLETED")}>Рассчитать P&amp;L</button></form> : null}</div> : null}
+            {canManageVehicles ? <form action={createVehicle} className="flow-card">
+              <div className="flow-card-heading"><span className="flow-step">1</span><span><b>Автомобиль</b><small>Добавьте машину в парк</small></span></div>
+              <input type="hidden" name="organization_id" value={data.organization.id} />
+              <div className="flow-fields vehicle-fields">
+                <label className="flow-field"><span>Название</span><input name="display_name" placeholder="Например: DAF 001" required /></label>
+                <label className="flow-field"><span>Госномер</span><input name="plate_number" placeholder="Например: KZ 001 DEM" required /></label>
+                <label className="flow-field"><span>Марка и модель</span><input name="make_model" placeholder="Например: DAF XF" /></label>
+                <label className="flow-field"><span>Норма топлива</span><input name="fuel_norm" inputMode="decimal" placeholder="30.5 л/100 км" /></label>
+              </div>
+              <div className="flow-card-action"><button type="submit">Сохранить</button></div>
+            </form> : null}
+            {canManageTrips ? <form action={createTrip} className="flow-card">
+              <div className="flow-card-heading"><span className="flow-step">2</span><span><b>Рейс</b><small>Маршрут и назначение</small></span></div>
+              <input type="hidden" name="organization_id" value={data.organization.id} />
+              <div className="flow-fields trip-fields">
+                <label className="flow-field flow-field-wide"><span>Название рейса</span><input name="title" placeholder="Например: Алматы → Москва" required /></label>
+                <label className="flow-field"><span>Автомобиль</span><select name="vehicle_id" required disabled={!data.vehicles.length}><option value="">Выберите машину</option>{data.vehicles.map((item) => <option key={item.id} value={item.id}>{item.displayName} · {item.plateNumber}</option>)}</select></label>
+                <label className="flow-field"><span>Водитель</span><select name="driver_id"><option value="">Назначить позже</option>{data.drivers.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}</select></label>
+                <label className="flow-field"><span>Откуда</span><input name="origin_city" placeholder="Город отправления" required /></label>
+                <label className="flow-field"><span>Куда</span><input name="destination_city" placeholder="Город назначения" required /></label>
+                <label className="flow-field"><span>Тип пробега</span><select name="load_state" defaultValue="LOADED"><option value="LOADED">С грузом</option><option value="EMPTY">Порожний</option><option value="UNKNOWN">Неизвестно</option></select></label>
+                <label className="flow-field"><span>Дата старта</span><input name="started_at" type="date" defaultValue={today} required /></label>
+              </div>
+              <div className="flow-card-action"><button type="submit" disabled={!data.vehicles.length}>Создать рейс</button></div>
+            </form> : null}
+            {canManageFinance ? <form action={createIncome} className="flow-card">
+              <div className="flow-card-heading"><span className="flow-step">3</span><span><b>Доход</b><small>Оплата от заказчика</small></span></div>
+              <input type="hidden" name="organization_id" value={data.organization.id} />
+              <input type="hidden" name="currency" value={data.organization.baseCurrency} />
+              <div className="flow-fields income-fields">
+                <label className="flow-field"><span>Рейс</span><select name="trip_id" required disabled={!data.trips.length}><option value="">Выберите рейс</option>{data.trips.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
+                <label className="flow-field"><span>Заказчик</span><input name="customer_name" placeholder="Название компании" /></label>
+                <label className="flow-field"><span>Сумма, {data.organization.baseCurrency}</span><input name="amount" inputMode="decimal" placeholder="0" required /></label>
+                <label className="flow-field"><span>Ожидаемая оплата</span><input name="expected_payment_at" type="date" /></label>
+                <label className="flow-field flow-field-wide"><span>Комментарий</span><input name="comment" placeholder="Необязательно" /></label>
+              </div>
+              <div className="flow-card-action"><button type="submit" disabled={!data.trips.length}>Добавить доход</button></div>
+            </form> : null}
+            {canManageTrips || canManageFinance ? <div className="flow-card flow-card-closing">
+              <div className="flow-card-heading"><span className="flow-step">4</span><span><b>Закрытие и P&amp;L</b><small>Завершите рейс и рассчитайте итог</small></span></div>
+              <div className="closing-actions">
+                {canManageTrips ? <form action={completeTrip} className="closing-action"><input type="hidden" name="organization_id" value={data.organization.id} /><label className="flow-field"><span>Завершить рейс</span><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "ACTIVE")}><option value="">Выберите активный рейс</option>{data.trips.filter((item) => item.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><button type="submit" disabled={!data.trips.some((item) => item.status === "ACTIVE")}>Закрыть</button></form> : null}
+                {canManageFinance ? <form action={recalculateTripPnl} className="closing-action"><input type="hidden" name="organization_id" value={data.organization.id} /><label className="flow-field"><span>Рассчитать результат</span><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "COMPLETED")}><option value="">Выберите закрытый рейс</option>{data.trips.filter((item) => item.status === "COMPLETED").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><button type="submit" disabled={!data.trips.some((item) => item.status === "COMPLETED")}>Рассчитать P&amp;L</button></form> : null}
+              </div>
+            </div> : null}
           </div>
         </section> : <section className="panel"><h2>Ваш доступ: {data.accessRoleName}</h2><p className="muted">Редактирование ограничено владельцем. Доступные данные остаются в режиме просмотра.</p></section>}
 

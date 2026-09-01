@@ -171,16 +171,29 @@ td { font-size: 14px; }
 .workbench-status { padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--muted); font-size: 13px; }
 .workbench-status span { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--orange); }
 .workbench-status span.ready { background: #2a986d; }
-.flow-card { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fff; display: grid; grid-template-columns: 165px repeat(3, minmax(120px, 1fr)) auto; gap: 10px; align-items: center; box-shadow: 0 8px 30px #22352b08; }
-.grid-form { grid-template-columns: 165px repeat(3, minmax(120px, 1fr)) auto; }
-.flow-card input, .flow-card select, .inline-flow input, .inline-flow select, .stack-form input, .stack-form select { min-width: 0; min-height: 42px; border: 1px solid #cdd6d1; border-radius: 9px; padding: 10px 12px; background: #fbfcfa; color: var(--ink); }
-.flow-card input:focus, .flow-card select:focus, .stack-form input:focus, .stack-form select:focus { border-color: #3a7454; box-shadow: 0 0 0 3px #dceddf; outline: 0; }
+.flow-card { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fff; display: grid; grid-template-columns: 190px minmax(0, 1fr) auto; gap: 20px; align-items: end; box-shadow: 0 8px 30px #22352b08; }
+.flow-card-heading { align-self: start; display: flex; align-items: flex-start; gap: 11px; min-width: 0; padding-top: 3px; }
+.flow-card-heading > span:last-child { display: grid; gap: 4px; min-width: 0; }
+.flow-card-heading b { font-size: 17px; line-height: 1.2; }
+.flow-card-heading small { color: var(--muted); font-size: 11px; line-height: 1.35; }
+.flow-step { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--green-soft); color: var(--green); font-size: 12px; font-weight: 850; }
+.flow-fields { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 12px; min-width: 0; }
+.flow-field { display: grid; align-content: end; gap: 6px; min-width: 0; color: #53615b; font-size: 11px; font-weight: 750; }
+.flow-field-wide { grid-column: span 2; }
+.flow-card input, .flow-card select, .closing-action input, .closing-action select, .stack-form input, .stack-form select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #cdd6d1; border-radius: 9px; padding: 10px 12px; background-color: #fbfcfa; color: var(--ink); }
+.flow-card select, .closing-action select { appearance: none; padding-right: 34px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20'%3E%3Cpath fill='%23586660' d='m5.5 7.5 4.5 4.5 4.5-4.5z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; }
+.flow-card input[type="date"] { color-scheme: light; }
+.flow-card input:focus, .flow-card select:focus, .closing-action input:focus, .closing-action select:focus, .stack-form input:focus, .stack-form select:focus { border-color: #3a7454; box-shadow: 0 0 0 3px #dceddf; outline: 0; }
+.flow-card-action { align-self: end; }
+.flow-card-action button { min-width: 164px; white-space: nowrap; }
 .flow-hint { color: var(--muted); font-size: 12px; line-height: 1.4; }
-.flow-card button, .inline-flow button, .primary-action, button:not(.sidebar-signout):not(.sidebar-mini-app):not(.tiny-button):not(.button-secondary) { min-height: 42px; border: 0; border-radius: 9px; padding: 10px 14px; background: var(--green); color: #fff; font-weight: 750; }
-.flow-card button:hover, .inline-flow button:hover, button:not(.sidebar-signout):not(.sidebar-mini-app):not(.tiny-button):not(.button-secondary):hover { background: #105b42; }
-.flow-card button:disabled, .inline-flow button:disabled, button:disabled { opacity: .5; cursor: not-allowed; }
-.action-card { grid-template-columns: 165px 1fr 1fr; }
-.inline-flow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.flow-card button, .closing-action button, .primary-action, button:not(.sidebar-signout):not(.sidebar-mini-app):not(.tiny-button):not(.button-secondary) { min-height: 44px; border: 0; border-radius: 9px; padding: 10px 14px; background: var(--green); color: #fff; font-weight: 750; }
+.flow-card button:hover, .closing-action button:hover, button:not(.sidebar-signout):not(.sidebar-mini-app):not(.tiny-button):not(.button-secondary):hover { background: #105b42; }
+.flow-card button:disabled, .closing-action button:disabled, button:disabled { opacity: .5; cursor: not-allowed; }
+.flow-card-closing { grid-template-columns: 190px minmax(0, 1fr); }
+.closing-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
+.closing-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 9px; min-width: 0; padding: 13px; border: 1px solid #e1e8e4; border-radius: 11px; background: #f8faf8; }
+.closing-action button { white-space: nowrap; }
 .button-secondary { min-height: 42px; padding: 10px 14px; border: 1px solid #cfd9d4; border-radius: 9px; background: #fff; color: #274235; font-weight: 700; }
 .button-secondary:hover { background: #eaf1ed; }
 
@@ -204,10 +217,12 @@ td { font-size: 14px; }
 .stack-form button { min-height: 44px; border: 0; border-radius: 9px; background: var(--green); color: #fff; font-weight: 750; }
 .auth-card a { color: var(--green); font-weight: 700; }
 
-@media (max-width: 1050px) {
-  .flow-card, .grid-form { grid-template-columns: 150px repeat(2, minmax(130px, 1fr)); }
-  .flow-card button { justify-self: start; }
-  .action-card { grid-template-columns: 150px 1fr; }
+@media (max-width: 1200px) {
+  .flow-card, .flow-card-closing { grid-template-columns: 170px minmax(0, 1fr); }
+  .flow-fields { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
+  .flow-card-action { grid-column: 2; }
+  .flow-card-action button { width: 100%; }
+  .closing-actions { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 900px) {
@@ -228,9 +243,11 @@ td { font-size: 14px; }
 @media (max-width: 760px) {
   .board-grid { grid-template-columns: 1fr; }
   .panel-wide { grid-column: auto; }
-  .flow-card, .grid-form, .action-card { grid-template-columns: 1fr; }
-  .inline-flow { grid-template-columns: 1fr; }
-  .flow-card button, .inline-flow button { width: 100%; }
+  .flow-card, .flow-card-closing { grid-template-columns: 1fr; gap: 16px; padding: 16px; }
+  .flow-fields { grid-template-columns: 1fr; }
+  .flow-field-wide, .flow-card-action { grid-column: auto; }
+  .flow-card-action button, .closing-action button { width: 100%; }
+  .closing-action { grid-template-columns: 1fr; }
   .entity-list li { align-items: flex-start; }
   .driver-list li { display: grid; }
   .driver-actions { align-items: flex-start; }
