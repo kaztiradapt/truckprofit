@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
 import { completeTrip, createDriver, createVehicle, enableOwnerDriverMode, recalculateTripPnl } from "@/app/actions/owner";
 import { getDashboardData } from "@/lib/dashboard-data";
+import { ActiveTripDetails } from "./active-trip-details";
 import { DriverList } from "./driver-list";
 import { DriverReports } from "./driver-reports";
 import { IncomeForm } from "./income-form";
@@ -151,7 +152,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
           <article><span>Порожний пробег</span><strong>{latestPnl ? formatKm(latestPnl.emptyKm) : emptyShare}</strong><small>{latestPnl ? `${emptyShare} от последнего рейса` : "Доля от общего"}</small></article>
         </section> : null}
 
-        {section === "overview" || section === "trips" ? <section className="trip-card">
+        {section === "overview" ? <section className="trip-card">
           {latestTrip ? <>
             <div className="trip-heading">
               <div><p className="eyebrow">Последний рейс</p><h2>{latestTrip.title}</h2><p>{latestTrip.vehicleName} · {latestTrip.driverName ?? "Водитель не назначен"} · {dateLabel(latestTrip.startedAt)}</p></div>
@@ -197,6 +198,15 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
           </> : <div className="empty-trip"><p className="eyebrow">Первый рейс</p><h2>Начните с машины и водителя</h2><p>Ниже расположен рабочий end-to-end контур из архива TruckProfit.</p></div>}
         </section> : null}
 
+        {section === "trips" ? <ActiveTripDetails
+          organizationId={data.organization.id}
+          trips={data.trips}
+          expenses={data.recentExpenses}
+          baseCurrency={data.organization.baseCurrency}
+          canManage={canManageTrips}
+          canViewFinance={canViewFinance}
+        /> : null}
+
         {["trips", "vehicles", "drivers", "expenses"].includes(section) ? <section className="board-grid compact-board section-board">
           {section === "trips" ? <article className="panel panel-wide">
             <div className="panel-title"><div><p className="eyebrow">Рейсы</p><h2>Активность и P&amp;L</h2></div><span>{data.trips.length} рейс(ов)</span></div>
@@ -230,9 +240,9 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             {data.role === "OWNER" && !ownerDriver ? <form action={enableOwnerDriverMode} className="self-driver-cta"><input type="hidden" name="organization_id" value={data.organization.id} /><span><b>Вы сами за рулём?</b><small>Это дополнительный вариант — создадим отдельный водительский режим для вашего профиля.</small></span><button type="submit" className="tiny-button">Я владелец-водитель</button></form> : null}
           </article> : null}
 
-          {section === "expenses" && canViewFinance ? <article className="panel panel-wide"><div className="panel-title"><div><p className="eyebrow">Финансовый учёт</p><h2>Последние расходы</h2></div><span>{data.recentExpenses.length}</span></div>
-            <p className="panel-note">Расход попадает в экономику рейса сразу после записи водителем.</p>
-            <ul className="entity-list expense-list">{data.recentExpenses.length ? data.recentExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {dateLabel(expense.occurredAt)}{expense.comment ? ` · ${expense.comment}` : ""}</small></span><strong>{formatMoney(expense.amount, expense.currency)}</strong></li>) : <li className="empty-state">Расходов пока нет.</li>}</ul>
+          {section === "expenses" && canViewFinance ? <article className="panel panel-wide"><div className="panel-title"><div><p className="eyebrow">Финансовый учёт</p><h2>Расходы</h2></div><span>{data.recentExpenses.length}</span></div>
+            <p className="panel-note">Расход попадает в карточку назначенного рейса и его экономику сразу после записи водителем. Отдельного подтверждения владельца не требуется.</p>
+            <ul className="entity-list expense-list">{data.recentExpenses.length ? data.recentExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {expense.driverName ?? "Водитель не указан"} · {dateLabel(expense.occurredAt)} · {expense.source === "TELEGRAM" ? "Telegram" : "Кабинет"}{expense.locationText ? ` · ${expense.locationText}` : ""}{expense.comment ? ` · ${expense.comment}` : ""}</small></span><strong>{formatMoney(expense.amount, expense.currency)}</strong></li>) : <li className="empty-state">Расходов пока нет.</li>}</ul>
           </article> : section === "expenses" ? <article className="panel panel-wide"><h2>Доступ ограничен</h2><p className="muted">Владелец не выдал этой роли доступ к финансовым данным.</p></article> : null}
         </section> : null}
 
@@ -259,14 +269,14 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {section === "help" ? <section className="help-section">
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>
           <div className="help-grid">
-            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль в разделе «Автомобили», а водителя — в разделе «Водители».</li><li>Откройте «Изменить» у водителя и закрепите за ним автомобиль. При выборе водителя в новом рейсе эта машина подставится сама.</li><li>В «Создании рейса» найдите адрес погрузки, затем адрес выгрузки и выберите один из автоматически рассчитанных вариантов маршрута.</li><li>Проверьте плановый километраж: он подставляется с карты, но его можно исправить вручную. Выбранная линия сохранится вместе с рейсом.</li><li>Сводку по рейсам и пробегу команды смотрите в разделе «Отчёты»; там можно отфильтровать данные по водителю и автомобилю.</li><li>Расходы водителей учитываются автоматически, а после закрытия рейса можно рассчитать P&amp;L.</li></ol></article>
+            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль в разделе «Автомобили», а водителя — в разделе «Водители».</li><li>Откройте «Изменить» у водителя и закрепите за ним автомобиль. При выборе водителя в новом рейсе эта машина подставится сама.</li><li>В «Создании рейса» найдите адрес погрузки, затем адрес выгрузки и выберите один из автоматически рассчитанных вариантов маршрута.</li><li>Проверьте плановый километраж: он подставляется с карты, но его можно исправить вручную. Выбранная линия сохранится вместе с рейсом.</li><li>В разделе «Рейсы» нажмите «Подробнее» у любой активной машины: внутри будут карта, геопозиции, километраж и расходы именно этого рейса.</li><li>Сводку по рейсам и пробегу команды смотрите в разделе «Отчёты»; там можно отфильтровать данные по водителю и автомобилю.</li><li>Расходы водителей учитываются автоматически, а после закрытия рейса можно рассчитать P&amp;L.</li></ol></article>
             <article className="panel"><h3>Водителю</h3><ol><li>Откройте персональную ссылку владельца и нажмите START.</li><li>После назначения нового рейса бот пришлёт уведомление с маршрутом, автомобилем, датой и кнопкой «Мой рейс».</li><li>В «Мой рейс» проверьте адреса погрузки и выгрузки.</li><li>Там же одной кнопкой отмечайте ожидание, погрузку, путь и выгрузку.</li><li>Геопозиция передаётся только после вашего нажатия и разрешения Telegram.</li><li>После расхода отправьте фото чека; оплату смотрите в «Моя зарплата».</li></ol></article>
             <article className="panel"><h3>Mini App</h3><ol><li>Откройте «Открыть кабинет» возле поля ввода в Telegram.</li><li>При первом запуске войдите тем же email владельца.</li><li>Каждый раздел открывается на отдельной странице из верхнего или бокового меню.</li><li>В обзоре карта показывает маршрут, текущую точку водителя и всю историю геопозиций.</li><li>Нажмите номер точки, чтобы найти её на карте; выберите тип «Ночёвка / отдых», «Погрузка», «Выгрузка» или добавьте комментарий.</li></ol></article>
           </div>
           <div className="faq-list">
             <details><summary>Почему бот не видит мой профиль?</summary><p>Telegram ещё не привязан или открыта чужая/просроченная ссылка. Создайте новую ссылку в карточке владельца или водителя и нажмите START именно в нужном аккаунте Telegram.</p></details>
             <details><summary>Можно ли владельцу самому быть водителем?</summary><p>Да. Нажмите «Я владелец-водитель» в разделе команды. Один Telegram получит два режима, между ними можно переключаться в меню бота.</p></details>
-            <details><summary>Как учитывается расход?</summary><p>Сразу после сохранения водителем. Дополнительное подтверждение владельца не требуется.</p></details>
+            <details><summary>Как учитывается расход?</summary><p>Сразу после сохранения водителем. Запись видна в раскрытой карточке активного рейса и в общем разделе «Расходы»: категория, водитель, дата, источник, комментарий, сумма и валюта. Суммы разных валют не смешиваются. Дополнительное подтверждение владельца не требуется.</p></details>
             <details><summary>Как работает основная валюта компании?</summary><p>При создании компании выберите валюту управленческого учёта: KZT, RUB, USD, CNY или UZS. Если доход записан в другой валюте, кабинет попросит курс именно к основной валюте компании. Например, для рублёвой компании: «1 USD = сколько RUB». Доход и P&amp;L будут пересчитаны в RUB.</p></details>
             <details><summary>Откуда берётся километраж рейса?</summary><p>После выбора погрузки и выгрузки кабинет строит автомобильный маршрут и подставляет его расстояние. Перед созданием рейса проверьте значение: при необходимости его можно заменить плановым километражем вручную.</p></details>
             <details><summary>Как закрепить автомобиль за водителем?</summary><p>Откройте раздел «Водители», нажмите «Изменить» напротив нужного человека и выберите активный автомобиль. При создании следующего рейса выбор этого водителя автоматически подставит закреплённую машину; при необходимости её можно заменить вручную.</p></details>
