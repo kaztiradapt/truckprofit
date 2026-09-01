@@ -42,6 +42,7 @@ export type DashboardData = {
     originLongitude: number | null;
     destinationLatitude: number | null;
     destinationLongitude: number | null;
+    distanceKm: number | null;
     loadState: string;
     lastLocation: {
       latitude: number;
@@ -293,6 +294,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       originLongitude: firstLeg?.origin_longitude === null || firstLeg?.origin_longitude === undefined ? null : Number(firstLeg.origin_longitude),
       destinationLatitude: firstLeg?.destination_latitude === null || firstLeg?.destination_latitude === undefined ? null : Number(firstLeg.destination_latitude),
       destinationLongitude: firstLeg?.destination_longitude === null || firstLeg?.destination_longitude === undefined ? null : Number(firstLeg.destination_longitude),
+      distanceKm: firstLeg?.distance_km === null || firstLeg?.distance_km === undefined ? null : Number(firstLeg.distance_km),
       loadState: firstLeg?.load_state ?? "UNKNOWN",
       lastLocation: lastLocation ? {
         latitude: lastLocation.latitude,

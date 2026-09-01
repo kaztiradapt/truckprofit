@@ -156,12 +156,14 @@ export async function createTrip(formData: FormData): Promise<void> {
     originLongitude: optionalCoordinate(-180, 180),
     destinationLatitude: optionalCoordinate(-90, 90),
     destinationLongitude: optionalCoordinate(-180, 180),
+    distanceKm: z.preprocess((value) => Number(String(value ?? "").replace(",", ".")), z.number().positive().finite().max(100_000)),
     loadState: z.enum(["LOADED", "EMPTY", "UNKNOWN"]),
     startedAt: z.string().date(),
   }).safeParse({
     organizationId: formData.get("organization_id"), vehicleId: formData.get("vehicle_id"), driverId: formData.get("driver_id"), title: formData.get("title"),
     originCity: formData.get("origin_city"), destinationCity: formData.get("destination_city"), originAddress: formData.get("origin_address"), destinationAddress: formData.get("destination_address"),
     originLatitude: formData.get("origin_latitude"), originLongitude: formData.get("origin_longitude"), destinationLatitude: formData.get("destination_latitude"), destinationLongitude: formData.get("destination_longitude"),
+    distanceKm: formData.get("distance_km"),
     loadState: formData.get("load_state"), startedAt: formData.get("started_at"),
   });
   if (!parsed.success) dashboardError("Проверьте данные рейса.");
@@ -186,6 +188,7 @@ export async function createTrip(formData: FormData): Promise<void> {
     p_origin_longitude: parsed.data.originLongitude,
     p_destination_latitude: parsed.data.destinationLatitude,
     p_destination_longitude: parsed.data.destinationLongitude,
+    p_distance_km: parsed.data.distanceKm,
     p_load_state: parsed.data.loadState,
     p_started_at: `${parsed.data.startedAt}T00:00:00.000Z`,
   });

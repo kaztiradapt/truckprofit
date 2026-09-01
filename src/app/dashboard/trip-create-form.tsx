@@ -45,6 +45,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
   const [searchError, setSearchError] = useState("");
   const [routeAlternatives, setRouteAlternatives] = useState<RoutingAlternative[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState("");
+  const [distanceKm, setDistanceKm] = useState("");
   const [routing, setRouting] = useState(false);
   const [routingError, setRoutingError] = useState("");
 
@@ -56,8 +57,9 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
     setSearchError("");
   }, []);
 
-  const selectRoute = useCallback((routeId: string) => {
+  const selectRoute = useCallback((routeId: string, routeDistanceKm?: number) => {
     setSelectedRouteId(routeId);
+    if (routeDistanceKm !== undefined) setDistanceKm(String(routeDistanceKm));
     for (const [id, layer] of routeLayers.current) {
       const selected = id === routeId;
       layer.setStyle({ color: selected ? "#166b4f" : "#87948e", weight: selected ? 6 : 4, opacity: selected ? .92 : .58 });
@@ -147,13 +149,14 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
         if (controller.signal.aborted || !routes.length) return;
         setRouteAlternatives(routes);
         setSelectedRouteId(routes[0].id);
+        setDistanceKm(String(routes[0].distanceKm));
         for (const [index, route] of routes.entries()) {
           const selected = index === 0;
           const layer = routeLeaflet.polyline(
             route.coordinates.map(([longitude, latitude]) => [latitude, longitude]),
             { color: selected ? "#166b4f" : "#87948e", weight: selected ? 6 : 4, opacity: selected ? .92 : .58 },
           ).addTo(routeMap);
-          layer.on("click", () => selectRoute(route.id));
+          layer.on("click", () => selectRoute(route.id, route.distanceKm));
           activeRouteLayers.set(route.id, layer);
         }
         activeRouteLayers.get(routes[0].id)?.bringToFront();
@@ -235,6 +238,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
         <label className="flow-field flow-field-wide"><span>Адрес погрузки</span><input name="origin_address" value={originAddress} onChange={(event) => { setOriginAddress(event.target.value); originAddressRef.current = event.target.value; }} placeholder="Улица, дом, склад или ориентир" required /></label>
         <label className="flow-field flow-field-wide"><span>Адрес выгрузки</span><input name="destination_address" value={destinationAddress} onChange={(event) => { setDestinationAddress(event.target.value); destinationAddressRef.current = event.target.value; }} placeholder="Улица, дом, склад или ориентир" required /></label>
         <label className="flow-field"><span>Тип пробега</span><select name="load_state" defaultValue="LOADED"><option value="LOADED">С грузом</option><option value="EMPTY">Порожний</option><option value="UNKNOWN">Неизвестно</option></select></label>
+        <label className="flow-field"><span>Плановый километраж</span><input name="distance_km" type="number" inputMode="decimal" min="0.1" max="100000" step="0.1" value={distanceKm} onChange={(event) => setDistanceKm(event.target.value)} placeholder="Подставится по маршруту" required /></label>
         <label className="flow-field"><span>Дата старта</span><input name="started_at" type="date" defaultValue={today} required /></label>
         <div className="route-map-field flow-field-wide">
           <span>Точные точки на карте <small>необязательно</small></span>
@@ -259,7 +263,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
           {routingError ? <span className="route-search-error" role="status">{routingError}</span> : null}
           {routeAlternatives.length ? <div className="route-alternatives" aria-label="Варианты маршрута">
             <div><b>Варианты маршрута</b><small>Нажмите вариант или линию на карте</small></div>
-            <div className="route-alternative-list">{routeAlternatives.map((route, index) => <button type="button" className={selectedRouteId === route.id ? "active" : ""} onClick={() => selectRoute(route.id)} key={route.id}>
+            <div className="route-alternative-list">{routeAlternatives.map((route, index) => <button type="button" className={selectedRouteId === route.id ? "active" : ""} onClick={() => selectRoute(route.id, route.distanceKm)} key={route.id}>
               <span>Вариант {index + 1}</span><strong>{route.distanceKm.toLocaleString("ru-RU")} км</strong><small>≈ {Math.floor(route.durationMinutes / 60)} ч {route.durationMinutes % 60} мин</small>
             </button>)}</div>
             <small>Маршруты и расчёт времени: OSRM / OpenStreetMap. Фактическое время зависит от границ, пробок и ограничений для грузовиков.</small>

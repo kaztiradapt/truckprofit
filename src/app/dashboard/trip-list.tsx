@@ -8,7 +8,7 @@ type Driver = { id: string; displayName: string };
 type Trip = {
   id: string; title: string; status: string; vehicleId: string; driverId: string | null; vehicleName: string; driverName: string | null; startedAt: string | null;
   originCity: string; destinationCity: string; originAddress: string; destinationAddress: string; originLatitude: number | null; originLongitude: number | null;
-  destinationLatitude: number | null; destinationLongitude: number | null; loadState: string;
+  destinationLatitude: number | null; destinationLongitude: number | null; distanceKm: number | null; loadState: string;
   pnl: { managementProfitMinor: number; totalKm: number } | null;
 };
 
@@ -48,6 +48,7 @@ export function TripList({ organizationId, baseCurrency, trips, vehicles, driver
       originLongitude: form.get("origin_longitude") ? Number(form.get("origin_longitude")) : null,
       destinationLatitude: form.get("destination_latitude") ? Number(form.get("destination_latitude")) : null,
       destinationLongitude: form.get("destination_longitude") ? Number(form.get("destination_longitude")) : null,
+      distanceKm: Number(String(form.get("distance_km") ?? "").replace(",", ".")),
       loadState: form.get("load_state"), startedAt: form.get("started_at"),
     }, "Рейс обновлён.");
   }
@@ -72,6 +73,7 @@ export function TripList({ organizationId, baseCurrency, trips, vehicles, driver
           <input type="hidden" name="origin_latitude" value={trip.originLatitude ?? ""} /><input type="hidden" name="origin_longitude" value={trip.originLongitude ?? ""} />
           <input type="hidden" name="destination_latitude" value={trip.destinationLatitude ?? ""} /><input type="hidden" name="destination_longitude" value={trip.destinationLongitude ?? ""} />
           <label>Тип пробега<select name="load_state" defaultValue={trip.loadState}><option value="LOADED">С грузом</option><option value="EMPTY">Порожний</option><option value="UNKNOWN">Неизвестно</option></select></label>
+          <label>Плановый километраж<input name="distance_km" type="number" min="0.1" max="100000" step="0.1" defaultValue={trip.distanceKm ?? ""} required /></label>
           <label>Дата старта<input name="started_at" type="date" defaultValue={trip.startedAt?.slice(0, 10) ?? ""} required /></label>
           <div className="record-edit-actions record-field-wide"><button type="submit" className="tiny-button" disabled={busy === `PATCH-${trip.id}`}>{busy === `PATCH-${trip.id}` ? "Сохраняю…" : "Сохранить"}</button><button type="button" className="tiny-button" onClick={() => setEditingId("")}>Отмена</button></div>
         </form></td></tr> : null}</Fragment>)}

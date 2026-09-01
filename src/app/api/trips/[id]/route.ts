@@ -15,6 +15,7 @@ const updateSchema = z.object({
   originLongitude: z.number().finite().min(-180).max(180).nullable(),
   destinationLatitude: z.number().finite().min(-90).max(90).nullable(),
   destinationLongitude: z.number().finite().min(-180).max(180).nullable(),
+  distanceKm: z.number().positive().finite().max(100_000),
   loadState: z.enum(["LOADED", "EMPTY", "UNKNOWN"]),
   startedAt: z.string().date(),
 });
@@ -51,6 +52,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     p_origin_longitude: parsed.data.originLongitude,
     p_destination_latitude: parsed.data.destinationLatitude,
     p_destination_longitude: parsed.data.destinationLongitude,
+    p_distance_km: parsed.data.distanceKm,
     p_load_state: parsed.data.loadState,
     p_started_at: `${parsed.data.startedAt}T00:00:00.000Z`,
   });
