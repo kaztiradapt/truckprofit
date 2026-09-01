@@ -18,7 +18,7 @@ export function IncomeForm({ organizationId, baseCurrency, trips }: IncomeFormPr
 
   return (
     <form action={createIncome} className="flow-card">
-      <div className="flow-card-heading"><span className="flow-step">3</span><span><b>Доход</b><small>Оплата от заказчика</small></span></div>
+      <div className="flow-card-heading"><span className="flow-step">2</span><span><b>Доход</b><small>Оплата от заказчика</small></span></div>
       <input type="hidden" name="organization_id" value={organizationId} />
       <div className="flow-fields income-fields">
         <label className="flow-field"><span>Рейс</span><select name="trip_id" required disabled={!trips.length}><option value="">Выберите рейс</option>{trips.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>

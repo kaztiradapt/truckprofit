@@ -68,7 +68,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
   const canManageFinance = data.permissions.includes("MANAGE_FINANCE");
   const canViewFinance = data.permissions.includes("VIEW_FINANCE");
   const canDelete = data.permissions.includes("DELETE_RECORDS");
-  const canOperate = canManageVehicles || canManageDrivers || canManageTrips || canManageFinance;
+  const canOperate = canManageTrips || canManageFinance;
   const ownerDriver = data.drivers.find((driver) => driver.isOwnerDriver) ?? null;
   const today = new Date().toISOString().slice(0, 10);
   const latestTrip = data.trips[0] ?? null;
@@ -181,9 +181,24 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             </tbody></table></div> : <p className="empty-state">Пока нет рейсов.</p>}
           </article> : null}
 
-          {section === "vehicles" ? <article className="panel panel-wide"><p className="eyebrow">Парк</p><h2>{data.vehicles.length} машин(ы)</h2>
-            <ul className="entity-list">{data.vehicles.length ? data.vehicles.map((vehicle) => <li key={vehicle.id}><span>{vehicle.displayName}<small>{vehicle.plateNumber}</small></span><span className="badge">{vehicle.status}</span></li>) : <li className="empty-state">Нет добавленных машин.</li>}</ul>
-          </article> : null}
+          {section === "vehicles" ? <>
+            {canManageVehicles ? <article className="panel vehicle-create-panel">
+              <p className="eyebrow">Новая машина</p><h2>Добавить автомобиль</h2>
+              <form action={createVehicle} className="stack-form vehicle-create-form">
+                <input type="hidden" name="organization_id" value={data.organization.id} />
+                <div className="vehicle-create-grid">
+                  <label><span>Название</span><input name="display_name" placeholder="Например: DAF 001" required /></label>
+                  <label><span>Госномер</span><input name="plate_number" placeholder="Например: KZ 001 DEM" required /></label>
+                  <label><span>Марка и модель</span><input name="make_model" placeholder="Например: DAF XF" /></label>
+                  <label><span>Норма топлива</span><input name="fuel_norm" inputMode="decimal" placeholder="30.5 л/100 км" /></label>
+                </div>
+                <button type="submit">Добавить автомобиль</button>
+              </form>
+            </article> : null}
+            <article className={`panel ${canManageVehicles ? "" : "panel-wide"}`}><div className="panel-title"><div><p className="eyebrow">Парк</p><h2>Автомобили</h2></div><span>{data.vehicles.length} в списке</span></div>
+              <ul className="entity-list">{data.vehicles.length ? data.vehicles.map((vehicle) => <li key={vehicle.id}><span>{vehicle.displayName}<small>{vehicle.plateNumber}{vehicle.makeModel ? ` · ${vehicle.makeModel}` : ""}</small></span><span className="badge">{vehicle.status}</span></li>) : <li className="empty-state">Нет добавленных машин.</li>}</ul>
+            </article>
+          </> : null}
 
           {section === "drivers" ? <article className="panel panel-wide">
             <div className="panel-title"><div><p className="eyebrow">Команда</p><h2>Водители</h2></div><span>{data.drivers.length} в списке</span></div>
@@ -205,21 +220,10 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
           <div className="start-intro"><p className="eyebrow">End-to-end контур</p><h2>Провести настоящий рейс</h2><p>Организация уже подключена. Пройдите шаги по порядку — данные сохраняются в защищённом контуре компании.</p></div>
           <div className="workbench">
             <div className="workbench-status"><span className="ready" />Supabase, Telegram и расчётный слой подключены</div>
-            {canManageVehicles ? <form action={createVehicle} className="flow-card">
-              <div className="flow-card-heading"><span className="flow-step">1</span><span><b>Автомобиль</b><small>Добавьте машину в парк</small></span></div>
-              <input type="hidden" name="organization_id" value={data.organization.id} />
-              <div className="flow-fields vehicle-fields">
-                <label className="flow-field"><span>Название</span><input name="display_name" placeholder="Например: DAF 001" required /></label>
-                <label className="flow-field"><span>Госномер</span><input name="plate_number" placeholder="Например: KZ 001 DEM" required /></label>
-                <label className="flow-field"><span>Марка и модель</span><input name="make_model" placeholder="Например: DAF XF" /></label>
-                <label className="flow-field"><span>Норма топлива</span><input name="fuel_norm" inputMode="decimal" placeholder="30.5 л/100 км" /></label>
-              </div>
-              <div className="flow-card-action"><button type="submit">Сохранить</button></div>
-            </form> : null}
             {canManageTrips ? <TripCreateForm organizationId={data.organization.id} vehicles={data.vehicles} drivers={data.drivers} today={today} /> : null}
             {canManageFinance ? <IncomeForm organizationId={data.organization.id} baseCurrency={data.organization.baseCurrency} trips={data.trips.map(({ id, title }) => ({ id, title }))} /> : null}
             {canManageTrips || canManageFinance ? <div className="flow-card flow-card-closing">
-              <div className="flow-card-heading"><span className="flow-step">4</span><span><b>Закрытие и P&amp;L</b><small>Завершите рейс и рассчитайте итог</small></span></div>
+              <div className="flow-card-heading"><span className="flow-step">3</span><span><b>Закрытие и P&amp;L</b><small>Завершите рейс и рассчитайте итог</small></span></div>
               <div className="closing-actions">
                 {canManageTrips ? <form action={completeTrip} className="closing-action"><input type="hidden" name="organization_id" value={data.organization.id} /><label className="flow-field"><span>Завершить рейс</span><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "ACTIVE")}><option value="">Выберите активный рейс</option>{data.trips.filter((item) => item.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><button type="submit" disabled={!data.trips.some((item) => item.status === "ACTIVE")}>Закрыть</button></form> : null}
                 {canManageFinance ? <form action={recalculateTripPnl} className="closing-action"><input type="hidden" name="organization_id" value={data.organization.id} /><label className="flow-field"><span>Рассчитать результат</span><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "COMPLETED")}><option value="">Выберите закрытый рейс</option>{data.trips.filter((item) => item.status === "COMPLETED").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><button type="submit" disabled={!data.trips.some((item) => item.status === "COMPLETED")}>Рассчитать P&amp;L</button></form> : null}
@@ -242,7 +246,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {section === "help" ? <section className="help-section">
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>
           <div className="help-grid">
-            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль и водителя.</li><li>Создайте рейс, укажите маршрут и доход.</li><li>Подключите свой Telegram кнопкой выше.</li><li>Расходы водителей учитываются автоматически.</li><li>После закрытия рассчитайте P&amp;L.</li></ol></article>
+            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль в разделе «Автомобили», а водителя — в разделе «Водители».</li><li>Создайте рейс, укажите маршрут и доход.</li><li>Подключите свой Telegram кнопкой выше.</li><li>Расходы водителей учитываются автоматически.</li><li>После закрытия рассчитайте P&amp;L.</li></ol></article>
             <article className="panel"><h3>Водителю</h3><ol><li>Откройте персональную ссылку владельца и нажмите START.</li><li>В «Мой рейс» проверьте адреса погрузки и выгрузки.</li><li>Там же одной кнопкой отмечайте ожидание, погрузку, путь и выгрузку.</li><li>Геопозиция передаётся только после вашего нажатия и разрешения Telegram.</li><li>После расхода отправьте фото чека; оплату смотрите в «Моя зарплата».</li></ol></article>
             <article className="panel"><h3>Mini App</h3><ol><li>Откройте «Открыть кабинет» возле поля ввода в Telegram.</li><li>При первом запуске войдите тем же email владельца.</li><li>Каждый раздел открывается на отдельной странице из верхнего или бокового меню.</li><li>Все данные синхронизируются с ботом автоматически.</li><li>Для сложных операций используйте кабинет, для быстрых — меню бота.</li></ol></article>
           </div>

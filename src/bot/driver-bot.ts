@@ -354,7 +354,18 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
   }
 
   async function findTrip(context: DriverBotContext, driver: DriverIdentity): Promise<ActiveTrip | null> {
-    const trip = await repository.findActiveTrip(driver);
+    let trip: ActiveTrip | null;
+    try {
+      trip = await repository.findActiveTrip(driver);
+    } catch (error) {
+      console.error("telegram_active_trip_lookup_failed", error);
+      await replaceMenu(
+        context,
+        "Не удалось загрузить рейс. Попробуйте ещё раз через несколько секунд или сообщите диспетчеру.",
+        driverMenu(context.session.ownerAvailable),
+      );
+      return null;
+    }
     if (!trip) await replaceMenu(context, "Сейчас нет активного рейса. Если это ошибка — сообщите диспетчеру.", driverMenu(context.session.ownerAvailable));
     return trip;
   }
@@ -537,7 +548,13 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
 
   bot.on("callback_query:data", async (context) => {
     const data = context.callbackQuery.data;
-    await context.answerCallbackQuery();
+    try {
+      await context.answerCallbackQuery();
+    } catch {
+      // Telegram retries failed webhooks. A callback may already be too old by the
+      // time that retry arrives, so mark it processed without repeating its action.
+      return;
+    }
     if (data === "flow:cancel") {
       resetFlow(context);
       await showCurrentMenu(context, "Ввод отменён.");

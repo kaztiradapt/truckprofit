@@ -114,6 +114,9 @@ td { font-size: 14px; }
 .team-driver-form input { min-width: 0; min-height: 38px; border: 1px solid #bfcfc7; border-radius: 8px; padding: 8px 10px; background: #fff; }
 .team-driver-form button { min-height: 38px !important; padding: 8px 11px !important; white-space: nowrap; }
 .team-driver-form small { color: var(--muted); font-size: 10px; }
+.vehicle-create-form { margin-top: 16px; }
+.vehicle-create-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.vehicle-create-form button { width: 100%; }
 .team-list-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid #e6ebe8; }
 .team-list-heading b { font-size: 13px; }
 .team-list-heading span { color: var(--muted); font-size: 10px; text-align: right; }
@@ -210,6 +213,15 @@ td { font-size: 14px; }
 .route-map-controls { display: flex; flex-wrap: wrap; gap: 7px; }
 .flow-card .route-map-controls button { min-height: 36px; padding: 7px 10px; border: 1px solid #bdcbc4; background: #fff; color: var(--green); font-size: 11px; }
 .flow-card .route-map-controls button:hover, .flow-card .route-map-controls button.active { border-color: var(--green); background: var(--green-soft); color: #174f3d; }
+.route-search { display: grid; gap: 7px; padding: 11px; border: 1px solid #dbe4df; border-radius: 10px; background: #f8faf8; }
+.route-search > label { color: #315d4b; font-size: 11px; font-weight: 800; }
+.route-search-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+.flow-card .route-search-input button { min-width: 92px; }
+.route-search-error { color: #9b251b; font-size: 11px; font-weight: 650; }
+.route-search-results { display: grid; gap: 5px; }
+.flow-card .route-search-results button { width: 100%; min-height: 0; padding: 9px 10px; border: 1px solid #d5dfda; background: #fff; color: var(--ink); display: grid; gap: 3px; text-align: left; font-size: 11px; font-weight: 650; }
+.flow-card .route-search-results button:hover { border-color: #74a28f; background: var(--green-soft); color: var(--ink); }
+.route-search-results small { color: var(--muted); font-size: 9px; font-weight: 500; }
 .route-map { z-index: 0; width: 100%; height: 320px; overflow: hidden; border: 1px solid #cdd6d1; border-radius: 11px; background: #e8eeea; }
 .route-map .leaflet-control-attribution { font-size: 9px; }
 .flow-card input, .flow-card select, .closing-action input, .closing-action select, .stack-form input, .stack-form select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #cdd6d1; border-radius: 9px; padding: 10px 12px; background-color: #fbfcfa; color: var(--ink); }
@@ -329,6 +341,7 @@ td { font-size: 14px; }
   .driver-invite-result code { max-width: 100%; text-align: left; }
   .team-driver-form > div { grid-template-columns: 1fr; }
   .team-driver-form button { width: 100%; }
+  .vehicle-create-grid { grid-template-columns: 1fr; }
   .self-driver-cta { align-items: stretch; flex-direction: column; }
   .self-driver-cta .tiny-button { width: 100%; }
   .owner-telegram-card { align-items: stretch; flex-direction: column; }
@@ -350,6 +363,8 @@ td { font-size: 14px; }
   .route-map { height: 230px; }
   .route-map-controls { display: grid; grid-template-columns: 1fr 1fr; }
   .flow-card .route-map-controls button { width: 100%; min-width: 0; white-space: normal; }
+  .route-search-input { grid-template-columns: 1fr; }
+  .flow-card .route-search-input button { width: 100%; }
 }
 
 @media (max-width: 560px) {
