@@ -8,6 +8,8 @@ type TelegramWebApp = {
   openTelegramLink(url: string): void;
   setHeaderColor(color: string): void;
   setBackgroundColor(color: string): void;
+  setBottomBarColor?(color: string): void;
+  disableVerticalSwipes?(): void;
 };
 
 declare global {
@@ -25,6 +27,8 @@ export function TelegramWebAppBridge() {
     webApp.expand();
     webApp.setHeaderColor("#14231e");
     webApp.setBackgroundColor("#f6f7f4");
+    webApp.setBottomBarColor?.("#f6f7f4");
+    webApp.disableVerticalSwipes?.();
   }
 
   return (
