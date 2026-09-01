@@ -4,6 +4,7 @@ import type { CircleMarker, Map as LeafletMap, Marker, Polyline } from "leaflet"
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { closestRouteToPlannedDistance } from "@/domain/route-alternative";
 import { routeGeocodingQueries } from "@/domain/route-endpoint";
 
 type EventType = "CHECKPOINT" | "REST" | "LOADING" | "UNLOADING" | "OTHER";
@@ -17,7 +18,7 @@ type LocationPoint = {
   note: string | null;
 };
 type Endpoint = { latitude: number | null; longitude: number | null; label: string; city: string };
-type RoutingAlternative = { coordinates: Array<[number, number]> };
+type RoutingAlternative = { distanceKm: number; coordinates: Array<[number, number]> };
 type ResolvedEndpoint = { latitude: number; longitude: number };
 type RouteRecord = {
   title: string;
@@ -142,6 +143,7 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
   const numberedPoints = useMemo(() => points.map((point, index) => ({ ...point, number: points.length - index })), [points]);
   const { latitude: originLatitude, longitude: originLongitude, label: originLabel, city: originCity } = origin;
   const { latitude: destinationLatitude, longitude: destinationLongitude, label: destinationLabel, city: destinationCity } = destination;
+  const plannedDistanceKm = routeRecord.distanceKm;
 
   useEffect(() => {
     let cancelled = false;
@@ -261,9 +263,9 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
           const response = await fetch(`/api/routing?${query}`, { signal: controller.signal });
           const payload = await response.json() as { routes?: RoutingAlternative[]; error?: string };
           if (!response.ok) throw new Error(payload.error ?? "Маршрут временно недоступен.");
-          const primary = payload.routes?.[0];
-          if (!primary || cancelled || !mountedMap) return;
-          routeLayer = leaflet.polyline(primary.coordinates.map(([longitude, latitude]) => [latitude, longitude]), {
+          const selectedRoute = closestRouteToPlannedDistance(payload.routes ?? [], plannedDistanceKm);
+          if (!selectedRoute || cancelled || !mountedMap) return;
+          routeLayer = leaflet.polyline(selectedRoute.coordinates.map(([longitude, latitude]) => [latitude, longitude]), {
             color: "#166b4f", weight: 5, opacity: .82,
           }).addTo(mountedMap);
           routeLayer.bringToBack();
@@ -287,7 +289,7 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
       map.current = null;
       mountedPointMarkers.clear();
     };
-  }, [destinationCity, destinationLabel, destinationLatitude, destinationLongitude, mapRevision, numberedPoints, originCity, originLabel, originLatitude, originLongitude, points.length]);
+  }, [destinationCity, destinationLabel, destinationLatitude, destinationLongitude, mapRevision, numberedPoints, originCity, originLabel, originLatitude, originLongitude, plannedDistanceKm, points.length]);
 
   function chooseRoutePoint(point: "origin" | "destination") {
     activeRoutePointRef.current = point;
@@ -323,8 +325,9 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
         destination: `${draftDestination.latitude},${draftDestination.longitude}`,
       });
       const routeResponse = await fetch(`/api/routing?${routeQuery}`);
-      const routePayload = await routeResponse.json() as { routes?: Array<RoutingAlternative & { distanceKm: number }>; error?: string };
-      if (!routeResponse.ok || !routePayload.routes?.[0]) throw new Error(routePayload.error ?? "Не удалось построить маршрут по выбранным точкам.");
+      const routePayload = await routeResponse.json() as { routes?: RoutingAlternative[]; error?: string };
+      const selectedRoute = closestRouteToPlannedDistance(routePayload.routes ?? [], plannedDistanceKm);
+      if (!routeResponse.ok || !selectedRoute) throw new Error(routePayload.error ?? "Не удалось построить маршрут по выбранным точкам.");
 
       const response = await fetch(`/api/trips/${tripId}`, {
         method: "PATCH",
@@ -342,7 +345,7 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
           originLongitude: draftOrigin.longitude,
           destinationLatitude: draftDestination.latitude,
           destinationLongitude: draftDestination.longitude,
-          distanceKm: routePayload.routes[0].distanceKm,
+          distanceKm: selectedRoute.distanceKm,
           loadState: routeRecord.loadState,
           startedAt: routeRecord.startedAt?.slice(0, 10),
         }),
