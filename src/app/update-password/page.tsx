@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 export default async function UpdatePasswordPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const supabase = await createClient();
   const { data, error: claimsError } = await supabase.auth.getClaims();
-  if (claimsError || !data?.claims?.sub) redirect("/forgot-password?error=Ссылка%20недействительна%20или%20истекла.%20Запросите%20новую.");
+  if (claimsError || !data?.claims?.sub) {
+    redirect(`/forgot-password?error=${encodeURIComponent("Ссылка недействительна или истекла. Запросите новую.")}`);
+  }
 
   const { error } = await searchParams;
   return (
