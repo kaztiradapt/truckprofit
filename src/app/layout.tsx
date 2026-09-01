@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "leaflet/dist/leaflet.css";
 import "./styles.css";
 import { TelegramWebAppBridge } from "./telegram-web-app-bridge";
 

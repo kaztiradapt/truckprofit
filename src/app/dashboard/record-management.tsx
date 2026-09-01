@@ -16,6 +16,12 @@ type Trip = {
   startedAt: string | null;
   originCity: string;
   destinationCity: string;
+  originAddress: string;
+  destinationAddress: string;
+  originLatitude: number | null;
+  originLongitude: number | null;
+  destinationLatitude: number | null;
+  destinationLongitude: number | null;
   loadState: string;
 };
 
@@ -93,6 +99,12 @@ export function RecordManagement(props: Props) {
       driverId: form.get("driver_id") || null,
       originCity: form.get("origin_city"),
       destinationCity: form.get("destination_city"),
+      originAddress: form.get("origin_address"),
+      destinationAddress: form.get("destination_address"),
+      originLatitude: form.get("origin_latitude") ? Number(form.get("origin_latitude")) : null,
+      originLongitude: form.get("origin_longitude") ? Number(form.get("origin_longitude")) : null,
+      destinationLatitude: form.get("destination_latitude") ? Number(form.get("destination_latitude")) : null,
+      destinationLongitude: form.get("destination_longitude") ? Number(form.get("destination_longitude")) : null,
       loadState: form.get("load_state"),
       startedAt: form.get("started_at"),
     }, `trip-${tripId}`, "Рейс обновлён.");
@@ -143,10 +155,16 @@ export function RecordManagement(props: Props) {
             <label>Водитель<select name="driver_id" defaultValue={trip.driverId ?? ""}><option value="">Назначить позже</option>{props.drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.displayName}</option>)}</select></label>
             <label>Откуда<input name="origin_city" defaultValue={trip.originCity} required /></label>
             <label>Куда<input name="destination_city" defaultValue={trip.destinationCity} required /></label>
+            <label className="record-field-wide">Адрес погрузки<input name="origin_address" defaultValue={trip.originAddress} required /></label>
+            <label className="record-field-wide">Адрес выгрузки<input name="destination_address" defaultValue={trip.destinationAddress} required /></label>
+            <input type="hidden" name="origin_latitude" value={trip.originLatitude ?? ""} />
+            <input type="hidden" name="origin_longitude" value={trip.originLongitude ?? ""} />
+            <input type="hidden" name="destination_latitude" value={trip.destinationLatitude ?? ""} />
+            <input type="hidden" name="destination_longitude" value={trip.destinationLongitude ?? ""} />
             <label>Тип пробега<select name="load_state" defaultValue={trip.loadState}><option value="LOADED">С грузом</option><option value="EMPTY">Порожний</option><option value="UNKNOWN">Неизвестно</option></select></label>
             <label>Дата старта<input name="started_at" type="date" defaultValue={trip.startedAt?.slice(0, 10) ?? ""} required /></label>
             <div className="record-edit-actions record-field-wide"><button type="submit" className="tiny-button" disabled={busy === `trip-${trip.id}`}>Сохранить</button><button type="button" className="tiny-button" onClick={() => setEditing("")}>Отмена</button></div>
-          </form> : <><span><b>{trip.title}</b><small>{trip.originCity} → {trip.destinationCity} · {trip.vehicleName} · {trip.driverName ?? "без водителя"}</small></span><span className="record-actions"><span className="badge">{tripStatusLabels[trip.status] ?? trip.status}</span><span><button type="button" className="tiny-button" onClick={() => setEditing(`trip-${trip.id}`)}>Изменить</button>{props.canDelete ? <button type="button" className="tiny-button danger-button" disabled={busy === `delete-trips-${trip.id}`} onClick={() => remove("trips", trip.id, trip.title)}>Удалить</button> : null}</span></span></>}
+          </form> : <><span><b>{trip.title}</b><small>{trip.originCity} → {trip.destinationCity} · {trip.vehicleName} · {trip.driverName ?? "без водителя"}</small><small>Погрузка: {trip.originAddress}<br />Выгрузка: {trip.destinationAddress}</small></span><span className="record-actions"><span className="badge">{tripStatusLabels[trip.status] ?? trip.status}</span><span><button type="button" className="tiny-button" onClick={() => setEditing(`trip-${trip.id}`)}>Изменить</button>{props.canDelete ? <button type="button" className="tiny-button danger-button" disabled={busy === `delete-trips-${trip.id}`} onClick={() => remove("trips", trip.id, trip.title)}>Удалить</button> : null}</span></span></>}
         </li>)}</ul>
       </RecordCard> : null}
     </div>

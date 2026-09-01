@@ -12,6 +12,10 @@ import { calculateAndPublishTripPnl } from "@/server/trip-pnl-service";
 const uuid = z.uuid();
 const money = z.coerce.number().positive().finite().max(999_999_999);
 const text = (min: number, max = 160) => z.string().trim().min(min).max(max);
+const optionalCoordinate = (minimum: number, maximum: number) => z.preprocess(
+  (value) => value === null || value === undefined || String(value).trim() === "" ? null : Number(String(value).replace(",", ".")),
+  z.number().finite().min(minimum).max(maximum).nullable(),
+);
 const organizationInput = z.object({
   name: text(2),
   slug: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,62}$/),
@@ -79,7 +83,7 @@ export async function createOrganization(formData: FormData): Promise<void> {
     input_create_owner_driver: parsed.data.ownerDriver,
   });
   if (error) redirect("/onboarding?error=Не%20удалось%20создать%20организацию.%20Возможно%2C%20код%20уже%20занят.");
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
   redirect("/dashboard");
 }
 
@@ -93,7 +97,7 @@ export async function enableOwnerDriverMode(formData: FormData): Promise<void> {
   });
   if (error) dashboardError("Не удалось создать ваш профиль водителя.");
 
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
   redirect(`/dashboard?message=${encodeURIComponent("Режим «владелец-водитель» включён. Теперь добавьте автомобиль.")}`);
 }
 
@@ -120,7 +124,7 @@ export async function createVehicle(formData: FormData): Promise<void> {
     fuel_norm_l_per_100km: fuelNorm,
   });
   if (error) dashboardError("Не удалось сохранить машину. Проверьте, не повторяется ли госномер.");
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 export async function createDriver(formData: FormData): Promise<void> {
@@ -135,7 +139,7 @@ export async function createDriver(formData: FormData): Promise<void> {
     status: "ACTIVE",
   });
   if (error) dashboardError("Не удалось сохранить водителя.");
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 export async function createTrip(formData: FormData): Promise<void> {
@@ -146,13 +150,25 @@ export async function createTrip(formData: FormData): Promise<void> {
     title: text(3),
     originCity: text(2),
     destinationCity: text(2),
+    originAddress: text(2, 300),
+    destinationAddress: text(2, 300),
+    originLatitude: optionalCoordinate(-90, 90),
+    originLongitude: optionalCoordinate(-180, 180),
+    destinationLatitude: optionalCoordinate(-90, 90),
+    destinationLongitude: optionalCoordinate(-180, 180),
     loadState: z.enum(["LOADED", "EMPTY", "UNKNOWN"]),
     startedAt: z.string().date(),
   }).safeParse({
     organizationId: formData.get("organization_id"), vehicleId: formData.get("vehicle_id"), driverId: formData.get("driver_id"), title: formData.get("title"),
-    originCity: formData.get("origin_city"), destinationCity: formData.get("destination_city"), loadState: formData.get("load_state"), startedAt: formData.get("started_at"),
+    originCity: formData.get("origin_city"), destinationCity: formData.get("destination_city"), originAddress: formData.get("origin_address"), destinationAddress: formData.get("destination_address"),
+    originLatitude: formData.get("origin_latitude"), originLongitude: formData.get("origin_longitude"), destinationLatitude: formData.get("destination_latitude"), destinationLongitude: formData.get("destination_longitude"),
+    loadState: formData.get("load_state"), startedAt: formData.get("started_at"),
   });
   if (!parsed.success) dashboardError("Проверьте данные рейса.");
+  if ((parsed.data.originLatitude === null) !== (parsed.data.originLongitude === null)
+    || (parsed.data.destinationLatitude === null) !== (parsed.data.destinationLongitude === null)) {
+    dashboardError("Для геометки нужны и широта, и долгота.");
+  }
   const driverId = parsed.data.driverId ? uuid.safeParse(parsed.data.driverId) : null;
   if (driverId && !driverId.success) dashboardError("Выберите водителя из списка.");
 
@@ -164,11 +180,17 @@ export async function createTrip(formData: FormData): Promise<void> {
     p_title: parsed.data.title,
     p_origin_city: parsed.data.originCity,
     p_destination_city: parsed.data.destinationCity,
+    p_origin_address: parsed.data.originAddress,
+    p_destination_address: parsed.data.destinationAddress,
+    p_origin_latitude: parsed.data.originLatitude,
+    p_origin_longitude: parsed.data.originLongitude,
+    p_destination_latitude: parsed.data.destinationLatitude,
+    p_destination_longitude: parsed.data.destinationLongitude,
     p_load_state: parsed.data.loadState,
     p_started_at: `${parsed.data.startedAt}T00:00:00.000Z`,
   });
-  if (error) dashboardError("Не удалось создать рейс. Проверьте машину и водителя.");
-  revalidatePath("/dashboard");
+  if (error) dashboardError("Не удалось создать рейс. Проверьте машину, водителя и точки маршрута.");
+  revalidatePath("/dashboard", "layout");
 }
 
 export async function createIncome(formData: FormData): Promise<void> {
@@ -209,7 +231,7 @@ export async function createIncome(formData: FormData): Promise<void> {
     p_fx_rate_to_reporting: parsed.data.currency === organization.base_currency ? 1 : parsed.data.fxRate,
   });
   if (error) dashboardError("Не удалось сохранить доход. Проверьте сумму, валюту и курс.");
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 export async function reviewExpense(formData: FormData): Promise<void> {
@@ -231,7 +253,7 @@ export async function reviewExpense(formData: FormData): Promise<void> {
     p_note: null,
   });
   if (error) dashboardError("Не удалось проверить расход. Возможно, он уже обработан.");
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 export async function completeTrip(formData: FormData): Promise<void> {
@@ -246,7 +268,7 @@ export async function completeTrip(formData: FormData): Promise<void> {
     p_trip_id: parsed.data.tripId,
   });
   if (error) dashboardError("Рейс нельзя закрыть: завершите все плечи с одометром и статусом груза.");
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 export async function recalculateTripPnl(formData: FormData): Promise<void> {
@@ -261,5 +283,5 @@ export async function recalculateTripPnl(formData: FormData): Promise<void> {
   } catch {
     dashboardError("P&L пока не рассчитан: проверьте утверждение расходов, плечи рейса и настройку сервера.");
   }
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }

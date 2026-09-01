@@ -9,6 +9,12 @@ const updateSchema = z.object({
   title: z.string().trim().min(3).max(160),
   originCity: z.string().trim().min(2).max(160),
   destinationCity: z.string().trim().min(2).max(160),
+  originAddress: z.string().trim().min(2).max(300),
+  destinationAddress: z.string().trim().min(2).max(300),
+  originLatitude: z.number().finite().min(-90).max(90).nullable(),
+  originLongitude: z.number().finite().min(-180).max(180).nullable(),
+  destinationLatitude: z.number().finite().min(-90).max(90).nullable(),
+  destinationLongitude: z.number().finite().min(-180).max(180).nullable(),
   loadState: z.enum(["LOADED", "EMPTY", "UNKNOWN"]),
   startedAt: z.string().date(),
 });
@@ -24,7 +30,11 @@ function tripError(message: string, deleting = false): string {
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
   const { id } = await context.params;
   const parsed = updateSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success || !z.uuid().safeParse(id).success) return Response.json({ error: "Проверьте данные рейса." }, { status: 400 });
+  if (!parsed.success || !z.uuid().safeParse(id).success
+    || (parsed.data.originLatitude === null) !== (parsed.data.originLongitude === null)
+    || (parsed.data.destinationLatitude === null) !== (parsed.data.destinationLongitude === null)) {
+    return Response.json({ error: "Проверьте данные рейса." }, { status: 400 });
+  }
   const auth = await authenticatedTeamRequest();
   if (!auth) return Response.json({ error: "Требуется вход." }, { status: 401 });
   const { error } = await auth.supabase.rpc("update_trip_record", {
@@ -35,6 +45,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     p_title: parsed.data.title,
     p_origin_city: parsed.data.originCity,
     p_destination_city: parsed.data.destinationCity,
+    p_origin_address: parsed.data.originAddress,
+    p_destination_address: parsed.data.destinationAddress,
+    p_origin_latitude: parsed.data.originLatitude,
+    p_origin_longitude: parsed.data.originLongitude,
+    p_destination_latitude: parsed.data.destinationLatitude,
+    p_destination_longitude: parsed.data.destinationLongitude,
     p_load_state: parsed.data.loadState,
     p_started_at: `${parsed.data.startedAt}T00:00:00.000Z`,
   });
@@ -52,4 +68,3 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   if (error) return Response.json({ error: tripError(error.message, true) }, { status: error.message.includes("permission") ? 403 : 409 });
   return Response.json({ ok: true });
 }
-

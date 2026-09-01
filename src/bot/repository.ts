@@ -65,6 +65,15 @@ export type ActiveTrip = {
   vehicleId: string;
   title: string;
   currency: string;
+  originCity: string;
+  destinationCity: string;
+  originAddress: string;
+  destinationAddress: string;
+  originLatitude: number | null;
+  originLongitude: number | null;
+  destinationLatitude: number | null;
+  destinationLongitude: number | null;
+  latestStatusCode: RecordStatusCode | null;
 };
 
 export type RecordExpenseInput = {
@@ -79,11 +88,13 @@ export type RecordExpenseInput = {
   fuelLitres?: number;
 };
 
+export type RecordStatusCode = "WAITING_LOADING" | "AT_LOADING" | "LOADED" | "IN_TRANSIT" | "WAITING_UNLOADING" | "AT_UNLOADING" | "UNLOADED" | "IDLE" | "DELAY";
+
 export type RecordStatusInput = {
   organizationId: string;
   driverId: string;
   tripId: string;
-  statusCode: "AT_LOADING" | "LOADED" | "IN_TRANSIT" | "AT_UNLOADING" | "UNLOADED" | "IDLE" | "DELAY";
+  statusCode: RecordStatusCode;
   loadState: "LOADED" | "EMPTY" | "UNKNOWN";
   locationText: string;
   occurredAt: Date;

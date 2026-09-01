@@ -1,5 +1,7 @@
 import { Bot, Context, InlineKeyboard, Keyboard, session, type SessionFlavor } from "grammy";
 
+import { MINI_APP_URL } from "../server/telegram";
+
 import {
   advanceExpenseWizard,
   beginExpenseWizard,
@@ -32,6 +34,7 @@ type BotSession = {
   ownerAvailable?: boolean;
   driverAvailable?: boolean;
   menuMessageId?: number;
+  menuButtonMode?: "WEB_APP" | "COMMANDS";
 };
 
 type DriverBotContext = Context & SessionFlavor<BotSession>;
@@ -46,10 +49,12 @@ const categoryLabels: Record<string, string> = {
 };
 
 const statusDefinitions: Record<string, { title: string; statusCode: RecordStatusInput["statusCode"]; loadState: RecordStatusInput["loadState"] }> = {
-  AT_LOADING: { title: "На погрузке", statusCode: "AT_LOADING", loadState: "UNKNOWN" },
+  WAITING_LOADING: { title: "Ожидаю погрузку", statusCode: "WAITING_LOADING", loadState: "UNKNOWN" },
+  AT_LOADING: { title: "Погрузка", statusCode: "AT_LOADING", loadState: "UNKNOWN" },
   LOADED: { title: "Загружен", statusCode: "LOADED", loadState: "LOADED" },
   IN_TRANSIT: { title: "В пути", statusCode: "IN_TRANSIT", loadState: "LOADED" },
-  AT_UNLOADING: { title: "На выгрузке", statusCode: "AT_UNLOADING", loadState: "LOADED" },
+  WAITING_UNLOADING: { title: "Ожидаю выгрузку", statusCode: "WAITING_UNLOADING", loadState: "LOADED" },
+  AT_UNLOADING: { title: "Выгрузка", statusCode: "AT_UNLOADING", loadState: "LOADED" },
   UNLOADED: { title: "Выгружен", statusCode: "UNLOADED", loadState: "EMPTY" },
   IDLE: { title: "Простой", statusCode: "IDLE", loadState: "EMPTY" },
   DELAY: { title: "Задержка", statusCode: "DELAY", loadState: "UNKNOWN" },
@@ -62,10 +67,9 @@ function driverMenu(ownerAvailable = false): InlineKeyboard {
     .text("Добавить расход", "menu:expense")
     .text("Пробег", "menu:odometer")
     .row()
-    .text("Статус", "menu:status")
     .text("📍 Геопозиция", "menu:location")
-    .row()
     .text("Моя зарплата", "menu:pay")
+    .row()
     .text("❓ Помощь", "help:main");
   if (ownerAvailable) keyboard.row().text("👔 Режим владельца", "mode:owner");
   return keyboard;
@@ -120,17 +124,47 @@ function categoriesMenu(): InlineKeyboard {
 
 function statusesMenu(): InlineKeyboard {
   return new InlineKeyboard()
-    .text("На погрузке", "status:AT_LOADING")
-    .text("Загружен", "status:LOADED")
+    .text("Ожидаю погрузку", "status:WAITING_LOADING")
+    .text("Погрузка", "status:AT_LOADING")
     .row()
+    .text("Загружен", "status:LOADED")
     .text("В пути", "status:IN_TRANSIT")
-    .text("На выгрузке", "status:AT_UNLOADING")
+    .row()
+    .text("Ожидаю выгрузку", "status:WAITING_UNLOADING")
+    .text("Выгрузка", "status:AT_UNLOADING")
     .row()
     .text("Выгружен", "status:UNLOADED")
     .text("Простой", "status:IDLE")
     .row()
     .text("Задержка", "status:DELAY")
     .text("Отменить", "flow:cancel");
+}
+
+function routePointUrl(latitude: number, longitude: number): string {
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`;
+}
+
+function tripMenu(trip: ActiveTrip, ownerAvailable = false): InlineKeyboard {
+  const keyboard = new InlineKeyboard()
+    .text("⏳ Ожидаю погрузку", "trip-status:WAITING_LOADING")
+    .text("🏗 Погрузка", "trip-status:AT_LOADING")
+    .row()
+    .text("✅ Загружен", "trip-status:LOADED")
+    .text("🚚 В пути", "trip-status:IN_TRANSIT")
+    .row()
+    .text("⏳ Ожидаю выгрузку", "trip-status:WAITING_UNLOADING")
+    .text("📦 Выгрузка", "trip-status:AT_UNLOADING")
+    .row()
+    .text("✅ Выгружен", "trip-status:UNLOADED");
+  if (trip.originLatitude !== null && trip.originLongitude !== null) {
+    keyboard.row().url("📍 Точка погрузки", routePointUrl(trip.originLatitude, trip.originLongitude));
+  }
+  if (trip.destinationLatitude !== null && trip.destinationLongitude !== null) {
+    keyboard.url("🏁 Точка выгрузки", routePointUrl(trip.destinationLatitude, trip.destinationLongitude));
+  }
+  keyboard.row().text("← Главное меню", "trip:close");
+  if (ownerAvailable) keyboard.text("👔 Режим владельца", "mode:owner");
+  return keyboard;
 }
 
 function formatMoney(amountMinor: number, currency: string): string {
@@ -171,6 +205,20 @@ export function formatOwnerExpenses(expenses: OwnerExpenseSummary[]): string {
   return ["💳 Расходы на проверке", "", ...expenses.map((expense, index) =>
     `${index + 1}. ${expense.categoryName} — ${formatMoney(expense.amountMinor, expense.currency)}\n${expense.tripTitle ?? "без рейса"} · ${expense.driverName ?? "водитель не указан"} · ${dateLabel(expense.occurredAt)}`,
   )].join("\n\n");
+}
+
+export function formatDriverTrip(trip: ActiveTrip): string {
+  const status = trip.latestStatusCode ? statusDefinitions[trip.latestStatusCode]?.title ?? trip.latestStatusCode : "не указан";
+  return [
+    `🚛 Мой рейс · ${trip.title}`,
+    "",
+    `${trip.originCity} → ${trip.destinationCity}`,
+    `📦 Погрузка: ${trip.originAddress}`,
+    `🏁 Выгрузка: ${trip.destinationAddress}`,
+    "",
+    `Текущий статус: ${status}`,
+    "Выберите новый статус одной кнопкой.",
+  ].join("\n");
 }
 
 function parsePositiveNumber(value: string): number | null {
@@ -274,6 +322,20 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     return owner;
   }
 
+  async function ensureChatMenuButton(context: DriverBotContext, mode: "WEB_APP" | "COMMANDS"): Promise<void> {
+    if (context.session.menuButtonMode === mode || !context.chat) return;
+    try {
+      await context.setChatMenuButton({
+        menu_button: mode === "WEB_APP"
+          ? { type: "web_app", text: "Открыть кабинет", web_app: { url: MINI_APP_URL } }
+          : { type: "commands" },
+      });
+      context.session.menuButtonMode = mode;
+    } catch {
+      // Telegram menu button customization is best-effort and must not block the bot.
+    }
+  }
+
   async function clearPreviousMenu(context: DriverBotContext): Promise<void> {
     const messageId = context.session.menuMessageId;
     const chatId = context.chat?.id;
@@ -304,6 +366,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     context.session.mode = "DRIVER";
     context.session.ownerAvailable = ownerAvailable;
     context.session.driverAvailable = true;
+    await ensureChatMenuButton(context, ownerAvailable ? "WEB_APP" : "COMMANDS");
     await replaceMenu(context, message, driverMenu(ownerAvailable));
   }
 
@@ -313,6 +376,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     context.session.mode = "OWNER";
     context.session.ownerAvailable = true;
     context.session.driverAvailable = driverAvailable;
+    await ensureChatMenuButton(context, "WEB_APP");
     await replaceMenu(
       context,
       message ?? `Кабинет владельца · ${owner.organizationName}\nВыберите, что посмотреть.`,
@@ -322,6 +386,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
 
   async function showStaffMenu(context: DriverBotContext, staff: StaffIdentity, message?: string): Promise<void> {
     context.session.mode = undefined;
+    await ensureChatMenuButton(context, "WEB_APP");
     await replaceMenu(
       context,
       message ?? `Рабочий кабинет · ${staff.organizationName}\nРоль: ${staff.roleName}`,
@@ -363,6 +428,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       "Доступ пока не привязан. Владельцу нужно подключить Telegram в личном кабинете, водителю — открыть персональную ссылку от владельца.",
       accessHelpMenu(),
     );
+    await ensureChatMenuButton(context, "COMMANDS");
   }
 
   async function showCurrentMenu(context: DriverBotContext, message: string): Promise<void> {
@@ -506,9 +572,10 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
         "",
         "1. Откройте персональную ссылку владельца и нажмите START.",
         "2. Проверьте назначение в «Мой рейс».",
-        "3. Передавайте расход, пробег и статус кнопками.",
+        "3. Внутри «Мой рейс» меняйте статусы ожидания, погрузки и выгрузки одной кнопкой.",
         "4. В «📍 Геопозиция» нажмите «Отправить» и разрешите Telegram передать текущую точку.",
         "5. После расхода отправьте фото чека; предварительный расчёт смотрите в «Моя зарплата».",
+        "6. Mini App водителю не нужен — все водительские действия доступны в чате.",
       ].join("\n"), helpMenu());
       return;
     }
@@ -583,7 +650,30 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
 
     if (data === "menu:trip") {
       const trip = await findTrip(context, driver);
-      if (trip) await replaceMenu(context, `Ваш активный рейс: ${trip.title}`, driverMenu(context.session.ownerAvailable));
+      if (trip) await replaceMenu(context, formatDriverTrip(trip), tripMenu(trip, context.session.ownerAvailable));
+      return;
+    }
+
+    if (data === "trip:close") {
+      await showDriverMenu(context);
+      return;
+    }
+
+    if (data.startsWith("trip-status:")) {
+      const definition = statusDefinitions[data.replace("trip-status:", "")];
+      const trip = await findTrip(context, driver);
+      if (!definition || !trip) return;
+      await repository.recordStatus({
+        organizationId: trip.organizationId,
+        driverId: trip.driverId,
+        tripId: trip.id,
+        statusCode: definition.statusCode,
+        loadState: definition.loadState,
+        locationText: "",
+        occurredAt: new Date(),
+      });
+      const refreshedTrip = await repository.findActiveTrip(driver);
+      if (refreshedTrip) await replaceMenu(context, `✅ Статус сохранён.\n\n${formatDriverTrip(refreshedTrip)}`, tripMenu(refreshedTrip, context.session.ownerAvailable));
       return;
     }
 

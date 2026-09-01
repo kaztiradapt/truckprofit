@@ -79,6 +79,24 @@ type RawOwnerExpense = {
   drivers: { display_name: string } | { display_name: string }[] | null;
 };
 
+type RawActiveTrip = {
+  id: string;
+  organization_id: string;
+  driver_id: string;
+  vehicle_id: string;
+  title: string;
+  trip_legs: Array<{
+    origin_city: string;
+    destination_city: string;
+    origin_address: string;
+    destination_address: string;
+    origin_latitude: number | string | null;
+    origin_longitude: number | string | null;
+    destination_latitude: number | string | null;
+    destination_longitude: number | string | null;
+  }>;
+};
+
 function throwOnError(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
 }
@@ -381,7 +399,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   async findActiveTrip(driver: DriverIdentity): Promise<ActiveTrip | null> {
     const { data, error } = await this.client
       .from("trips")
-      .select("id, organization_id, driver_id, vehicle_id, title")
+      .select("id, organization_id, driver_id, vehicle_id, title, trip_legs(origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude)")
       .eq("organization_id", driver.organizationId)
       .eq("driver_id", driver.driverId)
       .eq("status", "ACTIVE")
@@ -391,13 +409,34 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
       .maybeSingle();
     throwOnError(error);
     if (!data) return null;
+    const trip = data as unknown as RawActiveTrip;
+    const firstLeg = trip.trip_legs[0];
+    if (!firstLeg) throw new Error("Active trip has no route");
+    const { data: latestStatus, error: statusError } = await this.client
+      .from("vehicle_status_records")
+      .select("status_code")
+      .eq("organization_id", driver.organizationId)
+      .eq("trip_id", trip.id)
+      .order("recorded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    throwOnError(statusError);
     return {
-      id: data.id,
-      organizationId: data.organization_id,
-      driverId: data.driver_id,
-      vehicleId: data.vehicle_id,
-      title: data.title,
+      id: trip.id,
+      organizationId: trip.organization_id,
+      driverId: trip.driver_id,
+      vehicleId: trip.vehicle_id,
+      title: trip.title,
       currency: driver.baseCurrency,
+      originCity: firstLeg.origin_city,
+      destinationCity: firstLeg.destination_city,
+      originAddress: firstLeg.origin_address,
+      destinationAddress: firstLeg.destination_address,
+      originLatitude: firstLeg.origin_latitude === null ? null : Number(firstLeg.origin_latitude),
+      originLongitude: firstLeg.origin_longitude === null ? null : Number(firstLeg.origin_longitude),
+      destinationLatitude: firstLeg.destination_latitude === null ? null : Number(firstLeg.destination_latitude),
+      destinationLongitude: firstLeg.destination_longitude === null ? null : Number(firstLeg.destination_longitude),
+      latestStatusCode: latestStatus?.status_code as ActiveTrip["latestStatusCode"] ?? null,
     };
   }
 

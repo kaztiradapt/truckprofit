@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips, normalizeLocationPoint } from "./driver-bot";
+import { formatDriverTrip, formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips, normalizeLocationPoint } from "./driver-bot";
 
 describe("owner Telegram menu formatting", () => {
   it("renders an operational and financial summary", () => {
@@ -49,5 +49,29 @@ describe("owner Telegram menu formatting", () => {
     expect(normalizeLocationPoint({ latitude: 91, longitude: 63.6246 })).toBeNull();
     expect(normalizeLocationPoint({ latitude: 53.2144, longitude: 181 })).toBeNull();
     expect(normalizeLocationPoint({ latitude: 53.2144, longitude: 63.6246, horizontalAccuracyM: 1501 })).toBeNull();
+  });
+
+  it("shows route addresses and the latest driver status inside My Trip", () => {
+    const message = formatDriverTrip({
+      id: "trip-1",
+      organizationId: "org-1",
+      driverId: "driver-1",
+      vehicleId: "vehicle-1",
+      title: "Алматы → Москва",
+      currency: "KZT",
+      originCity: "Алматы",
+      destinationCity: "Москва",
+      originAddress: "ул. Райымбека, склад 12",
+      destinationAddress: "МКАД, терминал 4",
+      originLatitude: 43.238949,
+      originLongitude: 76.889709,
+      destinationLatitude: 55.755826,
+      destinationLongitude: 37.6173,
+      latestStatusCode: "WAITING_UNLOADING",
+    });
+
+    expect(message).toContain("Погрузка: ул. Райымбека");
+    expect(message).toContain("Выгрузка: МКАД");
+    expect(message).toContain("Ожидаю выгрузку");
   });
 });
