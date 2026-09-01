@@ -24,7 +24,31 @@ export type DashboardData = {
     isOwner: boolean;
   }>;
   vehicles: Array<{ id: string; displayName: string; plateNumber: string; makeModel: string | null; fuelNorm: number | null; status: string }>;
-  drivers: Array<{ id: string; displayName: string; status: string; telegramLinked: boolean; pendingInviteExpiresAt: string | null; isOwnerDriver: boolean }>;
+  drivers: Array<{
+    id: string;
+    displayName: string;
+    status: string;
+    telegramLinked: boolean;
+    pendingInviteExpiresAt: string | null;
+    isOwnerDriver: boolean;
+    assignedVehicleId: string | null;
+    assignedVehicleName: string | null;
+  }>;
+  driverReports: Array<{
+    driverId: string;
+    displayName: string;
+    status: string;
+    assignedVehicleName: string | null;
+    totalTrips: number;
+    activeTrips: number;
+    completedTrips: number;
+    totalKm: number;
+    loadedKm: number;
+    emptyKm: number;
+    driverCompensationMinor: number;
+    managementProfitMinor: number;
+    latestTripAt: string | null;
+  }>;
   trips: Array<{
     id: string;
     title: string;
@@ -116,6 +140,15 @@ type PnlRow = {
   empty_km: number;
 };
 
+type DriverRow = {
+  id: string;
+  profile_id: string | null;
+  display_name: string;
+  status: string;
+  telegram_user_id: number | null;
+  assigned_vehicle_id: string | null;
+};
+
 type TripRow = {
   id: string;
   title: string;
@@ -184,8 +217,8 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult] = await Promise.all([
     supabase.from("profiles").select("telegram_user_id, telegram_username").eq("id", userId).maybeSingle(),
     supabase.from("vehicles").select("id, display_name, plate_number, make_model, fuel_norm_l_per_100km, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
-    supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
-    supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(50),
+    supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id, assigned_vehicle_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
+    supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(500),
     supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id),
     supabase.from("expenses").select("id, amount, currency, occurred_at, comment, expense_categories(display_name), trips(title)").eq("organization_id", membership.organization_id).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(20),
     supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
@@ -225,6 +258,42 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   }
   const totalKm = summaries.reduce((sum, item) => sum + Number(item.total_km ?? 0), 0);
   const emptyKm = summaries.reduce((sum, item) => sum + Number(item.empty_km ?? 0), 0);
+  const vehicleNames = new Map((vehiclesResult.data ?? []).map((vehicle) => [vehicle.id, `${vehicle.display_name} · ${vehicle.plate_number}`]));
+  const driverRows = (driversResult.data as DriverRow[] | null) ?? [];
+  const driverReports = new Map(driverRows.map((driver) => [driver.id, {
+    driverId: driver.id,
+    displayName: driver.display_name,
+    status: driver.status,
+    assignedVehicleName: driver.assigned_vehicle_id ? vehicleNames.get(driver.assigned_vehicle_id) ?? null : null,
+    totalTrips: 0,
+    activeTrips: 0,
+    completedTrips: 0,
+    totalKm: 0,
+    loadedKm: 0,
+    emptyKm: 0,
+    driverCompensationMinor: 0,
+    managementProfitMinor: 0,
+    latestTripAt: null as string | null,
+  }]));
+  for (const trip of ((tripsResult.data ?? []) as unknown as TripRow[])) {
+    if (!trip.driver_id) continue;
+    const report = driverReports.get(trip.driver_id);
+    if (!report) continue;
+    const legs = trip.trip_legs ?? [];
+    const pnl = pnlByTrip.get(trip.id);
+    const legTotalKm = legs.reduce((sum, leg) => sum + Number(leg.distance_km ?? 0), 0);
+    const legLoadedKm = legs.filter((leg) => leg.load_state === "LOADED").reduce((sum, leg) => sum + Number(leg.distance_km ?? 0), 0);
+    const legEmptyKm = legs.filter((leg) => leg.load_state === "EMPTY").reduce((sum, leg) => sum + Number(leg.distance_km ?? 0), 0);
+    report.totalTrips += 1;
+    if (trip.status === "ACTIVE") report.activeTrips += 1;
+    if (trip.status === "COMPLETED") report.completedTrips += 1;
+    report.totalKm += pnl?.totalKm ?? legTotalKm;
+    report.loadedKm += pnl?.loadedKm ?? legLoadedKm;
+    report.emptyKm += pnl?.emptyKm ?? legEmptyKm;
+    report.driverCompensationMinor += pnl?.driverCompensationMinor ?? 0;
+    report.managementProfitMinor += pnl?.managementProfitMinor ?? 0;
+    if (trip.started_at && (!report.latestTripAt || trip.started_at > report.latestTripAt)) report.latestTripAt = trip.started_at;
+  }
 
   return {
     organization: { id: membership.organization_id, name: organization.name, baseCurrency: organization.base_currency },
@@ -256,14 +325,17 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       fuelNorm: vehicle.fuel_norm_l_per_100km === null ? null : Number(vehicle.fuel_norm_l_per_100km),
       status: vehicle.status,
     })),
-    drivers: (driversResult.data ?? []).map((driver) => ({
+    drivers: driverRows.map((driver) => ({
       id: driver.id,
       displayName: driver.display_name,
       status: driver.status,
       telegramLinked: driver.telegram_user_id !== null,
       pendingInviteExpiresAt: pendingInvitesByDriver.get(driver.id) ?? null,
       isOwnerDriver: driver.profile_id === userId,
+      assignedVehicleId: driver.assigned_vehicle_id,
+      assignedVehicleName: driver.assigned_vehicle_id ? vehicleNames.get(driver.assigned_vehicle_id) ?? null : null,
     })),
+    driverReports: [...driverReports.values()].sort((left, right) => right.totalKm - left.totalKm || left.displayName.localeCompare(right.displayName, "ru")),
     trips: ((tripsResult.data ?? []) as unknown as TripRow[]).map((trip) => {
       const legs = (trip.trip_legs ?? []).sort((left, right) => left.sequence_no - right.sequence_no);
       const firstLeg = legs[0];

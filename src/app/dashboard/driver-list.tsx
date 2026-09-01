@@ -12,11 +12,16 @@ type Driver = {
   telegramLinked: boolean;
   pendingInviteExpiresAt: string | null;
   isOwnerDriver: boolean;
+  assignedVehicleId: string | null;
+  assignedVehicleName: string | null;
 };
+
+type Vehicle = { id: string; displayName: string; plateNumber: string; status: string };
 
 type DriverListProps = {
   organizationId: string;
   drivers: Driver[];
+  vehicles: Vehicle[];
   canManage: boolean;
   canDelete: boolean;
 };
@@ -27,7 +32,7 @@ const statusLabels: Record<string, string> = {
   INACTIVE: "Неактивен",
 };
 
-export function DriverList({ organizationId, drivers, canManage, canDelete }: DriverListProps) {
+export function DriverList({ organizationId, drivers, vehicles, canManage, canDelete }: DriverListProps) {
   const router = useRouter();
   const [editingId, setEditingId] = useState("");
   const [busy, setBusy] = useState("");
@@ -63,6 +68,7 @@ export function DriverList({ organizationId, drivers, canManage, canDelete }: Dr
       organizationId,
       displayName: form.get("display_name"),
       status: form.get("status"),
+      assignedVehicleId: form.get("assigned_vehicle_id") || null,
     }, "Водитель обновлён.");
   }
 
@@ -81,12 +87,13 @@ export function DriverList({ organizationId, drivers, canManage, canDelete }: Dr
       {editingId === driver.id ? <form className="driver-inline-edit" onSubmit={(event) => updateDriver(event, driver.id)}>
         <label><span>Имя водителя</span><input name="display_name" defaultValue={driver.displayName} minLength={2} maxLength={160} required /></label>
         <label><span>Статус</span><select name="status" defaultValue={driver.status}><option value="ACTIVE">Активен</option><option value="INVITED">Приглашён</option><option value="INACTIVE">Неактивен</option></select></label>
+        <label><span>Закреплённый автомобиль</span><select name="assigned_vehicle_id" defaultValue={driver.assignedVehicleId ?? ""}><option value="">Не закреплён</option>{vehicles.filter((vehicle) => vehicle.status === "ACTIVE").map((vehicle) => <option value={vehicle.id} key={vehicle.id}>{vehicle.displayName} · {vehicle.plateNumber}</option>)}</select></label>
         <div className="driver-inline-actions">
           <button type="submit" className="tiny-button" disabled={busy === `PATCH-${driver.id}`}>{busy === `PATCH-${driver.id}` ? "Сохраняю…" : "Сохранить"}</button>
           <button type="button" className="tiny-button" onClick={() => setEditingId("")}>Отмена</button>
         </div>
       </form> : <>
-        <span>{driver.displayName}{driver.isOwnerDriver ? <span className="owner-driver-mark">Вы</span> : null}<small>{driver.isOwnerDriver ? driver.telegramLinked ? "Ваш профиль · Telegram подключён" : "Ваш профиль владельца-водителя" : driver.telegramLinked ? "Telegram подключён" : driver.pendingInviteExpiresAt ? "Приглашение подготовлено" : "Ещё не приглашён"}</small></span>
+        <span>{driver.displayName}{driver.isOwnerDriver ? <span className="owner-driver-mark">Вы</span> : null}<small>{driver.isOwnerDriver ? driver.telegramLinked ? "Ваш профиль · Telegram подключён" : "Ваш профиль владельца-водителя" : driver.telegramLinked ? "Telegram подключён" : driver.pendingInviteExpiresAt ? "Приглашение подготовлено" : "Ещё не приглашён"}{driver.assignedVehicleName ? ` · Авто: ${driver.assignedVehicleName}` : " · Авто не закреплено"}</small></span>
         <span className="driver-actions">
           <span className={`badge ${driver.telegramLinked ? "badge-connected" : ""}`}>{driver.telegramLinked ? "Подключён" : statusLabels[driver.status] ?? driver.status}</span>
           <span className="driver-item-buttons">

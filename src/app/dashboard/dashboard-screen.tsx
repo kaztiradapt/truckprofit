@@ -5,6 +5,7 @@ import { signOut } from "@/app/actions/auth";
 import { completeTrip, createDriver, createVehicle, enableOwnerDriverMode, recalculateTripPnl } from "@/app/actions/owner";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { DriverList } from "./driver-list";
+import { DriverReports } from "./driver-reports";
 import { IncomeForm } from "./income-form";
 import { OwnerTelegramConnectButton } from "./owner-telegram-connect-button";
 import { TelegramMenuButton } from "./telegram-menu-button";
@@ -41,13 +42,14 @@ const sectionTitles: Record<DashboardSection, string> = {
   trips: "Рейсы и маршруты",
   vehicles: "Автомобили",
   drivers: "Водители",
+  reports: "Отчёты по водителям",
   expenses: "Расходы",
   team: "Сотрудники и роли",
   operations: "Создание и закрытие рейса",
   help: "Инструкции и ЧАВО",
 };
 
-export const dashboardSections = ["overview", "trips", "vehicles", "drivers", "expenses", "team", "operations", "help"] as const;
+export const dashboardSections = ["overview", "trips", "vehicles", "drivers", "reports", "expenses", "team", "operations", "help"] as const;
 export type DashboardSection = (typeof dashboardSections)[number];
 
 export async function DashboardScreen({ section, searchParams }: { section: DashboardSection; searchParams: Promise<{ error?: string; message?: string }> }) {
@@ -77,6 +79,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
     { href: "/dashboard/trips", label: "Рейсы", visible: true, key: "trips" },
     { href: "/dashboard/vehicles", label: "Автомобили", visible: true, key: "vehicles" },
     { href: "/dashboard/drivers", label: "Водители", visible: true, key: "drivers" },
+    { href: "/dashboard/reports", label: "Отчёты", visible: true, key: "reports" },
     { href: "/dashboard/expenses", label: "Расходы", visible: canViewFinance, key: "expenses" },
     { href: "/dashboard/team", label: "Сотрудники", visible: data.role === "OWNER", key: "team" },
     { href: "/dashboard/operations", label: "Создание рейса", visible: canOperate, key: "operations" },
@@ -198,7 +201,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             <div className="panel-title"><div><p className="eyebrow">Команда</p><h2>Водители</h2></div><span>{data.drivers.length} в списке</span></div>
             {canManageDrivers ? <form action={createDriver} className="team-driver-form"><input type="hidden" name="organization_id" value={data.organization.id} /><label htmlFor="team-driver-name">Новый водитель</label><div><input id="team-driver-name" name="display_name" placeholder="Имя и фамилия" required /><button type="submit">+ Добавить</button></div><small>После добавления сразу появится кнопка приглашения в Telegram.</small></form> : null}
             <div className="team-list-heading"><b>Список водителей</b><span>{data.drivers.length ? "Статус и подключение Telegram" : "Список пока пуст"}</span></div>
-            <DriverList organizationId={data.organization.id} drivers={data.drivers} canManage={canManageDrivers} canDelete={canDelete} />
+            <DriverList organizationId={data.organization.id} drivers={data.drivers} vehicles={data.vehicles} canManage={canManageDrivers} canDelete={canDelete} />
             {data.role === "OWNER" && !ownerDriver ? <form action={enableOwnerDriverMode} className="self-driver-cta"><input type="hidden" name="organization_id" value={data.organization.id} /><span><b>Вы сами за рулём?</b><small>Это дополнительный вариант — создадим отдельный водительский режим для вашего профиля.</small></span><button type="submit" className="tiny-button">Я владелец-водитель</button></form> : null}
           </article> : null}
 
@@ -209,6 +212,8 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         </section> : null}
 
         {section === "team" && data.role === "OWNER" ? <TeamManagement organizationId={data.organization.id} roles={data.accessRoles} staff={data.staff} /> : section === "team" ? <section className="panel"><h2>Доступ ограничен</h2><p className="muted">Управление сотрудниками доступно только владельцу.</p></section> : null}
+
+        {section === "reports" ? <DriverReports reports={data.driverReports} baseCurrency={data.organization.baseCurrency} canViewFinance={canViewFinance} /> : null}
 
         {section === "operations" && canOperate ? <section className="operations">
           <div className="start-intro"><p className="eyebrow">End-to-end контур</p><h2>Провести настоящий рейс</h2><p>Организация уже подключена. Пройдите шаги по порядку — данные сохраняются в защищённом контуре компании.</p></div>
@@ -229,7 +234,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {section === "help" ? <section className="help-section">
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>
           <div className="help-grid">
-            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль в разделе «Автомобили», а водителя — в разделе «Водители».</li><li>В «Создании рейса» найдите адрес погрузки, затем адрес выгрузки и выберите вариант маршрута.</li><li>Проверьте плановый километраж: он подставляется с карты, но его можно исправить вручную.</li><li>Подключите свой Telegram кнопкой выше.</li><li>Расходы водителей учитываются автоматически, а после закрытия рейса можно рассчитать P&amp;L.</li></ol></article>
+            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль в разделе «Автомобили», а водителя — в разделе «Водители».</li><li>Откройте «Изменить» у водителя и закрепите за ним автомобиль. При выборе водителя в новом рейсе эта машина подставится сама.</li><li>В «Создании рейса» найдите адрес погрузки, затем адрес выгрузки и выберите вариант маршрута.</li><li>Проверьте плановый километраж: он подставляется с карты, но его можно исправить вручную.</li><li>Сводку по рейсам и пробегу команды смотрите в разделе «Отчёты».</li><li>Расходы водителей учитываются автоматически, а после закрытия рейса можно рассчитать P&amp;L.</li></ol></article>
             <article className="panel"><h3>Водителю</h3><ol><li>Откройте персональную ссылку владельца и нажмите START.</li><li>В «Мой рейс» проверьте адреса погрузки и выгрузки.</li><li>Там же одной кнопкой отмечайте ожидание, погрузку, путь и выгрузку.</li><li>Геопозиция передаётся только после вашего нажатия и разрешения Telegram.</li><li>После расхода отправьте фото чека; оплату смотрите в «Моя зарплата».</li></ol></article>
             <article className="panel"><h3>Mini App</h3><ol><li>Откройте «Открыть кабинет» возле поля ввода в Telegram.</li><li>При первом запуске войдите тем же email владельца.</li><li>Каждый раздел открывается на отдельной странице из верхнего или бокового меню.</li><li>В обзоре карта показывает маршрут, текущую точку водителя и всю историю геопозиций.</li><li>Нажмите номер точки, чтобы найти её на карте; выберите тип «Ночёвка / отдых», «Погрузка», «Выгрузка» или добавьте комментарий.</li></ol></article>
           </div>
@@ -238,6 +243,8 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             <details><summary>Можно ли владельцу самому быть водителем?</summary><p>Да. Нажмите «Я владелец-водитель» в разделе команды. Один Telegram получит два режима, между ними можно переключаться в меню бота.</p></details>
             <details><summary>Как учитывается расход?</summary><p>Сразу после сохранения водителем. Дополнительное подтверждение владельца не требуется.</p></details>
             <details><summary>Откуда берётся километраж рейса?</summary><p>После выбора погрузки и выгрузки кабинет строит автомобильный маршрут и подставляет его расстояние. Перед созданием рейса проверьте значение: при необходимости его можно заменить плановым километражем вручную.</p></details>
+            <details><summary>Как закрепить автомобиль за водителем?</summary><p>Откройте раздел «Водители», нажмите «Изменить» напротив нужного человека и выберите активный автомобиль. При создании следующего рейса выбор этого водителя автоматически подставит закреплённую машину; при необходимости её можно заменить вручную.</p></details>
+            <details><summary>Что показывает раздел «Отчёты»?</summary><p>По каждому водителю видны закреплённая машина, количество активных и закрытых рейсов, общий, гружёный и порожний пробег, а также дата последнего рейса. Финансовые показатели отображаются только ролям с доступом к финансам.</p></details>
             <details><summary>Сохраняются ли старые геопозиции водителя?</summary><p>Да. Каждая отправленная водителем точка остаётся в истории рейса. Последняя отмечена как текущая, а прошлые можно открыть по номеру, подписать и дополнить комментарием.</p></details>
             <details><summary>Где смотреть полную экономику?</summary><p>В Mini App: выручка, расходы, прибыль, пробег и P&amp;L закрытых рейсов. Бот показывает быструю оперативную сводку.</p></details>
           </div>

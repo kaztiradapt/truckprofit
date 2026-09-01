@@ -17,8 +17,8 @@ type RoutingAlternative = {
 
 type TripCreateFormProps = {
   organizationId: string;
-  vehicles: Array<{ id: string; displayName: string; plateNumber: string }>;
-  drivers: Array<{ id: string; displayName: string }>;
+  vehicles: Array<{ id: string; displayName: string; plateNumber: string; status: string }>;
+  drivers: Array<{ id: string; displayName: string; status: string; assignedVehicleId: string | null }>;
   today: string;
 };
 
@@ -48,6 +48,16 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
   const [distanceKm, setDistanceKm] = useState("");
   const [routing, setRouting] = useState(false);
   const [routingError, setRoutingError] = useState("");
+  const [vehicleId, setVehicleId] = useState("");
+  const [driverId, setDriverId] = useState("");
+  const activeVehicles = vehicles.filter((vehicle) => vehicle.status === "ACTIVE");
+  const selectedDriver = drivers.find((driver) => driver.id === driverId) ?? null;
+
+  function selectDriver(nextDriverId: string) {
+    setDriverId(nextDriverId);
+    const assignedVehicleId = drivers.find((driver) => driver.id === nextDriverId)?.assignedVehicleId ?? null;
+    setVehicleId(assignedVehicleId && activeVehicles.some((vehicle) => vehicle.id === assignedVehicleId) ? assignedVehicleId : "");
+  }
 
   const choosePoint = useCallback((point: PointKind) => {
     activePointRef.current = point;
@@ -231,8 +241,8 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
       <input type="hidden" name="destination_longitude" value={destinationPoint?.longitude ?? ""} readOnly />
       <div className="flow-fields trip-fields">
         <label className="flow-field flow-field-wide"><span>Название рейса</span><input name="title" placeholder="Например: Алматы → Москва" required /></label>
-        <label className="flow-field"><span>Автомобиль</span><select name="vehicle_id" required disabled={!vehicles.length}><option value="">Выберите машину</option>{vehicles.map((item) => <option key={item.id} value={item.id}>{item.displayName} · {item.plateNumber}</option>)}</select></label>
-        <label className="flow-field"><span>Водитель</span><select name="driver_id"><option value="">Назначить позже</option>{drivers.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}</select></label>
+        <label className="flow-field"><span>Автомобиль</span><select name="vehicle_id" value={vehicleId} onChange={(event) => setVehicleId(event.target.value)} required disabled={!activeVehicles.length}><option value="">Выберите машину</option>{activeVehicles.map((item) => <option key={item.id} value={item.id}>{item.displayName} · {item.plateNumber}</option>)}</select></label>
+        <label className="flow-field"><span>Водитель</span><select name="driver_id" value={driverId} onChange={(event) => selectDriver(event.target.value)}><option value="">Назначить позже</option>{drivers.filter((driver) => driver.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}</select>{selectedDriver?.assignedVehicleId ? <small>Закреплённая машина подставлена автоматически.</small> : null}</label>
         <label className="flow-field"><span>Город погрузки</span><input name="origin_city" value={originCity} onChange={(event) => setOriginCity(event.target.value)} placeholder="Например: Алматы" required /></label>
         <label className="flow-field"><span>Город выгрузки</span><input name="destination_city" value={destinationCity} onChange={(event) => setDestinationCity(event.target.value)} placeholder="Например: Москва" required /></label>
         <label className="flow-field flow-field-wide"><span>Адрес погрузки</span><input name="origin_address" value={originAddress} onChange={(event) => { setOriginAddress(event.target.value); originAddressRef.current = event.target.value; }} placeholder="Улица, дом, склад или ориентир" required /></label>
@@ -271,7 +281,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
           <small>Выберите тип точки и нажмите нужное место на карте. После двух точек маршрут построится автоматически.</small>
         </div>
       </div>
-      <div className="flow-card-action"><button type="submit" disabled={!vehicles.length}>Создать рейс</button></div>
+      <div className="flow-card-action"><button type="submit" disabled={!activeVehicles.length}>Создать рейс</button></div>
     </form>
   );
 }
