@@ -34,7 +34,6 @@ type BotSession = {
   ownerAvailable?: boolean;
   driverAvailable?: boolean;
   menuMessageId?: number;
-  menuButtonMode?: "WEB_APP" | "COMMANDS";
 };
 
 type DriverBotContext = Context & SessionFlavor<BotSession>;
@@ -356,14 +355,13 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
   }
 
   async function ensureChatMenuButton(context: DriverBotContext, mode: "WEB_APP" | "COMMANDS"): Promise<void> {
-    if (context.session.menuButtonMode === mode || !context.chat) return;
+    if (!context.chat) return;
     try {
       await context.setChatMenuButton({
         menu_button: mode === "WEB_APP"
           ? { type: "web_app", text: "Открыть кабинет", web_app: { url: MINI_APP_URL } }
           : { type: "commands" },
       });
-      context.session.menuButtonMode = mode;
     } catch {
       // Telegram menu button customization is best-effort and must not block the bot.
     }
