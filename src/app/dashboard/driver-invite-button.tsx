@@ -8,12 +8,21 @@ function expiryLabel(value: string) {
   return new Intl.DateTimeFormat("ru-KZ", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 }
 
-export function DriverInviteButton({ driverId, driverName, pendingInviteExpiresAt }: { driverId: string; driverName: string; pendingInviteExpiresAt: string | null }) {
+export function DriverInviteButton({ driverId, driverName, pendingInviteExpiresAt, selfService = false }: { driverId: string; driverName: string; pendingInviteExpiresAt: string | null; selfService?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [message, setMessage] = useState("");
 
-  async function createInvitation() {
+  function openTelegram(link: string) {
+    const telegramWebApp = window.Telegram?.WebApp;
+    if (telegramWebApp?.openTelegramLink) {
+      telegramWebApp.openTelegramLink(link);
+      return;
+    }
+    window.location.assign(link);
+  }
+
+  async function createInvitation(openForSelf = false) {
     setBusy(true);
     setMessage("");
     try {
@@ -21,6 +30,7 @@ export function DriverInviteButton({ driverId, driverName, pendingInviteExpiresA
       const payload = await response.json() as Invitation & { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "Не удалось создать ссылку.");
       setInvitation(payload);
+      if (openForSelf && payload.link) openTelegram(payload.link);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось создать ссылку.");
     } finally {
@@ -48,14 +58,18 @@ export function DriverInviteButton({ driverId, driverName, pendingInviteExpiresA
     const shareUrl = invitation.link ? `https://t.me/share/url?url=${encodeURIComponent(invitation.link)}&text=${encodeURIComponent(shareText)}` : null;
     return (
       <div className="driver-invite-result">
-        <span className="invite-ready">Приглашение готово</span>
-        {shareUrl ? (
+        <span className="invite-ready">{selfService ? "Подключение готово" : "Приглашение готово"}</span>
+        {selfService && invitation.link ? (
+          <a className="telegram-share-link" href={invitation.link} onClick={(event) => { event.preventDefault(); openTelegram(invitation.link!); }}>
+            Открыть моего бота
+          </a>
+        ) : shareUrl ? (
           <a className="telegram-share-link" href={shareUrl} target="_blank" rel="noreferrer" onClick={(event) => shareInvitation(event, shareUrl)}>
             Отправить водителю
           </a>
         ) : null}
-        <code>{inviteUrl}</code>
-        <div className="invite-buttons"><button type="button" className="tiny-button" onClick={copyInvitation}>Скопировать</button><button type="button" className="tiny-button" onClick={createInvitation} disabled={busy}>{busy ? "Обновляю…" : "Новая ссылка"}</button></div>
+        {!selfService ? <code>{inviteUrl}</code> : null}
+        <div className="invite-buttons">{!selfService ? <button type="button" className="tiny-button" onClick={copyInvitation}>Скопировать</button> : null}<button type="button" className="tiny-button" onClick={() => createInvitation(false)} disabled={busy}>{busy ? "Обновляю…" : selfService ? "Обновить подключение" : "Новая ссылка"}</button></div>
         <small>Действует до {expiryLabel(invitation.expiresAt)}</small>
         {message ? <span className="inline-message">{message}</span> : null}
       </div>
@@ -64,10 +78,10 @@ export function DriverInviteButton({ driverId, driverName, pendingInviteExpiresA
 
   return (
     <div className="driver-invite-control">
-      <button type="button" className="tiny-button" disabled={busy} onClick={createInvitation}>
-        {busy ? "Создаю…" : pendingInviteExpiresAt ? "Создать новую ссылку" : "Создать приглашение"}
+      <button type="button" className="tiny-button" disabled={busy} onClick={() => createInvitation(selfService)}>
+        {busy ? "Подключаю…" : selfService ? "Подключить мой Telegram" : pendingInviteExpiresAt ? "Создать новую ссылку" : "Создать приглашение"}
       </button>
-      {pendingInviteExpiresAt ? <small>Есть активное до {expiryLabel(pendingInviteExpiresAt)}</small> : null}
+      {selfService ? <small>Откроется бот — останется нажать START.</small> : pendingInviteExpiresAt ? <small>Есть активное до {expiryLabel(pendingInviteExpiresAt)}</small> : null}
       {message ? <span className="inline-error">{message}</span> : null}
     </div>
   );

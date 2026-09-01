@@ -14,6 +14,7 @@ const organizationInput = z.object({
   name: text(2),
   slug: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,62}$/),
   currency: z.string().trim().regex(/^[A-Z]{3}$/),
+  ownerDriver: z.boolean(),
 });
 
 function dashboardError(message: string): never {
@@ -41,11 +42,25 @@ async function requireOperator(organizationId: string) {
   return supabase;
 }
 
+async function requireOwner(organizationId: string) {
+  const { supabase, userId } = await getAuthenticatedUser();
+  const { data, error } = await supabase
+    .from("organization_memberships")
+    .select("role, status")
+    .eq("organization_id", organizationId)
+    .eq("user_id", userId)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
+  if (error || !data || data.role !== "OWNER") dashboardError("Только владелец может включить этот режим.");
+  return { supabase, userId };
+}
+
 export async function createOrganization(formData: FormData): Promise<void> {
   const parsed = organizationInput.safeParse({
     name: formData.get("name"),
     slug: formData.get("slug"),
     currency: formData.get("currency"),
+    ownerDriver: formData.get("owner_driver") === "yes",
   });
   if (!parsed.success) redirect("/onboarding?error=Проверьте%20название%2C%20код%20и%20валюту.");
 
@@ -55,10 +70,25 @@ export async function createOrganization(formData: FormData): Promise<void> {
     input_slug: parsed.data.slug,
     input_currency: parsed.data.currency,
     input_timezone: "Asia/Qostanay",
+    input_create_owner_driver: parsed.data.ownerDriver,
   });
   if (error) redirect("/onboarding?error=Не%20удалось%20создать%20организацию.%20Возможно%2C%20код%20уже%20занят.");
   revalidatePath("/dashboard");
   redirect("/dashboard");
+}
+
+export async function enableOwnerDriverMode(formData: FormData): Promise<void> {
+  const parsed = z.object({ organizationId: uuid }).safeParse({ organizationId: formData.get("organization_id") });
+  if (!parsed.success) dashboardError("Не удалось включить режим владельца-водителя.");
+
+  const { supabase } = await requireOwner(parsed.data.organizationId);
+  const { error } = await supabase.rpc("enable_owner_driver_mode", {
+    p_organization_id: parsed.data.organizationId,
+  });
+  if (error) dashboardError("Не удалось создать ваш профиль водителя.");
+
+  revalidatePath("/dashboard");
+  redirect(`/dashboard?message=${encodeURIComponent("Режим «владелец-водитель» включён. Теперь добавьте автомобиль.")}`);
 }
 
 export async function createVehicle(formData: FormData): Promise<void> {

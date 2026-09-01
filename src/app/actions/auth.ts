@@ -27,8 +27,20 @@ function resendConfirmationPage(email: string, message: string): never {
   redirect(`/resend-confirmation?email=${encodeURIComponent(email)}&message=${encodeURIComponent(message)}`);
 }
 
+function passwordResetPage(message: string, kind: "error" | "message" = "message"): never {
+  redirect(`/forgot-password?${kind}=${encodeURIComponent(message)}`);
+}
+
+function updatePasswordPage(message: string): never {
+  redirect(`/update-password?error=${encodeURIComponent(message)}`);
+}
+
 function confirmationRedirectTo(origin: string | null): string | undefined {
   return origin ? `${origin}/auth/confirm` : undefined;
+}
+
+function passwordResetRedirectTo(origin: string | null): string | undefined {
+  return origin ? `${origin}/auth/recovery` : undefined;
 }
 
 function isUnconfirmedEmailError(message: string): boolean {
@@ -104,6 +116,50 @@ export async function resendConfirmation(formData: FormData): Promise<void> {
   if (error) resendConfirmationPage(parsed.data.email, resendErrorMessage(error.message));
 
   redirect("/login?message=Если%20аккаунт%20существует%2C%20письмо%20для%20подтверждения%20отправлено.%20Проверьте%20Входящие%20и%20Спам.");
+}
+
+export async function requestPasswordReset(formData: FormData): Promise<void> {
+  const parsed = emailSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) passwordResetPage("Введите корректный email.", "error");
+
+  const origin = (await headers()).get("origin");
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: passwordResetRedirectTo(origin),
+  });
+  if (error) {
+    if (/rate limit|too many requests/i.test(error.message)) {
+      passwordResetPage("Письмо уже запрошено. Подождите минуту и проверьте Входящие и Спам.", "error");
+    }
+    passwordResetPage("Не удалось отправить письмо. Попробуйте ещё раз немного позже.", "error");
+  }
+
+  passwordResetPage("Если аккаунт с таким email существует, мы отправили ссылку для сброса пароля.");
+}
+
+export async function updatePassword(formData: FormData): Promise<void> {
+  const parsed = z.object({
+    password: z.string().min(12).max(128),
+    passwordConfirmation: z.string().min(12).max(128),
+  }).safeParse({
+    password: formData.get("password"),
+    passwordConfirmation: formData.get("password_confirmation"),
+  });
+  if (!parsed.success || parsed.data.password !== parsed.data.passwordConfirmation) {
+    updatePasswordPage("Пароли должны совпадать и содержать минимум 12 символов.");
+  }
+
+  const supabase = await createClient();
+  const { data: claimsResult, error: claimsError } = await supabase.auth.getClaims();
+  if (claimsError || !claimsResult?.claims?.sub) {
+    updatePasswordPage("Ссылка недействительна или истекла. Запросите новое письмо.");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) updatePasswordPage("Не удалось изменить пароль. Выберите другой пароль или запросите новую ссылку.");
+
+  await supabase.auth.signOut();
+  redirect("/login?message=Пароль%20изменён.%20Теперь%20войдите%20с%20новым%20паролем.");
 }
 
 export async function signOut(): Promise<void> {

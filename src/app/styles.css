@@ -100,6 +100,10 @@ td { font-size: 14px; }
 .driver-invite-result small, .inline-message { color: var(--muted); font-size: 11px; }
 .inline-error { color: #9b251b; font-size: 11px; }
 .invite-ready { color: var(--green); font-size: 11px; font-weight: 800; }
+.owner-driver-mark { display: inline-block; margin-left: 7px; padding: 2px 6px; border-radius: 999px; background: #d6f36b; color: var(--green-dark); font-size: 9px; font-weight: 850; text-transform: uppercase; vertical-align: 1px; }
+.self-driver-cta { margin-top: 14px; padding: 13px; border: 1px solid #cfe1d7; border-radius: 10px; background: var(--green-soft); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.self-driver-cta span { display: grid; gap: 3px; }
+.self-driver-cta small { color: var(--muted); font-size: 11px; }
 .invite-buttons { display: flex; gap: 6px; }
 .telegram-share-link { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; padding: 7px 12px; border-radius: 8px; background: #229ed9; color: #fff; font-size: 11px; font-weight: 800; text-decoration: none; }
 .telegram-share-link:hover { background: #1588be; }
@@ -145,6 +149,10 @@ td { font-size: 14px; }
 .lead { color: #52615b; font-size: 16px; line-height: 1.55; }
 .stack-form { display: grid; gap: 14px; }
 .stack-form label { display: grid; gap: 6px; color: #3d4c46; font-size: 13px; font-weight: 700; }
+.stack-form label.choice-card { grid-template-columns: auto 1fr; align-items: start; gap: 11px; padding: 14px; border: 1px solid #cfe1d7; border-radius: 11px; background: var(--green-soft); cursor: pointer; }
+.stack-form .choice-card input { width: 18px; min-width: 18px; height: 18px; min-height: 18px; margin: 2px 0 0; padding: 0; accent-color: var(--green); }
+.choice-card span { display: grid; gap: 4px; }
+.choice-card small { color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.4; }
 .stack-form button { min-height: 44px; border: 0; border-radius: 9px; background: var(--green); color: #fff; font-weight: 750; }
 .auth-card a { color: var(--green); font-weight: 700; }
 
@@ -177,6 +185,8 @@ td { font-size: 14px; }
   .driver-actions { align-items: flex-start; }
   .driver-invite-result { justify-items: start; }
   .driver-invite-result code { max-width: 100%; text-align: left; }
+  .self-driver-cta { align-items: stretch; flex-direction: column; }
+  .self-driver-cta .tiny-button { width: 100%; }
 }
 
 @media (max-width: 560px) {

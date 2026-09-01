@@ -5,15 +5,16 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <p className="eyebrow">Шаг 1 из 1</p>
-        <h1>Создайте компанию</h1>
-        <p className="lead">Она станет отдельным защищённым контуром данных вашего автопарка.</p>
+        <p className="eyebrow">Настройка учёта</p>
+        <h1>Создайте своё хозяйство</h1>
+        <p className="lead">Подойдёт и для компании с автопарком, и для владельца одной машины.</p>
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         <form action={createOrganization} className="stack-form">
-          <label>Название компании<input name="name" placeholder="ТОО Demo Transport" minLength={2} required /></label>
-          <label>Код в ссылке<input name="slug" placeholder="demo-transport" pattern="[a-z0-9][a-z0-9-]{1,62}" required /></label>
+          <label>Название<input name="name" placeholder="ИП Арман / Demo Transport" minLength={2} required /></label>
+          <label>Короткий код латиницей<input name="slug" placeholder="arman-transport" pattern="[a-z0-9][a-z0-9-]{1,62}" required /></label>
           <label>Базовая валюта<select name="currency" defaultValue="KZT"><option value="KZT">KZT — тенге</option><option value="RUB">RUB — рубль</option><option value="USD">USD — доллар</option></select></label>
-          <button type="submit">Создать компанию</button>
+          <label className="choice-card"><input name="owner_driver" type="checkbox" value="yes" /><span><b>Я владелец и сам вожу автомобиль</b><small>Создадим ваш профиль водителя автоматически.</small></span></label>
+          <button type="submit">Начать учёт</button>
         </form>
       </section>
     </main>
