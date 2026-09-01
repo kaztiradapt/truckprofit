@@ -6,6 +6,7 @@ import { getDashboardData } from "@/lib/dashboard-data";
 import { DriverInviteButton } from "./driver-invite-button";
 import { OwnerTelegramConnectButton } from "./owner-telegram-connect-button";
 import { TelegramMenuButton } from "./telegram-menu-button";
+import { TeamManagement } from "./team-management";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   if (data === "UNAUTHENTICATED") redirect("/login");
   if (data === "NO_ORGANIZATION") redirect("/onboarding");
   const { error, message } = await searchParams;
-  const canOperate = data.role === "OWNER" || data.role === "MANAGER";
+  const canManageVehicles = data.permissions.includes("MANAGE_VEHICLES");
+  const canManageDrivers = data.permissions.includes("MANAGE_DRIVERS");
+  const canManageTrips = data.permissions.includes("MANAGE_TRIPS");
+  const canManageFinance = data.permissions.includes("MANAGE_FINANCE");
+  const canReviewExpenses = data.permissions.includes("REVIEW_EXPENSES");
+  const canViewFinance = data.permissions.includes("VIEW_FINANCE");
+  const canOperate = canManageVehicles || canManageDrivers || canManageTrips || canManageFinance || canReviewExpenses;
   const ownerDriver = data.drivers.find((driver) => driver.isOwnerDriver) ?? null;
   const today = new Date().toISOString().slice(0, 10);
   const latestTrip = data.trips[0] ?? null;
@@ -55,14 +62,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <a href="#trips">Рейсы</a>
           <a href="#vehicles">Автомобили</a>
           <a href="#drivers">Водители</a>
-          <a href="#expenses">Расходы</a>
+          {canViewFinance || canReviewExpenses ? <a href="#expenses">Расходы</a> : null}
+          {data.role === "OWNER" ? <a href="#team">Сотрудники</a> : null}
           {canOperate ? <a href="#operations">Первичные факты</a> : null}
           <a href="#help">Инструкция</a>
         </nav>
         <div className="sidebar-note">
           <span>{data.organization.name}</span>
           <small>{data.vehicles.length} авто · {data.organization.baseCurrency}</small>
-          {canOperate ? <TelegramMenuButton organizationId={data.organization.id} /> : null}
+          {data.role === "OWNER" ? <TelegramMenuButton organizationId={data.organization.id} /> : null}
           <form action={signOut}><button className="sidebar-signout" type="submit">Выйти</button></form>
         </div>
       </aside>
@@ -70,7 +78,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <section className="content" id="overview">
         <header className="topbar">
           <div><p className="eyebrow">Экономика автопарка</p><h1>Управленческий обзор</h1></div>
-          {canOperate ? <a className="primary-link" href="#operations">+ Новый рейс</a> : null}
+          {canManageTrips ? <a className="primary-link" href="#operations">+ Новый рейс</a> : null}
         </header>
 
         {error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -81,17 +89,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <OwnerTelegramConnectButton organizationId={data.organization.id} linked={data.ownerTelegramLinked} />
         </section> : null}
 
-        <div className={data.pendingExpenses.length ? "signal signal-warning" : "signal"}>
+        {canViewFinance || canReviewExpenses ? <div className={data.pendingExpenses.length ? "signal signal-warning" : "signal"}>
           <div><span className="signal-dot" />{data.pendingExpenses.length ? `${data.pendingExpenses.length} расход(а) ждут проверки` : "Все расходы проверены"}</div>
           <p>{latestPnl ? "P&L последнего рейса зафиксирован" : "Данные поступают из рейсов и Telegram"}</p>
-        </div>
+        </div> : <div className="signal"><div><span className="signal-dot" />Роль: {data.accessRoleName}</div><p>Финансовые показатели скрыты настройками доступа</p></div>}
 
-        <section className="metrics" aria-label="Ключевые показатели">
+        {canViewFinance ? <section className="metrics" aria-label="Ключевые показатели">
           <article><span>Выручка</span><strong>{formatMoney(data.totals.revenue, data.organization.baseCurrency)}</strong><small>{data.totals.totalKm ? `${formatMoney(data.totals.revenue / data.totals.totalKm, data.organization.baseCurrency)} / км` : "Нет закрытого пробега"}</small></article>
           <article><span>Все расходы</span><strong>{formatMoney(data.totals.expenses, data.organization.baseCurrency)}</strong><small>{data.totals.totalKm ? `${formatMoney(data.totals.expenses / data.totals.totalKm, data.organization.baseCurrency)} / км` : "Только утверждённые"}</small></article>
           <article className="profit"><span>Результат</span><strong>{formatMoney(data.totals.profit, data.organization.baseCurrency)}</strong><small>{latestPnl ? `${margin} маржа последнего рейса` : "До оценочных налогов"}</small></article>
           <article><span>Порожний пробег</span><strong>{latestPnl ? formatKm(latestPnl.emptyKm) : emptyShare}</strong><small>{latestPnl ? `${emptyShare} от последнего рейса` : "Доля от общего"}</small></article>
-        </section>
+        </section> : null}
 
         <section className="trip-card" id="trips">
           {latestTrip ? <>
@@ -132,27 +140,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
           <article className="panel" id="drivers">
             <div className="panel-title"><div><p className="eyebrow">Команда</p><h2>Водители</h2></div><span>{data.drivers.length} в списке</span></div>
-            {canOperate ? <form action={createDriver} className="team-driver-form"><input type="hidden" name="organization_id" value={data.organization.id} /><label htmlFor="team-driver-name">Новый водитель</label><div><input id="team-driver-name" name="display_name" placeholder="Имя и фамилия" required /><button type="submit">+ Добавить</button></div><small>После добавления сразу появится кнопка приглашения в Telegram.</small></form> : null}
+            {canManageDrivers ? <form action={createDriver} className="team-driver-form"><input type="hidden" name="organization_id" value={data.organization.id} /><label htmlFor="team-driver-name">Новый водитель</label><div><input id="team-driver-name" name="display_name" placeholder="Имя и фамилия" required /><button type="submit">+ Добавить</button></div><small>После добавления сразу появится кнопка приглашения в Telegram.</small></form> : null}
             <div className="team-list-heading"><b>Список водителей</b><span>{data.drivers.length ? "Статус и подключение Telegram" : "Список пока пуст"}</span></div>
-            <ul className="entity-list driver-list">{data.drivers.length ? data.drivers.map((driver) => <li key={driver.id}><span>{driver.displayName}{driver.isOwnerDriver ? <span className="owner-driver-mark">Вы</span> : null}<small>{driver.isOwnerDriver ? driver.telegramLinked ? "Ваш профиль · Telegram подключён" : "Ваш профиль владельца-водителя" : driver.telegramLinked ? "Telegram подключён" : driver.pendingInviteExpiresAt ? "Приглашение подготовлено" : "Ещё не приглашён"}</small></span><span className="driver-actions"><span className={`badge ${driver.telegramLinked ? "badge-connected" : ""}`}>{driver.telegramLinked ? "Подключён" : driver.status}</span>{canOperate && !driver.telegramLinked ? <DriverInviteButton driverId={driver.id} driverName={driver.displayName} pendingInviteExpiresAt={driver.pendingInviteExpiresAt} selfService={driver.isOwnerDriver} /> : null}</span></li>) : <li className="empty-state">Добавьте первого водителя формой выше.</li>}</ul>
+            <ul className="entity-list driver-list">{data.drivers.length ? data.drivers.map((driver) => <li key={driver.id}><span>{driver.displayName}{driver.isOwnerDriver ? <span className="owner-driver-mark">Вы</span> : null}<small>{driver.isOwnerDriver ? driver.telegramLinked ? "Ваш профиль · Telegram подключён" : "Ваш профиль владельца-водителя" : driver.telegramLinked ? "Telegram подключён" : driver.pendingInviteExpiresAt ? "Приглашение подготовлено" : "Ещё не приглашён"}</small></span><span className="driver-actions"><span className={`badge ${driver.telegramLinked ? "badge-connected" : ""}`}>{driver.telegramLinked ? "Подключён" : driver.status}</span>{canManageDrivers && !driver.telegramLinked ? <DriverInviteButton driverId={driver.id} driverName={driver.displayName} pendingInviteExpiresAt={driver.pendingInviteExpiresAt} selfService={driver.isOwnerDriver} /> : null}</span></li>) : <li className="empty-state">Добавьте первого водителя формой выше.</li>}</ul>
             {data.role === "OWNER" && !ownerDriver ? <form action={enableOwnerDriverMode} className="self-driver-cta"><input type="hidden" name="organization_id" value={data.organization.id} /><span><b>Вы сами за рулём?</b><small>Это дополнительный вариант — создадим отдельный водительский режим для вашего профиля.</small></span><button type="submit" className="tiny-button">Я владелец-водитель</button></form> : null}
           </article>
 
-          <article className="panel panel-wide" id="expenses"><div className="panel-title"><div><p className="eyebrow">Финансовый контроль</p><h2>Расходы на проверке</h2></div><span>{data.pendingExpenses.length}</span></div>
-            <ul className="entity-list">{data.pendingExpenses.length ? data.pendingExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {dateLabel(expense.occurredAt)}{expense.comment ? ` · ${expense.comment}` : ""}</small></span><span>{formatMoney(expense.amount, expense.currency)}<span className="review-actions"><form action={reviewExpense}><input type="hidden" name="organization_id" value={data.organization.id} /><input type="hidden" name="expense_id" value={expense.id} /><input type="hidden" name="decision" value="APPROVED" /><button type="submit">Принять</button></form><form action={reviewExpense}><input type="hidden" name="organization_id" value={data.organization.id} /><input type="hidden" name="expense_id" value={expense.id} /><input type="hidden" name="decision" value="REJECTED" /><button className="button-secondary" type="submit">Отклонить</button></form></span></span></li>) : <li className="empty-state">Новых расходов нет.</li>}</ul>
-          </article>
+          {canViewFinance || canReviewExpenses ? <article className="panel panel-wide" id="expenses"><div className="panel-title"><div><p className="eyebrow">Финансовый контроль</p><h2>Расходы на проверке</h2></div><span>{data.pendingExpenses.length}</span></div>
+            <ul className="entity-list">{data.pendingExpenses.length ? data.pendingExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {dateLabel(expense.occurredAt)}{expense.comment ? ` · ${expense.comment}` : ""}</small></span><span>{formatMoney(expense.amount, expense.currency)}{canReviewExpenses ? <span className="review-actions"><form action={reviewExpense}><input type="hidden" name="organization_id" value={data.organization.id} /><input type="hidden" name="expense_id" value={expense.id} /><input type="hidden" name="decision" value="APPROVED" /><button type="submit">Принять</button></form><form action={reviewExpense}><input type="hidden" name="organization_id" value={data.organization.id} /><input type="hidden" name="expense_id" value={expense.id} /><input type="hidden" name="decision" value="REJECTED" /><button className="button-secondary" type="submit">Отклонить</button></form></span> : null}</span></li>) : <li className="empty-state">Новых расходов нет.</li>}</ul>
+          </article> : null}
         </section>
+
+        {data.role === "OWNER" ? <TeamManagement organizationId={data.organization.id} roles={data.accessRoles} staff={data.staff} /> : null}
 
         {canOperate ? <section className="operations" id="operations">
           <div className="start-intro"><p className="eyebrow">End-to-end контур</p><h2>Провести настоящий рейс</h2><p>Организация уже подключена. Пройдите шаги по порядку — данные сохраняются в защищённом контуре компании.</p></div>
           <div className="workbench">
             <div className="workbench-status"><span className="ready" />Supabase, Telegram и расчётный слой подключены</div>
-            <form action={createVehicle} className="flow-card grid-form"><b>1. Автомобиль</b><input type="hidden" name="organization_id" value={data.organization.id} /><input name="display_name" placeholder="DAF 001" required /><input name="plate_number" placeholder="KZ 001 DEM" required /><input name="make_model" placeholder="DAF XF" /><input name="fuel_norm" inputMode="decimal" placeholder="30.5 л/100 км" /><button type="submit">Сохранить</button></form>
-            <form action={createTrip} className="flow-card grid-form"><b>2. Рейс</b><input type="hidden" name="organization_id" value={data.organization.id} /><input name="title" placeholder="Алматы → Москва" required /><select name="vehicle_id" required disabled={!data.vehicles.length}><option value="">Машина</option>{data.vehicles.map((item) => <option key={item.id} value={item.id}>{item.displayName} · {item.plateNumber}</option>)}</select><select name="driver_id"><option value="">Водитель позже</option>{data.drivers.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}</select><input name="origin_city" placeholder="Алматы" required /><input name="destination_city" placeholder="Москва" required /><select name="load_state" defaultValue="LOADED"><option value="LOADED">С грузом</option><option value="EMPTY">Порожний</option><option value="UNKNOWN">Неизвестно</option></select><input name="started_at" type="date" defaultValue={today} required /><button type="submit" disabled={!data.vehicles.length}>Создать</button></form>
-            <form action={createIncome} className="flow-card"><b>3. Доход</b><input type="hidden" name="organization_id" value={data.organization.id} /><input type="hidden" name="currency" value={data.organization.baseCurrency} /><select name="trip_id" required disabled={!data.trips.length}><option value="">Рейс</option>{data.trips.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><input name="customer_name" placeholder="Заказчик" /><input name="amount" inputMode="decimal" placeholder={`Сумма, ${data.organization.baseCurrency}`} required /><input name="expected_payment_at" type="date" /><input name="comment" placeholder="Комментарий" /><button type="submit" disabled={!data.trips.length}>Добавить</button></form>
-            <div className="flow-card action-card"><b>4. Закрытие и P&amp;L</b><form action={completeTrip} className="inline-flow"><input type="hidden" name="organization_id" value={data.organization.id} /><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "ACTIVE")}><option value="">Активный рейс</option>{data.trips.filter((item) => item.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="submit" disabled={!data.trips.some((item) => item.status === "ACTIVE")}>Закрыть</button></form><form action={recalculateTripPnl} className="inline-flow"><input type="hidden" name="organization_id" value={data.organization.id} /><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "COMPLETED")}><option value="">Закрытый рейс</option>{data.trips.filter((item) => item.status === "COMPLETED").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="submit" disabled={!data.trips.some((item) => item.status === "COMPLETED")}>Рассчитать P&amp;L</button></form></div>
+            {canManageVehicles ? <form action={createVehicle} className="flow-card grid-form"><b>1. Автомобиль</b><input type="hidden" name="organization_id" value={data.organization.id} /><input name="display_name" placeholder="DAF 001" required /><input name="plate_number" placeholder="KZ 001 DEM" required /><input name="make_model" placeholder="DAF XF" /><input name="fuel_norm" inputMode="decimal" placeholder="30.5 л/100 км" /><button type="submit">Сохранить</button></form> : null}
+            {canManageTrips ? <form action={createTrip} className="flow-card grid-form"><b>2. Рейс</b><input type="hidden" name="organization_id" value={data.organization.id} /><input name="title" placeholder="Алматы → Москва" required /><select name="vehicle_id" required disabled={!data.vehicles.length}><option value="">Машина</option>{data.vehicles.map((item) => <option key={item.id} value={item.id}>{item.displayName} · {item.plateNumber}</option>)}</select><select name="driver_id"><option value="">Водитель позже</option>{data.drivers.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}</select><input name="origin_city" placeholder="Алматы" required /><input name="destination_city" placeholder="Москва" required /><select name="load_state" defaultValue="LOADED"><option value="LOADED">С грузом</option><option value="EMPTY">Порожний</option><option value="UNKNOWN">Неизвестно</option></select><input name="started_at" type="date" defaultValue={today} required /><button type="submit" disabled={!data.vehicles.length}>Создать</button></form> : null}
+            {canManageFinance ? <form action={createIncome} className="flow-card"><b>3. Доход</b><input type="hidden" name="organization_id" value={data.organization.id} /><input type="hidden" name="currency" value={data.organization.baseCurrency} /><select name="trip_id" required disabled={!data.trips.length}><option value="">Рейс</option>{data.trips.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><input name="customer_name" placeholder="Заказчик" /><input name="amount" inputMode="decimal" placeholder={`Сумма, ${data.organization.baseCurrency}`} required /><input name="expected_payment_at" type="date" /><input name="comment" placeholder="Комментарий" /><button type="submit" disabled={!data.trips.length}>Добавить</button></form> : null}
+            {canManageTrips || canManageFinance ? <div className="flow-card action-card"><b>4. Закрытие и P&amp;L</b>{canManageTrips ? <form action={completeTrip} className="inline-flow"><input type="hidden" name="organization_id" value={data.organization.id} /><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "ACTIVE")}><option value="">Активный рейс</option>{data.trips.filter((item) => item.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="submit" disabled={!data.trips.some((item) => item.status === "ACTIVE")}>Закрыть</button></form> : null}{canManageFinance ? <form action={recalculateTripPnl} className="inline-flow"><input type="hidden" name="organization_id" value={data.organization.id} /><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "COMPLETED")}><option value="">Закрытый рейс</option>{data.trips.filter((item) => item.status === "COMPLETED").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="submit" disabled={!data.trips.some((item) => item.status === "COMPLETED")}>Рассчитать P&amp;L</button></form> : null}</div> : null}
           </div>
-        </section> : <section className="panel"><h2>Ваш доступ: водитель</h2><p className="muted">Операционный ввод доступен в Telegram; общая экономика скрыта.</p></section>}
+        </section> : <section className="panel"><h2>Ваш доступ: {data.accessRoleName}</h2><p className="muted">Редактирование ограничено владельцем. Доступные данные остаются в режиме просмотра.</p></section>}
 
         <section className="help-section" id="help">
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>

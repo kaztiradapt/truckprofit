@@ -19,14 +19,11 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   if (driverError || !driver) return Response.json({ error: "Водитель не найден." }, { status: 404 });
   if (driver.telegram_user_id !== null) return Response.json({ error: "Telegram этого водителя уже привязан." }, { status: 409 });
 
-  const { data: membership, error: membershipError } = await supabase
-    .from("organization_memberships")
-    .select("role")
-    .eq("organization_id", driver.organization_id)
-    .eq("user_id", userId)
-    .eq("status", "ACTIVE")
-    .maybeSingle();
-  if (membershipError || !membership || !["OWNER", "MANAGER"].includes(membership.role)) {
+  const { data: allowed, error: permissionError } = await supabase.rpc("has_org_permission", {
+    target_organization_id: driver.organization_id,
+    required_permission: "MANAGE_DRIVERS",
+  });
+  if (permissionError || allowed !== true) {
     return Response.json({ error: "Недостаточно прав." }, { status: 403 });
   }
 

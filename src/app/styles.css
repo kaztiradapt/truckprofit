@@ -119,6 +119,27 @@ td { font-size: 14px; }
 .self-driver-cta { margin-top: 14px; padding: 13px; border: 1px solid #cfe1d7; border-radius: 10px; background: var(--green-soft); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .self-driver-cta span { display: grid; gap: 3px; }
 .self-driver-cta small { color: var(--muted); font-size: 11px; }
+.team-management { margin-top: 42px; scroll-margin-top: 24px; }
+.team-management-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.team-management .stack-form, .role-form { align-content: start; }
+.team-management h3 { margin: 5px 0 0; }
+.role-form { display: grid; gap: 14px; }
+.role-form > label { display: grid; gap: 6px; color: #3d4c46; font-size: 13px; font-weight: 700; }
+.role-form input[type="text"], .role-form input:not([type]), .role-form select { min-width: 0; min-height: 42px; border: 1px solid #cdd6d1; border-radius: 9px; padding: 10px 12px; background: #fbfcfa; color: var(--ink); }
+.permission-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.permission-grid label { display: flex; align-items: flex-start; gap: 7px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; color: #43514b; font-size: 12px; line-height: 1.35; }
+.permission-grid input { width: 15px; height: 15px; margin: 1px 0 0; accent-color: var(--green); }
+.permission-grid .permission-danger { border-color: #eccac6; color: #8a3028; }
+.team-invite-result { margin: 0 0 14px; padding: 14px; border: 1px solid #cfe1d7; border-radius: 11px; background: var(--green-soft); display: grid; gap: 8px; }
+.team-invite-result code { overflow-wrap: anywhere; color: var(--green); font-size: 11px; }
+.team-invite-result > div { display: flex; gap: 7px; }
+.team-roster { margin-top: 14px; }
+.staff-row { align-items: flex-start !important; }
+.staff-actions { display: grid; justify-items: end; gap: 7px; }
+.staff-actions > div { display: flex; gap: 6px; }
+.staff-edit-form { width: 100%; display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr auto; gap: 7px; }
+.staff-edit-form input, .staff-edit-form select { min-width: 0; min-height: 36px; border: 1px solid #cdd6d1; border-radius: 8px; padding: 7px 9px; background: #fbfcfa; }
+.staff-edit-form > div { display: flex; gap: 5px; }
 .invite-buttons { display: flex; gap: 6px; }
 .telegram-share-link { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; padding: 7px 12px; border-radius: 8px; background: #229ed9; color: #fff; font-size: 11px; font-weight: 800; text-decoration: none; }
 .telegram-share-link:hover { background: #1588be; }
@@ -196,6 +217,8 @@ td { font-size: 14px; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .trip-grid { grid-template-columns: 1fr; gap: 18px; }
   .help-grid { grid-template-columns: 1fr; }
+  .team-management-grid { grid-template-columns: 1fr; }
+  .staff-edit-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
@@ -215,6 +238,10 @@ td { font-size: 14px; }
   .self-driver-cta .tiny-button { width: 100%; }
   .owner-telegram-card { align-items: stretch; flex-direction: column; }
   .owner-telegram-control { min-width: 0; }
+  .permission-grid { grid-template-columns: 1fr; }
+  .staff-actions { justify-items: start; }
+  .staff-row { display: grid !important; }
+  .staff-edit-form { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {

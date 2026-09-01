@@ -13,6 +13,14 @@ export type OwnerIdentity = {
   baseCurrency: string;
 };
 
+export type StaffIdentity = {
+  organizationId: string;
+  staffId: string;
+  staffName: string;
+  organizationName: string;
+  roleName: string;
+};
+
 export type OwnerSummary = {
   vehicleCount: number;
   driverCount: number;
@@ -104,8 +112,11 @@ export interface DriverBotRepository {
   finishIncomingUpdate(updateId: number, outcome: "PROCESSED" | "FAILED", safeErrorSummary?: string): Promise<void>;
   claimInvitation(invitationCode: string, telegramUserId: number): Promise<DriverIdentity>;
   claimOwnerInvitation(invitationCode: string, telegramUserId: number): Promise<OwnerIdentity>;
+  claimStaffInvitation(invitationCode: string, telegramUserId: number, telegramUsername: string | null): Promise<StaffIdentity>;
+  syncTelegramUsername(telegramUserId: number, telegramUsername: string | null): Promise<void>;
   findDriverByTelegramUserId(telegramUserId: number): Promise<DriverIdentity | null>;
   findOwnerByTelegramUserId(telegramUserId: number): Promise<OwnerIdentity | null>;
+  findStaffByTelegramUserId(telegramUserId: number): Promise<StaffIdentity | null>;
   getOwnerSummary(owner: OwnerIdentity): Promise<OwnerSummary>;
   listOwnerActiveTrips(owner: OwnerIdentity): Promise<OwnerTripSummary[]>;
   listOwnerDrivers(owner: OwnerIdentity): Promise<OwnerDriverSummary[]>;

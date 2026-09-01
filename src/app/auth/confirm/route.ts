@@ -9,7 +9,9 @@ export async function GET(request: Request) {
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type");
   const isPasswordRecovery = type === "recovery";
-  const successPath = isPasswordRecovery ? "/update-password" : "/onboarding";
+  const requestedNext = url.searchParams.get("next");
+  const safeNext = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : null;
+  const successPath = isPasswordRecovery ? "/update-password" : safeNext ?? (type === "invite" ? "/dashboard" : "/onboarding");
   const supabase = await createClient();
 
   if (code) {

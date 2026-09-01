@@ -14,6 +14,7 @@ import type {
   OwnerSummary,
   OwnerTripSummary,
   RecordStatusInput,
+  StaffIdentity,
 } from "./repository";
 
 type PendingExpense = { state: ExpenseWizardState; trip: ActiveTrip };
@@ -81,6 +82,13 @@ function ownerMenu(driverAvailable = false): InlineKeyboard {
     .text("❓ Помощь", "help:main");
   if (driverAvailable) keyboard.row().text("🚚 Режим водителя", "mode:driver");
   return keyboard;
+}
+
+function staffMenu(): InlineKeyboard {
+  return new InlineKeyboard()
+    .webApp("🌐 Открыть рабочий кабинет", MINI_APP_URL)
+    .row()
+    .text("❓ Помощь", "help:main");
 }
 
 function helpMenu(): InlineKeyboard {
@@ -221,6 +229,12 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     },
   }));
 
+  bot.use(async (context, next) => {
+    await next();
+    const userId = telegramUserId(context);
+    if (userId) await repository.syncTelegramUsername(userId, context.from?.username ?? null);
+  });
+
   async function findDriver(context: DriverBotContext): Promise<DriverIdentity | null> {
     const userId = telegramUserId(context);
     if (!userId) {
@@ -295,15 +309,25 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     );
   }
 
+  async function showStaffMenu(context: DriverBotContext, staff: StaffIdentity, message?: string): Promise<void> {
+    context.session.mode = undefined;
+    await replaceMenu(
+      context,
+      message ?? `Рабочий кабинет · ${staff.organizationName}\nРоль: ${staff.roleName}`,
+      staffMenu(),
+    );
+  }
+
   async function showRoleMenu(context: DriverBotContext, greeting?: string): Promise<void> {
     const userId = telegramUserId(context);
     if (!userId) {
       await context.reply("Откройте бота в личном чате Telegram.");
       return;
     }
-    const [owner, driver] = await Promise.all([
+    const [owner, driver, staff] = await Promise.all([
       repository.findOwnerByTelegramUserId(userId),
       repository.findDriverByTelegramUserId(userId),
+      repository.findStaffByTelegramUserId(userId),
     ]);
     context.session.ownerAvailable = Boolean(owner);
     context.session.driverAvailable = Boolean(driver);
@@ -317,6 +341,10 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     }
     if (driver) {
       await showDriverMenu(context, greeting);
+      return;
+    }
+    if (staff) {
+      await showStaffMenu(context, staff, greeting);
       return;
     }
     await replaceMenu(
@@ -340,6 +368,11 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       await showDriverMenu(context, message);
       return;
     }
+    const staff = userId ? await repository.findStaffByTelegramUserId(userId) : null;
+    if (staff) {
+      await showStaffMenu(context, staff, message);
+      return;
+    }
     await showRoleMenu(context, message);
   }
 
@@ -355,6 +388,9 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
         if (code.startsWith("owner_")) {
           const owner = await repository.claimOwnerInvitation(code, userId);
           await showOwnerMenu(context, owner, `Готово, ${owner.ownerName}. Кабинет владельца подключён к Telegram.`);
+        } else if (code.startsWith("staff_")) {
+          const staff = await repository.claimStaffInvitation(code, userId, context.from?.username ?? null);
+          await showStaffMenu(context, staff, `Готово, ${staff.staffName}. Telegram подтверждён. Ваша роль: ${staff.roleName}.`);
         } else {
           const driver = await repository.claimInvitation(code, userId);
           const owner = await repository.findOwnerByTelegramUserId(userId);

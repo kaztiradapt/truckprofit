@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import type { PermissionCode } from "@/server/team-access";
 import { calculateAndPublishTripPnl } from "@/server/trip-pnl-service";
 
 const uuid = z.uuid();
@@ -29,16 +30,20 @@ async function getAuthenticatedUser() {
   return { supabase, userId };
 }
 
-async function requireOperator(organizationId: string) {
+async function requirePermission(organizationId: string, permission: PermissionCode) {
   const { supabase, userId } = await getAuthenticatedUser();
   const { data, error } = await supabase
     .from("organization_memberships")
-    .select("role, status")
+    .select("role, status, organization_access_roles(permissions)")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)
     .eq("status", "ACTIVE")
     .maybeSingle();
-  if (error || !data || !["OWNER", "MANAGER"].includes(data.role)) dashboardError("Недостаточно прав для этого действия.");
+  const nestedRole = data?.organization_access_roles;
+  const accessRole = Array.isArray(nestedRole) ? nestedRole[0] : nestedRole;
+  if (error || !data || (data.role !== "OWNER" && !accessRole?.permissions?.includes(permission))) {
+    dashboardError("Недостаточно прав для этого действия.");
+  }
   return supabase;
 }
 
@@ -105,7 +110,7 @@ export async function createVehicle(formData: FormData): Promise<void> {
   const fuelNorm = parsed.data.fuelNorm ? Number(parsed.data.fuelNorm.replace(",", ".")) : null;
   if (fuelNorm !== null && (!Number.isFinite(fuelNorm) || fuelNorm <= 0 || fuelNorm > 200)) dashboardError("Норма топлива должна быть от 0 до 200 л/100 км.");
 
-  const supabase = await requireOperator(parsed.data.organizationId);
+  const supabase = await requirePermission(parsed.data.organizationId, "MANAGE_VEHICLES");
   const { error } = await supabase.from("vehicles").insert({
     organization_id: parsed.data.organizationId,
     display_name: parsed.data.displayName,
@@ -122,7 +127,7 @@ export async function createDriver(formData: FormData): Promise<void> {
     organizationId: formData.get("organization_id"), displayName: formData.get("display_name"),
   });
   if (!parsed.success) dashboardError("Введите имя водителя.");
-  const supabase = await requireOperator(parsed.data.organizationId);
+  const supabase = await requirePermission(parsed.data.organizationId, "MANAGE_DRIVERS");
   const { error } = await supabase.from("drivers").insert({
     organization_id: parsed.data.organizationId,
     display_name: parsed.data.displayName,
@@ -150,7 +155,7 @@ export async function createTrip(formData: FormData): Promise<void> {
   const driverId = parsed.data.driverId ? uuid.safeParse(parsed.data.driverId) : null;
   if (driverId && !driverId.success) dashboardError("Выберите водителя из списка.");
 
-  const supabase = await requireOperator(parsed.data.organizationId);
+  const supabase = await requirePermission(parsed.data.organizationId, "MANAGE_TRIPS");
   const { error } = await supabase.rpc("create_trip_with_first_leg", {
     p_organization_id: parsed.data.organizationId,
     p_vehicle_id: parsed.data.vehicleId,
@@ -181,7 +186,7 @@ export async function createIncome(formData: FormData): Promise<void> {
   if (!parsed.success || (parsed.data.expectedPaymentAt && !z.string().date().safeParse(parsed.data.expectedPaymentAt).success)) {
     dashboardError("Проверьте сумму и дату ожидаемой оплаты.");
   }
-  const supabase = await requireOperator(parsed.data.organizationId);
+  const supabase = await requirePermission(parsed.data.organizationId, "MANAGE_FINANCE");
   const { error } = await supabase.rpc("record_owner_income", {
     p_organization_id: parsed.data.organizationId,
     p_trip_id: parsed.data.tripId,
@@ -206,7 +211,7 @@ export async function reviewExpense(formData: FormData): Promise<void> {
     decision: formData.get("decision"),
   });
   if (!parsed.success) dashboardError("Проверьте решение по расходу.");
-  const supabase = await requireOperator(parsed.data.organizationId);
+  const supabase = await requirePermission(parsed.data.organizationId, "REVIEW_EXPENSES");
   const { error } = await supabase.rpc("review_expense", {
     p_organization_id: parsed.data.organizationId,
     p_expense_id: parsed.data.expenseId,
@@ -223,7 +228,7 @@ export async function completeTrip(formData: FormData): Promise<void> {
     tripId: formData.get("trip_id"),
   });
   if (!parsed.success) dashboardError("Выберите рейс для закрытия.");
-  const supabase = await requireOperator(parsed.data.organizationId);
+  const supabase = await requirePermission(parsed.data.organizationId, "MANAGE_TRIPS");
   const { error } = await supabase.rpc("complete_trip_from_facts", {
     p_organization_id: parsed.data.organizationId,
     p_trip_id: parsed.data.tripId,
@@ -238,7 +243,7 @@ export async function recalculateTripPnl(formData: FormData): Promise<void> {
     tripId: formData.get("trip_id"),
   });
   if (!parsed.success) dashboardError("Выберите рейс для расчёта.");
-  await requireOperator(parsed.data.organizationId);
+  await requirePermission(parsed.data.organizationId, "MANAGE_FINANCE");
   try {
     await calculateAndPublishTripPnl({ organizationId: parsed.data.organizationId, tripId: parsed.data.tripId });
   } catch {

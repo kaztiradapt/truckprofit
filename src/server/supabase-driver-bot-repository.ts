@@ -13,6 +13,7 @@ import type {
   ReceiptUpload,
   RecordExpenseInput,
   RecordStatusInput,
+  StaffIdentity,
 } from "../bot/repository";
 import type { BotEnvironment } from "./env";
 
@@ -36,6 +37,22 @@ type ClaimedOwnerInvitation = {
   owner_name: string;
   organization_name: string;
   base_currency: string;
+};
+
+type ClaimedStaffInvitation = {
+  organization_id: string;
+  staff_id: string;
+  staff_name: string;
+  organization_name: string;
+  role_name: string;
+};
+
+type RawStaff = {
+  id: string;
+  organization_id: string;
+  display_name: string;
+  organizations: { name: string } | { name: string }[] | null;
+  organization_access_roles: { name: string } | { name: string }[] | null;
 };
 
 type RawOwnerMembership = {
@@ -176,6 +193,31 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
     };
   }
 
+  async claimStaffInvitation(invitationCode: string, telegramUserId: number, telegramUsername: string | null): Promise<StaffIdentity> {
+    const { data, error } = await this.client.rpc("claim_staff_telegram_invite", {
+      p_invitation_code: invitationCode,
+      p_telegram_user_id: telegramUserId,
+      p_telegram_username: telegramUsername,
+    }).single();
+    throwOnError(error);
+    const invitation = data as ClaimedStaffInvitation;
+    return {
+      organizationId: invitation.organization_id,
+      staffId: invitation.staff_id,
+      staffName: invitation.staff_name,
+      organizationName: invitation.organization_name,
+      roleName: invitation.role_name,
+    };
+  }
+
+  async syncTelegramUsername(telegramUserId: number, telegramUsername: string | null): Promise<void> {
+    const { error } = await this.client.rpc("sync_telegram_username", {
+      p_telegram_user_id: telegramUserId,
+      p_telegram_username: telegramUsername,
+    });
+    throwOnError(error);
+  }
+
   async findDriverByTelegramUserId(telegramUserId: number): Promise<DriverIdentity | null> {
     const { data, error } = await this.client
       .from("drivers")
@@ -217,6 +259,30 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
       ownerName: profile.display_name || "Владелец",
       organizationName: organization.name,
       baseCurrency: organization.base_currency,
+    };
+  }
+
+  async findStaffByTelegramUserId(telegramUserId: number): Promise<StaffIdentity | null> {
+    const { data, error } = await this.client
+      .from("organization_staff")
+      .select("id, organization_id, display_name, organizations(name), organization_access_roles(name)")
+      .eq("telegram_user_id", telegramUserId)
+      .eq("status", "ACTIVE")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    throwOnError(error);
+    if (!data) return null;
+    const staff = data as unknown as RawStaff;
+    const organization = asOne(staff.organizations);
+    const role = asOne(staff.organization_access_roles);
+    if (!organization) throw new Error("Staff organization is unavailable");
+    return {
+      organizationId: staff.organization_id,
+      staffId: staff.id,
+      staffName: staff.display_name,
+      organizationName: organization.name,
+      roleName: role?.name ?? "Сотрудник",
     };
   }
 
