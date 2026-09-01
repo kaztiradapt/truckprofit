@@ -5,6 +5,7 @@ import { completeTrip, createDriver, createIncome, createTrip, createVehicle, en
 import { getDashboardData } from "@/lib/dashboard-data";
 import { DriverInviteButton } from "./driver-invite-button";
 import { OwnerTelegramConnectButton } from "./owner-telegram-connect-button";
+import { RecordManagement } from "./record-management";
 import { TelegramMenuButton } from "./telegram-menu-button";
 import { TeamManagement } from "./team-management";
 
@@ -49,6 +50,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const canManageFinance = data.permissions.includes("MANAGE_FINANCE");
   const canReviewExpenses = data.permissions.includes("REVIEW_EXPENSES");
   const canViewFinance = data.permissions.includes("VIEW_FINANCE");
+  const canDelete = data.permissions.includes("DELETE_RECORDS");
   const canOperate = canManageVehicles || canManageDrivers || canManageTrips || canManageFinance || canReviewExpenses;
   const ownerDriver = data.drivers.find((driver) => driver.isOwnerDriver) ?? null;
   const today = new Date().toISOString().slice(0, 10);
@@ -73,6 +75,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           {canViewFinance || canReviewExpenses ? <a href="#expenses">Расходы</a> : null}
           {data.role === "OWNER" ? <a href="#team">Сотрудники</a> : null}
           {canOperate ? <a href="#operations">Первичные факты</a> : null}
+          {canManageVehicles || canManageDrivers || canManageTrips ? <a href="#records">Редактирование</a> : null}
           <a href="#help">Инструкция</a>
         </nav>
         <div className="sidebar-note">
@@ -216,6 +219,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </div> : null}
           </div>
         </section> : <section className="panel"><h2>Ваш доступ: {data.accessRoleName}</h2><p className="muted">Редактирование ограничено владельцем. Доступные данные остаются в режиме просмотра.</p></section>}
+
+        {canManageVehicles || canManageDrivers || canManageTrips ? <RecordManagement
+          organizationId={data.organization.id}
+          vehicles={data.vehicles}
+          drivers={data.drivers}
+          trips={data.trips}
+          canManageVehicles={canManageVehicles}
+          canManageDrivers={canManageDrivers}
+          canManageTrips={canManageTrips}
+          canDelete={canDelete}
+        /> : null}
 
         <section className="help-section" id="help">
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>

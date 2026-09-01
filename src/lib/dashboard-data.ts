@@ -23,15 +23,20 @@ export type DashboardData = {
     roleName: string;
     isOwner: boolean;
   }>;
-  vehicles: Array<{ id: string; displayName: string; plateNumber: string; status: string }>;
+  vehicles: Array<{ id: string; displayName: string; plateNumber: string; makeModel: string | null; fuelNorm: number | null; status: string }>;
   drivers: Array<{ id: string; displayName: string; status: string; telegramLinked: boolean; pendingInviteExpiresAt: string | null; isOwnerDriver: boolean }>;
   trips: Array<{
     id: string;
     title: string;
     status: string;
+    vehicleId: string;
+    driverId: string | null;
     vehicleName: string;
     driverName: string | null;
     startedAt: string | null;
+    originCity: string;
+    destinationCity: string;
+    loadState: string;
     lastLocation: {
       latitude: number;
       longitude: number;
@@ -99,6 +104,8 @@ type TripRow = {
   id: string;
   title: string;
   status: string;
+  vehicle_id: string;
+  driver_id: string | null;
   started_at: string | null;
   vehicles: { display_name: string } | { display_name: string }[] | null;
   drivers: { display_name: string } | { display_name: string }[] | null;
@@ -151,15 +158,15 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
 
   const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, pendingExpensesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult] = await Promise.all([
     supabase.from("profiles").select("telegram_user_id").eq("id", userId).maybeSingle(),
-    supabase.from("vehicles").select("id, display_name, plate_number, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
+    supabase.from("vehicles").select("id, display_name, plate_number, make_model, fuel_norm_l_per_100km, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
-    supabase.from("trips").select("id, title, status, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(12),
+    supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(50),
     supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id),
     supabase.from("expenses").select("id, amount, currency, occurred_at, comment, expense_categories(display_name), trips(title)").eq("organization_id", membership.organization_id).eq("review_status", "PENDING").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(12),
     supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
     supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()),
     supabase.from("organization_access_roles").select("id, name, permissions, is_system").eq("organization_id", membership.organization_id).order("is_system", { ascending: false }).order("name"),
-    supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name)").eq("organization_id", membership.organization_id).order("created_at"),
+    supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("created_at"),
     supabase.from("trip_location_points").select("trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(100),
   ]);
   for (const result of [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, accessRolesResult, staffResult]) {
@@ -210,7 +217,14 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       roleName: person.access_role_id ? asOne(person.organization_access_roles)?.name ?? "Сотрудник" : "Владелец",
       isOwner: person.access_role_id === null,
     })),
-    vehicles: (vehiclesResult.data ?? []).map((vehicle) => ({ id: vehicle.id, displayName: vehicle.display_name, plateNumber: vehicle.plate_number, status: vehicle.status })),
+    vehicles: (vehiclesResult.data ?? []).map((vehicle) => ({
+      id: vehicle.id,
+      displayName: vehicle.display_name,
+      plateNumber: vehicle.plate_number,
+      makeModel: vehicle.make_model,
+      fuelNorm: vehicle.fuel_norm_l_per_100km === null ? null : Number(vehicle.fuel_norm_l_per_100km),
+      status: vehicle.status,
+    })),
     drivers: (driversResult.data ?? []).map((driver) => ({
       id: driver.id,
       displayName: driver.display_name,
@@ -219,13 +233,21 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       pendingInviteExpiresAt: pendingInvitesByDriver.get(driver.id) ?? null,
       isOwnerDriver: driver.profile_id === userId,
     })),
-    trips: ((tripsResult.data ?? []) as unknown as TripRow[]).map((trip) => ({
+    trips: ((tripsResult.data ?? []) as unknown as TripRow[]).map((trip) => {
+      const legs = (trip.trip_legs ?? []).sort((left, right) => left.sequence_no - right.sequence_no);
+      const firstLeg = legs[0];
+      return {
       id: trip.id,
       title: trip.title,
       status: trip.status,
+      vehicleId: trip.vehicle_id,
+      driverId: trip.driver_id,
       vehicleName: asOne(trip.vehicles)?.display_name ?? "Без машины",
       driverName: asOne(trip.drivers)?.display_name ?? null,
       startedAt: trip.started_at,
+      originCity: firstLeg?.origin_city ?? "",
+      destinationCity: firstLeg?.destination_city ?? "",
+      loadState: firstLeg?.load_state ?? "UNKNOWN",
       lastLocation: latestLocationByTrip.has(trip.id) ? {
         latitude: Number(latestLocationByTrip.get(trip.id)!.latitude),
         longitude: Number(latestLocationByTrip.get(trip.id)!.longitude),
@@ -234,7 +256,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
           : Number(latestLocationByTrip.get(trip.id)!.horizontal_accuracy_m),
         recordedAt: latestLocationByTrip.get(trip.id)!.recorded_at,
       } : null,
-      legs: (trip.trip_legs ?? []).sort((left, right) => left.sequence_no - right.sequence_no).map((leg) => ({
+      legs: legs.map((leg) => ({
         id: leg.id,
         sequenceNo: leg.sequence_no,
         originCity: leg.origin_city,
@@ -245,7 +267,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
         distanceKm: leg.distance_km === null ? null : Number(leg.distance_km),
       })),
       pnl: pnlByTrip.get(trip.id) ?? null,
-    })),
+    }; }),
     pendingExpenses: (pendingExpensesResult.data ?? []).map((expense) => ({
       id: expense.id,
       categoryName: asOne(expense.expense_categories)?.display_name ?? "Расход",

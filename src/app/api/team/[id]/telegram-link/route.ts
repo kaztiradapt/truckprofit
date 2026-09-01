@@ -16,7 +16,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const { data: staff, error: staffError } = await auth.supabase.from("organization_staff")
     .select("id, telegram_username, telegram_user_id")
-    .eq("id", id).eq("organization_id", organizationId).maybeSingle();
+    .eq("id", id).eq("organization_id", organizationId).is("deleted_at", null).maybeSingle();
   if (staffError || !staff) return Response.json({ error: "Сотрудник не найден." }, { status: 404 });
   if (!staff.telegram_username) return Response.json({ error: "Сначала укажите Telegram @тег." }, { status: 400 });
   if (staff.telegram_user_id) return Response.json({ error: "Telegram сотрудника уже привязан по ID." }, { status: 409 });

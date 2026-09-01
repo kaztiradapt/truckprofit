@@ -141,6 +141,24 @@ export function TeamManagement({ organizationId, roles, staff }: { organizationI
     } finally { setBusy(""); }
   }
 
+  async function removeStaff(person: StaffView) {
+    if (!window.confirm(`Удалить сотрудника «${person.displayName}» из кабинета? Доступ будет отключён, запись останется в журнале.`)) return;
+    setBusy(`delete-${person.id}`); setError(""); setMessage("");
+    try {
+      const response = await fetch(`/api/team/${person.id}`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ organizationId }),
+      });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Не удалось удалить сотрудника.");
+      setMessage("Сотрудник удалён из кабинета.");
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Не удалось удалить сотрудника.");
+    } finally { setBusy(""); }
+  }
+
   async function copyInvite() {
     if (!invite?.telegramLink) return;
     await navigator.clipboard.writeText(invite.telegramLink);
@@ -185,7 +203,7 @@ export function TeamManagement({ organizationId, roles, staff }: { organizationI
             <div><button type="submit" className="tiny-button" disabled={busy === person.id}>Сохранить</button><button type="button" className="tiny-button" onClick={() => setEditingId(null)}>Отмена</button></div>
           </form> : <>
             <span><b>{person.displayName}{person.isOwner ? <span className="owner-driver-mark">Владелец</span> : null}</b><small>{person.email ?? "без email"} · {person.telegramUsername ? `@${person.telegramUsername}` : "без Telegram-тега"} · {person.telegramLinked ? "Telegram ID подтверждён" : "Telegram не подтверждён"}</small></span>
-            <span className="staff-actions"><span className="badge">{person.roleName} · {statusLabel(person.status)}</span>{!person.isOwner ? <div><button type="button" className="tiny-button" onClick={() => setEditingId(person.id)}>Изменить</button>{person.telegramUsername && !person.telegramLinked ? <button type="button" className="tiny-button" disabled={busy === `invite-${person.id}`} onClick={() => createTelegramLink(person.id)}>{busy === `invite-${person.id}` ? "Готовлю…" : "Telegram-ссылка"}</button> : null}</div> : null}</span>
+            <span className="staff-actions"><span className="badge">{person.roleName} · {statusLabel(person.status)}</span>{!person.isOwner ? <div><button type="button" className="tiny-button" onClick={() => setEditingId(person.id)}>Изменить</button>{person.telegramUsername && !person.telegramLinked ? <button type="button" className="tiny-button" disabled={busy === `invite-${person.id}`} onClick={() => createTelegramLink(person.id)}>{busy === `invite-${person.id}` ? "Готовлю…" : "Telegram-ссылка"}</button> : null}<button type="button" className="tiny-button danger-button" disabled={busy === `delete-${person.id}`} onClick={() => removeStaff(person)}>Удалить</button></div> : null}</span>
           </>}
         </li>)}</ul>
       </article>

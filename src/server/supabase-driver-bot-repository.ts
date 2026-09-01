@@ -269,6 +269,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
       .select("id, organization_id, display_name, organizations(name), organization_access_roles(name)")
       .eq("telegram_user_id", telegramUserId)
       .eq("status", "ACTIVE")
+      .is("deleted_at", null)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();

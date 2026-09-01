@@ -114,6 +114,7 @@ export async function POST(request: Request): Promise<Response> {
     email,
     telegram_username: telegramUsername,
     status: profileId ? "ACTIVE" : "INVITED",
+    deleted_at: null,
     created_by: context.userId,
   };
   const staffResult = staff
