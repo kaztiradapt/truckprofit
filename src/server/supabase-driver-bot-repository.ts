@@ -9,6 +9,7 @@ import type {
   OwnerIdentity,
   OwnerSummary,
   OwnerTripSummary,
+  OrganizationScope,
   PreliminaryCompensation,
   ReceiptUpload,
   RecordExpenseInput,
@@ -40,20 +41,12 @@ type ClaimedOwnerInvitation = {
   base_currency: string;
 };
 
-type ClaimedStaffInvitation = {
-  organization_id: string;
-  staff_id: string;
-  staff_name: string;
-  organization_name: string;
-  role_name: string;
-};
-
 type RawStaff = {
   id: string;
   organization_id: string;
   display_name: string;
-  organizations: { name: string } | { name: string }[] | null;
-  organization_access_roles: { name: string } | { name: string }[] | null;
+  organizations: { name: string; base_currency: string } | { name: string; base_currency: string }[] | null;
+  organization_access_roles: { name: string; permissions: string[] } | { name: string; permissions: string[] }[] | null;
 };
 
 type RawOwnerMembership = {
@@ -213,20 +206,15 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   }
 
   async claimStaffInvitation(invitationCode: string, telegramUserId: number, telegramUsername: string | null): Promise<StaffIdentity> {
-    const { data, error } = await this.client.rpc("claim_staff_telegram_invite", {
+    const { error } = await this.client.rpc("claim_staff_telegram_invite", {
       p_invitation_code: invitationCode,
       p_telegram_user_id: telegramUserId,
       p_telegram_username: telegramUsername,
     }).single();
     throwOnError(error);
-    const invitation = data as ClaimedStaffInvitation;
-    return {
-      organizationId: invitation.organization_id,
-      staffId: invitation.staff_id,
-      staffName: invitation.staff_name,
-      organizationName: invitation.organization_name,
-      roleName: invitation.role_name,
-    };
+    const staff = await this.findStaffByTelegramUserId(telegramUserId);
+    if (!staff) throw new Error("Claimed staff identity is unavailable");
+    return staff;
   }
 
   async syncTelegramUsername(telegramUserId: number, telegramUsername: string | null): Promise<void> {
@@ -284,7 +272,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   async findStaffByTelegramUserId(telegramUserId: number): Promise<StaffIdentity | null> {
     const { data, error } = await this.client
       .from("organization_staff")
-      .select("id, organization_id, display_name, organizations(name), organization_access_roles(name)")
+      .select("id, organization_id, display_name, organizations(name, base_currency), organization_access_roles(name, permissions)")
       .eq("telegram_user_id", telegramUserId)
       .eq("status", "ACTIVE")
       .is("deleted_at", null)
@@ -302,11 +290,13 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
       staffId: staff.id,
       staffName: staff.display_name,
       organizationName: organization.name,
+      baseCurrency: organization.base_currency,
       roleName: role?.name ?? "Сотрудник",
+      permissions: role?.permissions ?? [],
     };
   }
 
-  async getOwnerSummary(owner: OwnerIdentity): Promise<OwnerSummary> {
+  async getOwnerSummary(owner: OrganizationScope): Promise<OwnerSummary> {
     const today = new Date().toISOString().slice(0, 10);
     const [vehicles, drivers, activeTrips, overdueIncomes, financials] = await Promise.all([
       this.client.from("vehicles").select("id", { count: "exact", head: true }).eq("organization_id", owner.organizationId).eq("status", "ACTIVE").is("deleted_at", null),
@@ -329,7 +319,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
     };
   }
 
-  async listOwnerActiveTrips(owner: OwnerIdentity): Promise<OwnerTripSummary[]> {
+  async listOwnerActiveTrips(owner: OrganizationScope): Promise<OwnerTripSummary[]> {
     const { data, error } = await this.client
       .from("trips")
       .select("id, title, started_at, vehicles(display_name, plate_number), drivers(display_name)")
@@ -351,7 +341,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
     });
   }
 
-  async listOwnerDrivers(owner: OwnerIdentity): Promise<OwnerDriverSummary[]> {
+  async listOwnerDrivers(owner: OrganizationScope): Promise<OwnerDriverSummary[]> {
     const { data, error } = await this.client
       .from("drivers")
       .select("id, display_name, status, telegram_user_id")
@@ -368,7 +358,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
     }));
   }
 
-  async listOwnerRecentExpenses(owner: OwnerIdentity): Promise<OwnerExpenseSummary[]> {
+  async listOwnerRecentExpenses(owner: OrganizationScope): Promise<OwnerExpenseSummary[]> {
     const { data, error } = await this.client
       .from("expenses")
       .select("id, amount, currency, occurred_at, expense_categories(display_name), trips(title), drivers(display_name)")

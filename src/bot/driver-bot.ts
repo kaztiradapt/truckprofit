@@ -30,7 +30,7 @@ type BotSession = {
   odometer?: PendingOdometer;
   status?: PendingStatus;
   locationPromptMessageId?: number;
-  mode?: "OWNER" | "DRIVER";
+  mode?: "OWNER" | "DRIVER" | "STAFF";
   ownerAvailable?: boolean;
   driverAvailable?: boolean;
   menuMessageId?: number;
@@ -88,9 +88,23 @@ function ownerMenu(driverAvailable = false): InlineKeyboard {
   return keyboard;
 }
 
-function staffMenu(): InlineKeyboard {
-  return new InlineKeyboard()
-    .text("❓ Помощь", "help:main");
+function hasStaffPermission(staff: StaffIdentity, ...permissions: string[]): boolean {
+  return permissions.some((permission) => staff.permissions.includes(permission));
+}
+
+function staffMenu(staff: StaffIdentity): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  const buttons: Array<[string, string]> = [];
+  if (hasStaffPermission(staff, "VIEW_DASHBOARD")) buttons.push(["📊 Сводка", "staff:summary"]);
+  if (hasStaffPermission(staff, "VIEW_DASHBOARD", "MANAGE_TRIPS")) buttons.push(["🚛 Активные рейсы", "staff:trips"]);
+  if (hasStaffPermission(staff, "VIEW_DASHBOARD", "MANAGE_DRIVERS")) buttons.push(["👥 Водители", "staff:drivers"]);
+  if (hasStaffPermission(staff, "VIEW_FINANCE", "MANAGE_FINANCE")) buttons.push(["💳 Расходы", "staff:expenses"]);
+  for (const [index, [label, callback]] of buttons.entries()) {
+    keyboard.text(label, callback);
+    if (index % 2 === 1) keyboard.row();
+  }
+  if (buttons.length % 2 === 1) keyboard.row();
+  return keyboard.text("❓ Помощь", "help:main");
 }
 
 function helpMenu(): InlineKeyboard {
@@ -98,7 +112,9 @@ function helpMenu(): InlineKeyboard {
     .text("Владельцу", "help:owner")
     .text("Водителю", "help:driver")
     .row()
+    .text("Сотруднику", "help:staff")
     .text("Mini App", "help:miniapp")
+    .row()
     .text("Частые вопросы", "help:faq")
     .row()
     .text("← Главное меню", "help:close");
@@ -190,6 +206,24 @@ export function formatOwnerSummary(summary: OwnerSummary, currency: string): str
     `Расходы: ${formatMoney(summary.expensesMinor, currency)}`,
     `Результат: ${formatMoney(summary.profitMinor, currency)}`,
   ].join("\n");
+}
+
+export function formatStaffSummary(summary: OwnerSummary, currency: string, canViewFinance: boolean): string {
+  const lines = [
+    "📊 Рабочая сводка",
+    "",
+    `🚛 Активных рейсов: ${summary.activeTripCount}`,
+    `🚚 Машин: ${summary.vehicleCount}`,
+    `👥 Водителей: ${summary.driverCount}`,
+  ];
+  if (canViewFinance) lines.push(
+    `⏰ Просроченных оплат: ${summary.overdueIncomeCount}`,
+    "",
+    `Выручка: ${formatMoney(summary.revenueMinor, currency)}`,
+    `Расходы: ${formatMoney(summary.expensesMinor, currency)}`,
+    `Результат: ${formatMoney(summary.profitMinor, currency)}`,
+  );
+  return lines.join("\n");
 }
 
 export function formatOwnerTrips(trips: OwnerTripSummary[]): string {
@@ -395,12 +429,14 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
   }
 
   async function showStaffMenu(context: DriverBotContext, staff: StaffIdentity, message?: string): Promise<void> {
-    context.session.mode = undefined;
+    context.session.mode = "STAFF";
     await ensureChatMenuButton(context, "WEB_APP");
     await replaceMenu(
       context,
-      message ?? `Рабочий кабинет · ${staff.organizationName}\nРоль: ${staff.roleName}`,
-      staffMenu(),
+      message
+        ? `${message}\n\nРабочий кабинет · ${staff.organizationName}\nРоль: ${staff.roleName}`
+        : `Рабочий кабинет · ${staff.organizationName}\nРоль: ${staff.roleName}\nВыберите доступное действие.`,
+      staffMenu(staff),
     );
   }
 
@@ -595,6 +631,18 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       ].join("\n"), helpMenu());
       return;
     }
+    if (data === "help:staff") {
+      await replaceMenu(context, [
+        "👩‍💼 Инструкция сотруднику",
+        "",
+        "1. Главное меню показывает только действия, разрешённые вашей ролью.",
+        "2. В чате доступны быстрая сводка, активные рейсы, водители и расходы — в зависимости от прав.",
+        "3. Для создания и редактирования записей откройте Mini App встроенной кнопкой Telegram.",
+        "4. Удаление доступно только когда владелец отдельно выдал право «Удалять записи».",
+        "5. Если нужной кнопки нет, попросите владельца проверить вашу роль в разделе «Сотрудники».",
+      ].join("\n"), helpMenu());
+      return;
+    }
     if (data === "help:miniapp") {
       await replaceMenu(context, [
         "🌐 Как открыть Mini App",
@@ -657,6 +705,34 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       } else if (data === "owner:expenses") {
         const expenses = await repository.listOwnerRecentExpenses(owner);
         await replaceMenu(context, formatOwnerExpenses(expenses), ownerMenu(context.session.driverAvailable));
+      }
+      return;
+    }
+
+    if (data.startsWith("staff:")) {
+      const userId = telegramUserId(context);
+      const staff = userId ? await repository.findStaffByTelegramUserId(userId) : null;
+      if (!staff) {
+        await showRoleMenu(context, "Доступ сотрудника не найден. Попросите владельца проверить привязку Telegram.");
+        return;
+      }
+      if (data === "staff:summary" && hasStaffPermission(staff, "VIEW_DASHBOARD")) {
+        const summary = await repository.getOwnerSummary(staff);
+        await replaceMenu(context, formatStaffSummary(summary, staff.baseCurrency, hasStaffPermission(staff, "VIEW_FINANCE", "MANAGE_FINANCE")), staffMenu(staff));
+      } else if (data === "staff:trips" && hasStaffPermission(staff, "VIEW_DASHBOARD", "MANAGE_TRIPS")) {
+        const trips = await repository.listOwnerActiveTrips(staff);
+        await replaceMenu(context, formatOwnerTrips(trips), staffMenu(staff));
+      } else if (data === "staff:drivers" && hasStaffPermission(staff, "VIEW_DASHBOARD", "MANAGE_DRIVERS")) {
+        const drivers = await repository.listOwnerDrivers(staff);
+        const message = drivers.length
+          ? ["👥 Водители", "", ...drivers.map((item, index) => `${index + 1}. ${item.displayName} · ${item.status === "ACTIVE" ? "активен" : item.status} · ${item.telegramLinked ? "Telegram ✓" : "Telegram не подключён"}`)].join("\n")
+          : "Водителей пока нет.";
+        await replaceMenu(context, message, staffMenu(staff));
+      } else if (data === "staff:expenses" && hasStaffPermission(staff, "VIEW_FINANCE", "MANAGE_FINANCE")) {
+        const expenses = await repository.listOwnerRecentExpenses(staff);
+        await replaceMenu(context, formatOwnerExpenses(expenses), staffMenu(staff));
+      } else {
+        await showStaffMenu(context, staff, "Это действие недоступно для вашей роли.");
       }
       return;
     }
@@ -800,7 +876,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
   bot.on("message:text", async (context) => {
     const text = context.message.text.trim();
     if (text.startsWith("/")) return;
-    if (context.session.mode === "OWNER") {
+    if (context.session.mode === "OWNER" || context.session.mode === "STAFF") {
       await showCurrentMenu(context, "Для действий используйте кнопки меню. Справка доступна в разделе «❓ Помощь».");
       return;
     }

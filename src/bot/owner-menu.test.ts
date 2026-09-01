@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDriverTrip, formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips, normalizeLocationPoint } from "./driver-bot";
+import { formatDriverTrip, formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips, formatStaffSummary, normalizeLocationPoint } from "./driver-bot";
 
 describe("owner Telegram menu formatting", () => {
   it("renders an operational and financial summary", () => {
@@ -22,6 +22,26 @@ describe("owner Telegram menu formatting", () => {
   it("renders useful empty states", () => {
     expect(formatOwnerTrips([])).toContain("нет");
     expect(formatOwnerExpenses([])).toContain("нет");
+  });
+
+  it("hides financial values from staff without finance access", () => {
+    const summary = {
+      vehicleCount: 3,
+      driverCount: 4,
+      activeTripCount: 2,
+      overdueIncomeCount: 1,
+      revenueMinor: 900_000_00,
+      expensesMinor: 350_000_00,
+      profitMinor: 550_000_00,
+    };
+    const operational = formatStaffSummary(summary, "KZT", false);
+    const financial = formatStaffSummary(summary, "KZT", true);
+
+    expect(operational).toContain("Активных рейсов: 2");
+    expect(operational).not.toContain("Выручка:");
+    expect(operational).not.toContain("Просроченных оплат:");
+    expect(financial).toContain("Выручка:");
+    expect(financial).toContain("Просроченных оплат: 1");
   });
 
   it("includes assigned vehicle and driver in an active trip", () => {

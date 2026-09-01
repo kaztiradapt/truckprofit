@@ -18,8 +18,12 @@ export type StaffIdentity = {
   staffId: string;
   staffName: string;
   organizationName: string;
+  baseCurrency: string;
   roleName: string;
+  permissions: string[];
 };
+
+export type OrganizationScope = { organizationId: string };
 
 export type OwnerSummary = {
   vehicleCount: number;
@@ -137,10 +141,10 @@ export interface DriverBotRepository {
   findDriverByTelegramUserId(telegramUserId: number): Promise<DriverIdentity | null>;
   findOwnerByTelegramUserId(telegramUserId: number): Promise<OwnerIdentity | null>;
   findStaffByTelegramUserId(telegramUserId: number): Promise<StaffIdentity | null>;
-  getOwnerSummary(owner: OwnerIdentity): Promise<OwnerSummary>;
-  listOwnerActiveTrips(owner: OwnerIdentity): Promise<OwnerTripSummary[]>;
-  listOwnerDrivers(owner: OwnerIdentity): Promise<OwnerDriverSummary[]>;
-  listOwnerRecentExpenses(owner: OwnerIdentity): Promise<OwnerExpenseSummary[]>;
+  getOwnerSummary(scope: OrganizationScope): Promise<OwnerSummary>;
+  listOwnerActiveTrips(scope: OrganizationScope): Promise<OwnerTripSummary[]>;
+  listOwnerDrivers(scope: OrganizationScope): Promise<OwnerDriverSummary[]>;
+  listOwnerRecentExpenses(scope: OrganizationScope): Promise<OwnerExpenseSummary[]>;
   findActiveTrip(driver: DriverIdentity): Promise<ActiveTrip | null>;
   recordExpense(input: RecordExpenseInput): Promise<{ expenseId: string }>;
   recordOdometer(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm" | "occurredAt">): Promise<void>;
