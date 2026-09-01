@@ -55,8 +55,6 @@ const statusDefinitions: Record<string, { title: string; statusCode: RecordStatu
   DELAY: { title: "Задержка", statusCode: "DELAY", loadState: "UNKNOWN" },
 };
 
-const MINI_APP_URL = "https://fleet-economics.vercel.app/dashboard";
-
 function driverMenu(ownerAvailable = false): InlineKeyboard {
   const keyboard = new InlineKeyboard()
     .text("Мой рейс", "menu:trip")
@@ -81,7 +79,6 @@ function ownerMenu(driverAvailable = false): InlineKeyboard {
     .text("👥 Водители", "owner:drivers")
     .text("💳 Расходы", "owner:expenses")
     .row()
-    .webApp("🌐 Открыть кабинет", MINI_APP_URL)
     .text("❓ Помощь", "help:main");
   if (driverAvailable) keyboard.row().text("🚚 Режим водителя", "mode:driver");
   return keyboard;
@@ -89,8 +86,6 @@ function ownerMenu(driverAvailable = false): InlineKeyboard {
 
 function staffMenu(): InlineKeyboard {
   return new InlineKeyboard()
-    .webApp("🌐 Открыть рабочий кабинет", MINI_APP_URL)
-    .row()
     .text("❓ Помощь", "help:main");
 }
 
@@ -521,7 +516,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       await replaceMenu(context, [
         "🌐 Как открыть Mini App",
         "",
-        "Нажмите «Открыть кабинет» в меню владельца или кнопку возле поля ввода Telegram.",
+        "Нажмите синюю кнопку «Открыть кабинет» возле поля ввода Telegram.",
         "При первом открытии войдите email и паролем владельца. Бот и Mini App работают с одной базой — переносить данные вручную не нужно.",
       ].join("\n"), helpMenu());
       return;
