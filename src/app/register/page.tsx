@@ -8,7 +8,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
       <section className="auth-card">
         <p className="eyebrow">Первый собственник</p>
         <h1>Создайте защищённый вход</h1>
-        <p className="lead">После подтверждения email вы создадите первую транспортную компанию.</p>
+        <p className="lead">После подтверждения email вы создадите первую транспортную компанию и выберете её основную валюту учёта.</p>
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         <form action={signUp} className="stack-form">
           <label>Ваше имя<input name="display_name" autoComplete="name" minLength={2} required /></label>

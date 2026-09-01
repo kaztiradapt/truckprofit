@@ -13,7 +13,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         <form action={createOrganization} className="stack-form">
           <label>Название<input name="name" placeholder="ИП Арман / Demo Transport" minLength={2} required /></label>
           <label>Короткий код латиницей<input name="slug" placeholder="arman-transport" pattern="[a-z0-9][a-z0-9-]{1,62}" required /></label>
-          <label>Базовая валюта<select name="currency" defaultValue="KZT">{supportedCurrencies.map((currency) => <option key={currency} value={currency}>{currencyLabels[currency]}</option>)}</select></label>
+          <label>Основная валюта учёта компании<select name="currency" defaultValue="KZT">{supportedCurrencies.map((currency) => <option key={currency} value={currency}>{currencyLabels[currency]}</option>)}</select><small className="field-help">В этой валюте будут P&amp;L и отчёты. Доход можно принимать в любой поддерживаемой валюте — для неё приложение запросит курс к основной.</small></label>
           <label className="choice-card"><input name="owner_driver" type="checkbox" value="yes" /><span><b>Я владелец и сам вожу автомобиль</b><small>Создадим ваш профиль водителя автоматически.</small></span></label>
           <button type="submit">Начать учёт</button>
         </form>
