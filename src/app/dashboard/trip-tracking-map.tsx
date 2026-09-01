@@ -29,6 +29,14 @@ function dateTimeLabel(value: string) {
   return new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
+function pointCountLabel(count: number) {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  if (last === 1 && lastTwo !== 11) return `${count} точка`;
+  if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return `${count} точки`;
+  return `${count} точек`;
+}
+
 function AnnotationForm({ organizationId, tripId, point, onSaved }: {
   organizationId: string;
   tripId: string;
@@ -206,7 +214,7 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
     </div>
     <div ref={mapContainer} className="tracking-map" role="application" aria-label="Карта рейса и геопозиций водителя" />
     {mapError ? <p className="tracking-map-error" role="status">{mapError}</p> : null}
-    <div className="tracking-points-heading"><b>История отметок</b><span>{numberedPoints.length} точек · сохраняются в рейсе</span></div>
+    <div className="tracking-points-heading"><b>История отметок</b><span>{pointCountLabel(numberedPoints.length)} · сохраняются в рейсе</span></div>
     {numberedPoints.length ? <ol className="tracking-points">
       {numberedPoints.map((point) => <li key={point.id}>
         <button type="button" className={`tracking-point-number${point.number === points.length ? " latest" : ""}`} onClick={() => focusPoint(point)} aria-label={`Показать точку ${point.number} на карте`}>{point.number}</button>
