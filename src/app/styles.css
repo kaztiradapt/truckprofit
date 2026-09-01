@@ -157,7 +157,10 @@ button { cursor: pointer; }
 .trip-expense-totals strong { color: var(--green); font-size: 14px; }
 .trip-expense-list { margin: 14px 0 0; padding: 0; list-style: none; }
 .trip-expense-list li { padding: 11px 0; border-top: 1px solid #dfe7e2; display: flex; align-items: start; justify-content: space-between; gap: 16px; }
-.trip-expense-list li > strong { flex: 0 0 auto; color: var(--green); font-size: 15px; }
+.expense-amount-actions { flex: 0 0 auto; display: grid; justify-items: end; gap: 6px; }
+.expense-amount-actions > strong { color: var(--green); font-size: 15px; }
+.expense-receipt-link { padding: 6px 9px; border: 1px solid #bfcfc7; border-radius: 7px; background: var(--card); color: var(--green); font-size: 10px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.expense-receipt-link:hover { border-color: var(--green); background: var(--green-soft); }
 .trip-expense-copy { min-width: 0; display: grid; gap: 3px; }
 .trip-expense-copy b { font-size: 13px; }
 .trip-expense-copy small { color: var(--muted); font-size: 10px; }
@@ -543,7 +546,8 @@ td { font-size: 14px; }
   .active-trip-detail { padding: 0 10px 12px; }
   .trip-expenses { padding: 13px; }
   .trip-expense-list li { display: grid; gap: 7px; }
-  .trip-expense-list li > strong { justify-self: start; }
+  .expense-amount-actions { width: 100%; grid-template-columns: minmax(0, 1fr) auto; align-items: center; justify-items: start; }
+  .expense-receipt-link { min-height: 34px; display: grid; place-items: center; }
   .trip-heading { display: grid; }
   .tracking-heading { align-items: start; flex-direction: column; }
   .tracking-map { height: 245px; }

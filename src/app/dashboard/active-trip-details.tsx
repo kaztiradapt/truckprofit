@@ -74,7 +74,10 @@ function TripExpensePanel({ trip, expenses, baseCurrency, canViewFinance }: {
           {expense.locationText ? <small>Место: {expense.locationText}</small> : null}
           {expense.comment ? <p>{expense.comment}</p> : null}
         </span>
-        <strong>{formatMoney(expense.amount, expense.currency)}</strong>
+        <span className="expense-amount-actions">
+          <strong>{formatMoney(expense.amount, expense.currency)}</strong>
+          {expense.receipt ? <a className="expense-receipt-link" href={`/api/expenses/${expense.id}/receipt`} target="_blank" rel="noreferrer">Открыть чек</a> : null}
+        </span>
       </li>)}
     </ul> : <p className="trip-expense-empty">Расходов пока нет. После сохранения расхода водителем в Telegram он автоматически появится в этой карточке и в разделе «Расходы».</p>}
     <p className="trip-expense-footnote">Суммы разных валют показаны отдельно. Итоговый P&amp;L в {baseCurrency} фиксируется после закрытия рейса и расчёта результата.</p>
