@@ -4,6 +4,7 @@ import { signOut } from "@/app/actions/auth";
 import { completeTrip, createDriver, createIncome, createTrip, createVehicle, enableOwnerDriverMode, recalculateTripPnl, reviewExpense } from "@/app/actions/owner";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { DriverInviteButton } from "./driver-invite-button";
+import { OwnerTelegramConnectButton } from "./owner-telegram-connect-button";
 import { TelegramMenuButton } from "./telegram-menu-button";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <a href="#drivers">Водители</a>
           <a href="#expenses">Расходы</a>
           {canOperate ? <a href="#operations">Первичные факты</a> : null}
+          <a href="#help">Инструкция</a>
         </nav>
         <div className="sidebar-note">
           <span>{data.organization.name}</span>
@@ -73,6 +75,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         {message ? <p className="form-success" role="status">{message}</p> : null}
+
+        {data.role === "OWNER" ? <section className="owner-telegram-card" aria-label="Telegram владельца">
+          <span><b>Кабинет владельца в Telegram</b><small>Сводка, рейсы, водители, расходы и быстрый переход в Mini App.</small></span>
+          <OwnerTelegramConnectButton organizationId={data.organization.id} linked={data.ownerTelegramLinked} />
+        </section> : null}
 
         <div className={data.pendingExpenses.length ? "signal signal-warning" : "signal"}>
           <div><span className="signal-dot" />{data.pendingExpenses.length ? `${data.pendingExpenses.length} расход(а) ждут проверки` : "Все расходы проверены"}</div>
@@ -144,6 +151,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <div className="flow-card action-card"><b>5. Закрытие и P&amp;L</b><form action={completeTrip} className="inline-flow"><input type="hidden" name="organization_id" value={data.organization.id} /><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "ACTIVE")}><option value="">Активный рейс</option>{data.trips.filter((item) => item.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="submit" disabled={!data.trips.some((item) => item.status === "ACTIVE")}>Закрыть</button></form><form action={recalculateTripPnl} className="inline-flow"><input type="hidden" name="organization_id" value={data.organization.id} /><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "COMPLETED")}><option value="">Закрытый рейс</option>{data.trips.filter((item) => item.status === "COMPLETED").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button type="submit" disabled={!data.trips.some((item) => item.status === "COMPLETED")}>Рассчитать P&amp;L</button></form></div>
           </div>
         </section> : <section className="panel"><h2>Ваш доступ: водитель</h2><p className="muted">Операционный ввод доступен в Telegram; общая экономика скрыта.</p></section>}
+
+        <section className="help-section" id="help">
+          <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>
+          <div className="help-grid">
+            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль и водителя.</li><li>Создайте рейс, укажите маршрут и доход.</li><li>Подключите свой Telegram кнопкой выше.</li><li>Проверяйте расходы водителей и закрывайте рейс.</li><li>После закрытия рассчитайте P&amp;L.</li></ol></article>
+            <article className="panel"><h3>Водителю</h3><ol><li>Откройте персональную ссылку владельца и нажмите START.</li><li>В «Мой рейс» проверьте назначение.</li><li>Передавайте расходы, пробег и статус по кнопкам.</li><li>После расхода отправьте фото чека.</li><li>Предварительную оплату смотрите в «Моя зарплата».</li></ol></article>
+            <article className="panel"><h3>Mini App</h3><ol><li>Откройте «Открыть кабинет» возле поля ввода в Telegram.</li><li>При первом запуске войдите тем же email владельца.</li><li>Все данные синхронизируются с ботом автоматически.</li><li>Для сложных операций используйте кабинет, для быстрых — меню бота.</li></ol></article>
+          </div>
+          <div className="faq-list">
+            <details><summary>Почему бот не видит мой профиль?</summary><p>Telegram ещё не привязан или открыта чужая/просроченная ссылка. Создайте новую ссылку в карточке владельца или водителя и нажмите START именно в нужном аккаунте Telegram.</p></details>
+            <details><summary>Можно ли владельцу самому быть водителем?</summary><p>Да. Нажмите «Я владелец-водитель» в разделе команды. Один Telegram получит два режима, между ними можно переключаться в меню бота.</p></details>
+            <details><summary>Что делать, если ошибся в расходе?</summary><p>Не создавайте дубликат. Владелец может отклонить расход на проверке; затем водитель внесёт правильный.</p></details>
+            <details><summary>Где смотреть полную экономику?</summary><p>В Mini App: выручка, утверждённые расходы, прибыль, пробег и P&amp;L закрытых рейсов. Бот показывает быструю оперативную сводку.</p></details>
+          </div>
+        </section>
 
         <p className="disclaimer">Management estimate: без распределения офисных расходов и будущих ремонтных резервов.</p>
       </section>

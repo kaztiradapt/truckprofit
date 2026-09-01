@@ -7,6 +7,7 @@ export type MembershipRole = "OWNER" | "MANAGER" | "DRIVER";
 export type DashboardData = {
   organization: { id: string; name: string; baseCurrency: string };
   role: MembershipRole;
+  ownerTelegramLinked: boolean;
   vehicles: Array<{ id: string; displayName: string; plateNumber: string; status: string }>;
   drivers: Array<{ id: string; displayName: string; status: string; telegramLinked: boolean; pendingInviteExpiresAt: string | null; isOwnerDriver: boolean }>;
   trips: Array<{
@@ -103,7 +104,8 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   const organization = asOne(membership.organizations);
   if (!organization) throw new Error("Active membership has no organization");
 
-  const [vehiclesResult, driversResult, tripsResult, summariesResult, pendingExpensesResult, pnlResult, invitesResult] = await Promise.all([
+  const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, pendingExpensesResult, pnlResult, invitesResult] = await Promise.all([
+    supabase.from("profiles").select("telegram_user_id").eq("id", userId).maybeSingle(),
     supabase.from("vehicles").select("id, display_name, plate_number, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("trips").select("id, title, status, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(12),
@@ -112,7 +114,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
     supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
     supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()),
   ]);
-  for (const result of [vehiclesResult, driversResult, tripsResult, summariesResult]) {
+  for (const result of [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult]) {
     if (result.error) throw new Error(result.error.message);
   }
 
@@ -141,6 +143,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   return {
     organization: { id: membership.organization_id, name: organization.name, baseCurrency: organization.base_currency },
     role: membership.role,
+    ownerTelegramLinked: profileResult.data?.telegram_user_id !== null && profileResult.data?.telegram_user_id !== undefined,
     vehicles: (vehiclesResult.data ?? []).map((vehicle) => ({ id: vehicle.id, displayName: vehicle.display_name, plateNumber: vehicle.plate_number, status: vehicle.status })),
     drivers: (driversResult.data ?? []).map((driver) => ({
       id: driver.id,

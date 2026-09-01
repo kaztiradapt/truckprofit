@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-
-const MINI_APP_URL = "https://fleet-economics.vercel.app/dashboard";
+import { MINI_APP_URL } from "@/server/telegram";
 
 type TelegramResponse<T> = { ok?: boolean; result?: T; description?: string };
 type TelegramMenuButton = { type?: string; text?: string; web_app?: { url?: string } };

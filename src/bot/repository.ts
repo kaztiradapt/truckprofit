@@ -5,6 +5,51 @@ export type DriverIdentity = {
   baseCurrency: string;
 };
 
+export type OwnerIdentity = {
+  organizationId: string;
+  profileId: string;
+  ownerName: string;
+  organizationName: string;
+  baseCurrency: string;
+};
+
+export type OwnerSummary = {
+  vehicleCount: number;
+  driverCount: number;
+  activeTripCount: number;
+  pendingExpenseCount: number;
+  pendingExpenseMinor: number;
+  overdueIncomeCount: number;
+  revenueMinor: number;
+  expensesMinor: number;
+  profitMinor: number;
+};
+
+export type OwnerTripSummary = {
+  id: string;
+  title: string;
+  vehicleName: string;
+  driverName: string | null;
+  startedAt: string | null;
+};
+
+export type OwnerDriverSummary = {
+  id: string;
+  displayName: string;
+  status: string;
+  telegramLinked: boolean;
+};
+
+export type OwnerExpenseSummary = {
+  id: string;
+  categoryName: string;
+  tripTitle: string | null;
+  driverName: string | null;
+  amountMinor: number;
+  currency: string;
+  occurredAt: string;
+};
+
 export type ActiveTrip = {
   id: string;
   organizationId: string;
@@ -58,7 +103,13 @@ export interface DriverBotRepository {
   reserveIncomingUpdate(updateId: number): Promise<boolean>;
   finishIncomingUpdate(updateId: number, outcome: "PROCESSED" | "FAILED", safeErrorSummary?: string): Promise<void>;
   claimInvitation(invitationCode: string, telegramUserId: number): Promise<DriverIdentity>;
+  claimOwnerInvitation(invitationCode: string, telegramUserId: number): Promise<OwnerIdentity>;
   findDriverByTelegramUserId(telegramUserId: number): Promise<DriverIdentity | null>;
+  findOwnerByTelegramUserId(telegramUserId: number): Promise<OwnerIdentity | null>;
+  getOwnerSummary(owner: OwnerIdentity): Promise<OwnerSummary>;
+  listOwnerActiveTrips(owner: OwnerIdentity): Promise<OwnerTripSummary[]>;
+  listOwnerDrivers(owner: OwnerIdentity): Promise<OwnerDriverSummary[]>;
+  listOwnerPendingExpenses(owner: OwnerIdentity): Promise<OwnerExpenseSummary[]>;
   findActiveTrip(driver: DriverIdentity): Promise<ActiveTrip | null>;
   recordExpense(input: RecordExpenseInput): Promise<{ expenseId: string }>;
   recordOdometer(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm" | "occurredAt">): Promise<void>;

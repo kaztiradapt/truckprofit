@@ -1,17 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { createClient } from "@/lib/supabase/server";
-
-type TelegramIdentity = { ok?: boolean; result?: { username?: string } };
-
-async function telegramBotUsername(): Promise<string | null> {
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  if (!token) return null;
-  const response = await fetch(`https://api.telegram.org/bot${token}/getMe`, { cache: "no-store" });
-  if (!response.ok) return null;
-  const payload = await response.json() as TelegramIdentity;
-  return payload.ok && payload.result?.username ? payload.result.username : null;
-}
+import { telegramBotUsername, telegramStartLink } from "@/server/telegram";
 
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
   const { id } = await context.params;
@@ -65,6 +55,6 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     driverName: driver.display_name,
     expiresAt,
     token,
-    link: username ? `https://t.me/${username}?start=${token}` : null,
+    link: telegramStartLink(username, token),
   });
 }
