@@ -48,10 +48,12 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
   const [distanceKm, setDistanceKm] = useState("");
   const [routing, setRouting] = useState(false);
   const [routingError, setRoutingError] = useState("");
+  const [routingProvider, setRoutingProvider] = useState<"google" | "osrm" | "">("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
   const activeVehicles = vehicles.filter((vehicle) => vehicle.status === "ACTIVE");
   const selectedDriver = drivers.find((driver) => driver.id === driverId) ?? null;
+  const selectedRoute = routeAlternatives.find((route) => route.id === selectedRouteId) ?? null;
 
   function selectDriver(nextDriverId: string) {
     setDriverId(nextDriverId);
@@ -153,11 +155,12 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
       setRouting(true);
       try {
         const response = await fetch(`/api/routing?${query}`, { signal: controller.signal });
-        const payload = await response.json() as { routes?: RoutingAlternative[]; error?: string };
+        const payload = await response.json() as { routes?: RoutingAlternative[]; provider?: "google" | "osrm"; error?: string };
         if (!response.ok) throw new Error(payload.error ?? "Не удалось построить маршрут.");
         const routes = payload.routes ?? [];
         if (controller.signal.aborted || !routes.length) return;
         setRouteAlternatives(routes);
+        setRoutingProvider(payload.provider ?? "osrm");
         setSelectedRouteId(routes[0].id);
         setDistanceKm(String(routes[0].distanceKm));
         for (const [index, route] of routes.entries()) {
@@ -239,6 +242,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
       <input type="hidden" name="origin_longitude" value={originPoint?.longitude ?? ""} readOnly />
       <input type="hidden" name="destination_latitude" value={destinationPoint?.latitude ?? ""} readOnly />
       <input type="hidden" name="destination_longitude" value={destinationPoint?.longitude ?? ""} readOnly />
+      <input type="hidden" name="route_geometry" value={selectedRoute ? JSON.stringify(selectedRoute.coordinates) : ""} readOnly />
       <div className="flow-fields trip-fields">
         <label className="flow-field flow-field-wide"><span>Название рейса</span><input name="title" placeholder="Например: Алматы → Москва" required /></label>
         <label className="flow-field"><span>Автомобиль</span><select name="vehicle_id" value={vehicleId} onChange={(event) => setVehicleId(event.target.value)} required disabled={!activeVehicles.length}><option value="">Выберите машину</option>{activeVehicles.map((item) => <option key={item.id} value={item.id}>{item.displayName} · {item.plateNumber}</option>)}</select></label>
@@ -276,9 +280,9 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
             <div className="route-alternative-list">{routeAlternatives.map((route, index) => <button type="button" className={selectedRouteId === route.id ? "active" : ""} onClick={() => selectRoute(route.id, route.distanceKm)} key={route.id}>
               <span>Вариант {index + 1}</span><strong>{route.distanceKm.toLocaleString("ru-RU")} км</strong><small>≈ {Math.floor(route.durationMinutes / 60)} ч {route.durationMinutes % 60} мин</small>
             </button>)}</div>
-            <small>Маршруты и расчёт времени: OSRM / OpenStreetMap. Фактическое время зависит от границ, пробок и ограничений для грузовиков.</small>
+            <small>{routingProvider === "google" ? "Альтернативы рассчитаны Google Routes." : "Альтернативы рассчитаны OSRM / OpenStreetMap."} Фактическое время зависит от границ, пробок и ограничений для грузовиков.</small>
           </div> : null}
-          <small>Выберите тип точки и нажмите нужное место на карте. После двух точек маршрут построится автоматически.</small>
+          <small>Выберите тип точки и нажмите нужное место на карте. После двух точек варианты маршрута построятся автоматически.</small>
         </div>
       </div>
       <div className="flow-card-action"><button type="submit" disabled={!activeVehicles.length}>Создать рейс</button></div>

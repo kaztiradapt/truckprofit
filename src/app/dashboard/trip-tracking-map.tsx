@@ -114,12 +114,13 @@ function AnnotationForm({ organizationId, tripId, point, onSaved }: {
   </div>;
 }
 
-export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, destination, initialPoints, canManage }: {
+export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, destination, routeGeometry, initialPoints, canManage }: {
   organizationId: string;
   tripId: string;
   routeRecord: RouteRecord;
   origin: Endpoint;
   destination: Endpoint;
+  routeGeometry: Array<[number, number]> | null;
   initialPoints: LocationPoint[];
   canManage: boolean;
 }) {
@@ -254,7 +255,13 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
       if (bounds.length) mountedMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
       window.setTimeout(() => mountedMap?.invalidateSize(), 0);
 
-      if (resolvedOrigin && resolvedDestination) {
+      if (routeGeometry?.length) {
+        routeLayer = leaflet.polyline(routeGeometry.map(([longitude, latitude]) => [latitude, longitude]), {
+          color: "#166b4f", weight: 5, opacity: .82,
+        }).addTo(mountedMap);
+        routeLayer.bringToBack();
+        mountedMap.fitBounds(routeLayer.getBounds(), { padding: [30, 30], maxZoom: 14 });
+      } else if (resolvedOrigin && resolvedDestination) {
         const query = new URLSearchParams({
           origin: `${resolvedOrigin.latitude},${resolvedOrigin.longitude}`,
           destination: `${resolvedDestination.latitude},${resolvedDestination.longitude}`,
@@ -289,7 +296,7 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
       map.current = null;
       mountedPointMarkers.clear();
     };
-  }, [destinationCity, destinationLabel, destinationLatitude, destinationLongitude, mapRevision, numberedPoints, originCity, originLabel, originLatitude, originLongitude, plannedDistanceKm, points.length]);
+  }, [destinationCity, destinationLabel, destinationLatitude, destinationLongitude, mapRevision, numberedPoints, originCity, originLabel, originLatitude, originLongitude, plannedDistanceKm, points.length, routeGeometry]);
 
   function chooseRoutePoint(point: "origin" | "destination") {
     activeRoutePointRef.current = point;
@@ -346,6 +353,7 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
           destinationLatitude: draftDestination.latitude,
           destinationLongitude: draftDestination.longitude,
           distanceKm: selectedRoute.distanceKm,
+          routeGeometry: selectedRoute.coordinates,
           loadState: routeRecord.loadState,
           startedAt: routeRecord.startedAt?.slice(0, 10),
         }),

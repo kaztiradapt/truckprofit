@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { supportedCurrencies } from "@/domain/currencies";
+import { parseRouteGeometry } from "@/domain/route-geometry";
 import type { PermissionCode } from "@/server/team-access";
 import { calculateAndPublishTripPnl } from "@/server/trip-pnl-service";
 
@@ -143,6 +144,11 @@ export async function createDriver(formData: FormData): Promise<void> {
 }
 
 export async function createTrip(formData: FormData): Promise<void> {
+  const routeGeometryValue = formData.get("route_geometry");
+  const routeGeometry = parseRouteGeometry(routeGeometryValue);
+  if (typeof routeGeometryValue === "string" && routeGeometryValue.trim() && !routeGeometry) {
+    dashboardError("Не удалось проверить выбранную линию маршрута.");
+  }
   const parsed = z.object({
     organizationId: uuid,
     vehicleId: uuid,
@@ -175,7 +181,7 @@ export async function createTrip(formData: FormData): Promise<void> {
   if (driverId && !driverId.success) dashboardError("Выберите водителя из списка.");
 
   const supabase = await requirePermission(parsed.data.organizationId, "MANAGE_TRIPS");
-  const { error } = await supabase.rpc("create_trip_with_first_leg", {
+  const { data: tripId, error } = await supabase.rpc("create_trip_with_first_leg", {
     p_organization_id: parsed.data.organizationId,
     p_vehicle_id: parsed.data.vehicleId,
     p_driver_id: driverId?.data ?? null,
@@ -193,6 +199,14 @@ export async function createTrip(formData: FormData): Promise<void> {
     p_started_at: `${parsed.data.startedAt}T00:00:00.000Z`,
   });
   if (error) dashboardError("Не удалось создать рейс. Проверьте машину, водителя и точки маршрута.");
+  if (routeGeometry && tripId) {
+    const { error: routeGeometryError } = await supabase.rpc("set_trip_route_geometry", {
+      p_organization_id: parsed.data.organizationId,
+      p_trip_id: tripId,
+      p_route_geometry: routeGeometry,
+    });
+    if (routeGeometryError) dashboardError("Рейс создан, но выбранную линию маршрута сохранить не удалось.");
+  }
   revalidatePath("/dashboard", "layout");
 }
 

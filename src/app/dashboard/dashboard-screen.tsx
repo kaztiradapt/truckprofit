@@ -74,6 +74,18 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
   const emptyShare = latestPnl && latestPnl.totalKm > 0
     ? `${((latestPnl.emptyKm / latestPnl.totalKm) * 100).toFixed(1)}%`
     : data.totals.emptyMileagePct === null ? "—" : `${data.totals.emptyMileagePct}%`;
+  const reportTrips = data.trips.map((trip) => ({
+    driverId: trip.driverId,
+    vehicleId: trip.vehicleId,
+    vehicleName: trip.vehicleName,
+    status: trip.status,
+    startedAt: trip.startedAt,
+    totalKm: trip.pnl?.totalKm ?? trip.legs.reduce((sum, leg) => sum + (leg.distanceKm ?? 0), 0),
+    loadedKm: trip.pnl?.loadedKm ?? trip.legs.filter((leg) => leg.loadState === "LOADED").reduce((sum, leg) => sum + (leg.distanceKm ?? 0), 0),
+    emptyKm: trip.pnl?.emptyKm ?? trip.legs.filter((leg) => leg.loadState === "EMPTY").reduce((sum, leg) => sum + (leg.distanceKm ?? 0), 0),
+    driverCompensationMinor: trip.pnl?.driverCompensationMinor ?? 0,
+    managementProfitMinor: trip.pnl?.managementProfitMinor ?? 0,
+  }));
   const navigationItems = [
     { href: "/dashboard", label: "Обзор", visible: true, key: "overview" },
     { href: "/dashboard/trips", label: "Рейсы", visible: true, key: "trips" },
@@ -162,6 +174,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
               }}
               origin={{ latitude: latestTrip.originLatitude, longitude: latestTrip.originLongitude, label: latestTrip.originAddress, city: latestTrip.originCity }}
               destination={{ latitude: latestTrip.destinationLatitude, longitude: latestTrip.destinationLongitude, label: latestTrip.destinationAddress, city: latestTrip.destinationCity }}
+              routeGeometry={latestTrip.routeGeometry}
               initialPoints={latestTrip.locationHistory}
               canManage={canManageTrips}
             />
@@ -225,7 +238,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
 
         {section === "team" && data.role === "OWNER" ? <TeamManagement organizationId={data.organization.id} roles={data.accessRoles} staff={data.staff} /> : section === "team" ? <section className="panel"><h2>Доступ ограничен</h2><p className="muted">Управление сотрудниками доступно только владельцу.</p></section> : null}
 
-        {section === "reports" ? <DriverReports reports={data.driverReports} baseCurrency={data.organization.baseCurrency} canViewFinance={canViewFinance} /> : null}
+        {section === "reports" ? <DriverReports reports={data.driverReports} trips={reportTrips} vehicles={data.vehicles} baseCurrency={data.organization.baseCurrency} canViewFinance={canViewFinance} /> : null}
 
         {section === "operations" && canOperate ? <section className="operations">
           <div className="start-intro"><p className="eyebrow">End-to-end контур</p><h2>Провести настоящий рейс</h2><p>Организация уже подключена. Пройдите шаги по порядку — данные сохраняются в защищённом контуре компании.</p></div>
@@ -246,7 +259,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {section === "help" ? <section className="help-section">
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>
           <div className="help-grid">
-            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль в разделе «Автомобили», а водителя — в разделе «Водители».</li><li>Откройте «Изменить» у водителя и закрепите за ним автомобиль. При выборе водителя в новом рейсе эта машина подставится сама.</li><li>В «Создании рейса» найдите адрес погрузки, затем адрес выгрузки и выберите вариант маршрута.</li><li>Проверьте плановый километраж: он подставляется с карты, но его можно исправить вручную.</li><li>Сводку по рейсам и пробегу команды смотрите в разделе «Отчёты».</li><li>Расходы водителей учитываются автоматически, а после закрытия рейса можно рассчитать P&amp;L.</li></ol></article>
+            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль в разделе «Автомобили», а водителя — в разделе «Водители».</li><li>Откройте «Изменить» у водителя и закрепите за ним автомобиль. При выборе водителя в новом рейсе эта машина подставится сама.</li><li>В «Создании рейса» найдите адрес погрузки, затем адрес выгрузки и выберите один из автоматически рассчитанных вариантов маршрута.</li><li>Проверьте плановый километраж: он подставляется с карты, но его можно исправить вручную. Выбранная линия сохранится вместе с рейсом.</li><li>Сводку по рейсам и пробегу команды смотрите в разделе «Отчёты»; там можно отфильтровать данные по водителю и автомобилю.</li><li>Расходы водителей учитываются автоматически, а после закрытия рейса можно рассчитать P&amp;L.</li></ol></article>
             <article className="panel"><h3>Водителю</h3><ol><li>Откройте персональную ссылку владельца и нажмите START.</li><li>В «Мой рейс» проверьте адреса погрузки и выгрузки.</li><li>Там же одной кнопкой отмечайте ожидание, погрузку, путь и выгрузку.</li><li>Геопозиция передаётся только после вашего нажатия и разрешения Telegram.</li><li>После расхода отправьте фото чека; оплату смотрите в «Моя зарплата».</li></ol></article>
             <article className="panel"><h3>Mini App</h3><ol><li>Откройте «Открыть кабинет» возле поля ввода в Telegram.</li><li>При первом запуске войдите тем же email владельца.</li><li>Каждый раздел открывается на отдельной странице из верхнего или бокового меню.</li><li>В обзоре карта показывает маршрут, текущую точку водителя и всю историю геопозиций.</li><li>Нажмите номер точки, чтобы найти её на карте; выберите тип «Ночёвка / отдых», «Погрузка», «Выгрузка» или добавьте комментарий.</li></ol></article>
           </div>
@@ -257,7 +270,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             <details><summary>Как работает основная валюта компании?</summary><p>При создании компании выберите валюту управленческого учёта: KZT, RUB, USD, CNY или UZS. Если доход записан в другой валюте, кабинет попросит курс именно к основной валюте компании. Например, для рублёвой компании: «1 USD = сколько RUB». Доход и P&amp;L будут пересчитаны в RUB.</p></details>
             <details><summary>Откуда берётся километраж рейса?</summary><p>После выбора погрузки и выгрузки кабинет строит автомобильный маршрут и подставляет его расстояние. Перед созданием рейса проверьте значение: при необходимости его можно заменить плановым километражем вручную.</p></details>
             <details><summary>Как закрепить автомобиль за водителем?</summary><p>Откройте раздел «Водители», нажмите «Изменить» напротив нужного человека и выберите активный автомобиль. При создании следующего рейса выбор этого водителя автоматически подставит закреплённую машину; при необходимости её можно заменить вручную.</p></details>
-            <details><summary>Что показывает раздел «Отчёты»?</summary><p>По каждому водителю видны закреплённая машина, количество активных и закрытых рейсов, общий, гружёный и порожний пробег, а также дата последнего рейса. Финансовые показатели отображаются только ролям с доступом к финансам.</p></details>
+            <details><summary>Что показывает раздел «Отчёты»?</summary><p>По каждому водителю видны закреплённая машина, количество активных и закрытых рейсов, общий, гружёный и порожний пробег, а также дата последнего рейса. Фильтры по водителю и автомобилю можно использовать отдельно или вместе; карточки и таблица пересчитываются автоматически. Финансовые показатели отображаются только ролям с доступом к финансам.</p></details>
             <details><summary>Сохраняются ли старые геопозиции водителя?</summary><p>Да. Каждая отправленная водителем точка остаётся в истории рейса. Последняя отмечена как текущая, а прошлые можно открыть по номеру, подписать и дополнить комментарием.</p></details>
             <details><summary>Где смотреть полную экономику?</summary><p>В Mini App: выручка, расходы, прибыль, пробег и P&amp;L закрытых рейсов. Бот показывает быструю оперативную сводку.</p></details>
           </div>

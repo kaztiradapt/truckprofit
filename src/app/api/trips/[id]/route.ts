@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { normalizeRouteGeometry } from "@/domain/route-geometry";
 import { authenticatedTeamRequest } from "@/server/team-access";
 
 const updateSchema = z.object({
@@ -18,6 +19,7 @@ const updateSchema = z.object({
   distanceKm: z.number().positive().finite().max(100_000),
   loadState: z.enum(["LOADED", "EMPTY", "UNKNOWN"]),
   startedAt: z.string().date(),
+  routeGeometry: z.unknown().optional(),
 });
 const deleteSchema = z.object({ organizationId: z.uuid() });
 
@@ -35,6 +37,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     || (parsed.data.originLatitude === null) !== (parsed.data.originLongitude === null)
     || (parsed.data.destinationLatitude === null) !== (parsed.data.destinationLongitude === null)) {
     return Response.json({ error: "Проверьте данные рейса." }, { status: 400 });
+  }
+  const routeGeometry = parsed.data.routeGeometry === undefined ? undefined : normalizeRouteGeometry(parsed.data.routeGeometry);
+  if (parsed.data.routeGeometry !== undefined && !routeGeometry) {
+    return Response.json({ error: "Проверьте выбранную линию маршрута." }, { status: 400 });
   }
   const auth = await authenticatedTeamRequest();
   if (!auth) return Response.json({ error: "Требуется вход." }, { status: 401 });
@@ -57,6 +63,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     p_started_at: `${parsed.data.startedAt}T00:00:00.000Z`,
   });
   if (error) return Response.json({ error: tripError(error.message) }, { status: error.message.includes("permission") ? 403 : 409 });
+  if (routeGeometry) {
+    const { error: routeGeometryError } = await auth.supabase.rpc("set_trip_route_geometry", {
+      p_organization_id: parsed.data.organizationId,
+      p_trip_id: id,
+      p_route_geometry: routeGeometry,
+    });
+    if (routeGeometryError) return Response.json({ error: "Данные рейса обновлены, но линию маршрута сохранить не удалось." }, { status: 409 });
+  }
   return Response.json({ ok: true });
 }
 

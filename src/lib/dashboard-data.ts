@@ -1,5 +1,6 @@
 import { cache } from "react";
 
+import { normalizeRouteGeometry } from "@/domain/route-geometry";
 import { createClient } from "@/lib/supabase/server";
 import { permissionCodes } from "@/server/team-access";
 
@@ -67,6 +68,7 @@ export type DashboardData = {
     destinationLatitude: number | null;
     destinationLongitude: number | null;
     distanceKm: number | null;
+    routeGeometry: Array<[number, number]> | null;
     loadState: string;
     lastLocation: {
       latitude: number;
@@ -173,6 +175,7 @@ type TripRow = {
     start_odometer_km: number | string | null;
     end_odometer_km: number | string | null;
     distance_km: number | string | null;
+    route_geometry: unknown;
   }>;
 };
 
@@ -218,7 +221,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
     supabase.from("profiles").select("telegram_user_id, telegram_username").eq("id", userId).maybeSingle(),
     supabase.from("vehicles").select("id, display_name, plate_number, make_model, fuel_norm_l_per_100km, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id, assigned_vehicle_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
-    supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(500),
+    supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km, route_geometry)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(500),
     supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id),
     supabase.from("expenses").select("id, amount, currency, occurred_at, comment, expense_categories(display_name), trips(title)").eq("organization_id", membership.organization_id).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(20),
     supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
@@ -367,6 +370,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       destinationLatitude: firstLeg?.destination_latitude === null || firstLeg?.destination_latitude === undefined ? null : Number(firstLeg.destination_latitude),
       destinationLongitude: firstLeg?.destination_longitude === null || firstLeg?.destination_longitude === undefined ? null : Number(firstLeg.destination_longitude),
       distanceKm: firstLeg?.distance_km === null || firstLeg?.distance_km === undefined ? null : Number(firstLeg.distance_km),
+      routeGeometry: normalizeRouteGeometry(firstLeg?.route_geometry),
       loadState: firstLeg?.load_state ?? "UNKNOWN",
       lastLocation: lastLocation ? {
         latitude: lastLocation.latitude,
