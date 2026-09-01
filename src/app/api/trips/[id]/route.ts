@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { normalizeRouteGeometry } from "@/domain/route-geometry";
 import { authenticatedTeamRequest } from "@/server/team-access";
+import { sendTripAssignmentNotification, type TripAssignmentNotificationStatus } from "@/server/trip-assignment-notification";
 
 const updateSchema = z.object({
   organizationId: z.uuid(),
@@ -44,6 +45,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
   const auth = await authenticatedTeamRequest();
   if (!auth) return Response.json({ error: "Требуется вход." }, { status: 401 });
+  const { data: existingTrip, error: existingTripError } = await auth.supabase
+    .from("trips")
+    .select("driver_id")
+    .eq("organization_id", parsed.data.organizationId)
+    .eq("id", id)
+    .maybeSingle();
+  if (existingTripError || !existingTrip) return Response.json({ error: "Не удалось проверить текущее назначение рейса." }, { status: 409 });
   const { error } = await auth.supabase.rpc("update_trip_record", {
     p_organization_id: parsed.data.organizationId,
     p_trip_id: id,
@@ -71,7 +79,29 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     });
     if (routeGeometryError) return Response.json({ error: "Данные рейса обновлены, но линию маршрута сохранить не удалось." }, { status: 409 });
   }
-  return Response.json({ ok: true });
+  let notification: TripAssignmentNotificationStatus | null = null;
+  if (parsed.data.driverId && parsed.data.driverId !== existingTrip.driver_id) {
+    const [driverResult, vehicleResult] = await Promise.all([
+      auth.supabase.from("drivers").select("display_name, telegram_user_id").eq("organization_id", parsed.data.organizationId).eq("id", parsed.data.driverId).maybeSingle(),
+      auth.supabase.from("vehicles").select("display_name, plate_number").eq("organization_id", parsed.data.organizationId).eq("id", parsed.data.vehicleId).maybeSingle(),
+    ]);
+    const driver = driverResult.data;
+    const vehicle = vehicleResult.data;
+    notification = driver && vehicle
+      ? await sendTripAssignmentNotification({
+        telegramUserId: driver.telegram_user_id,
+        driverName: driver.display_name,
+        tripTitle: parsed.data.title,
+        vehicleName: `${vehicle.display_name} · ${vehicle.plate_number}`,
+        originCity: parsed.data.originCity,
+        destinationCity: parsed.data.destinationCity,
+        originAddress: parsed.data.originAddress,
+        destinationAddress: parsed.data.destinationAddress,
+        startedAt: parsed.data.startedAt,
+      })
+      : "FAILED";
+  }
+  return Response.json({ ok: true, notification });
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {

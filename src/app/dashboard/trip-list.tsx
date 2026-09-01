@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 type Vehicle = { id: string; displayName: string; plateNumber: string };
 type Driver = { id: string; displayName: string };
+type NotificationStatus = "SENT" | "NOT_LINKED" | "NOT_CONFIGURED" | "FAILED";
 type Trip = {
   id: string; title: string; status: string; vehicleId: string; driverId: string | null; vehicleName: string; driverName: string | null; startedAt: string | null;
   originCity: string; destinationCity: string; originAddress: string; destinationAddress: string; originLatitude: number | null; originLongitude: number | null;
@@ -29,9 +30,18 @@ export function TripList({ organizationId, baseCurrency, trips, vehicles, driver
     setBusy(`${method}-${tripId}`); setMessage(""); setError("");
     try {
       const response = await fetch(`/api/trips/${tripId}`, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      const payload = await response.json() as { error?: string };
+      const payload = await response.json() as { error?: string; notification?: NotificationStatus | null };
       if (!response.ok) throw new Error(payload.error ?? "Операция не выполнена.");
-      setEditingId(""); setMessage(successMessage); router.refresh();
+      const notificationMessage = payload.notification === "SENT"
+        ? " Водитель получил уведомление в Telegram."
+        : payload.notification === "NOT_LINKED"
+          ? " Telegram водителя не подключён — уведомление не отправлено."
+          : payload.notification === "NOT_CONFIGURED"
+            ? " Telegram-бот сейчас не настроен."
+            : payload.notification === "FAILED"
+              ? " Telegram не принял уведомление."
+              : "";
+      setEditingId(""); setMessage(`${successMessage}${notificationMessage}`); router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Операция не выполнена.");
     } finally { setBusy(""); }

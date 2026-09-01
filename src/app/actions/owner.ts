@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supportedCurrencies } from "@/domain/currencies";
 import { parseRouteGeometry } from "@/domain/route-geometry";
 import type { PermissionCode } from "@/server/team-access";
+import { sendTripAssignmentNotification, tripAssignmentStatusMessage } from "@/server/trip-assignment-notification";
 import { calculateAndPublishTripPnl } from "@/server/trip-pnl-service";
 
 const uuid = z.uuid();
@@ -207,7 +208,31 @@ export async function createTrip(formData: FormData): Promise<void> {
     });
     if (routeGeometryError) dashboardError("Рейс создан, но выбранную линию маршрута сохранить не удалось.");
   }
+  let notificationMessage: string | null = null;
+  if (driverId?.data) {
+    const [driverResult, vehicleResult] = await Promise.all([
+      supabase.from("drivers").select("display_name, telegram_user_id").eq("organization_id", parsed.data.organizationId).eq("id", driverId.data).maybeSingle(),
+      supabase.from("vehicles").select("display_name, plate_number").eq("organization_id", parsed.data.organizationId).eq("id", parsed.data.vehicleId).maybeSingle(),
+    ]);
+    const driver = driverResult.data;
+    const vehicle = vehicleResult.data;
+    const notificationStatus = driver && vehicle
+      ? await sendTripAssignmentNotification({
+        telegramUserId: driver.telegram_user_id,
+        driverName: driver.display_name,
+        tripTitle: parsed.data.title,
+        vehicleName: `${vehicle.display_name} · ${vehicle.plate_number}`,
+        originCity: parsed.data.originCity,
+        destinationCity: parsed.data.destinationCity,
+        originAddress: parsed.data.originAddress,
+        destinationAddress: parsed.data.destinationAddress,
+        startedAt: parsed.data.startedAt,
+      })
+      : "FAILED";
+    notificationMessage = tripAssignmentStatusMessage(notificationStatus);
+  }
   revalidatePath("/dashboard", "layout");
+  if (notificationMessage) redirect(`/dashboard/operations?message=${encodeURIComponent(`Рейс создан. ${notificationMessage}`)}`);
 }
 
 export async function createIncome(formData: FormData): Promise<void> {
