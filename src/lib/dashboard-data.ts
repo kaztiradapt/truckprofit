@@ -169,7 +169,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   const permissions = membership.role === "OWNER" ? [...permissionCodes] : accessRole?.permissions ?? [];
 
   const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult] = await Promise.all([
-    supabase.from("profiles").select("telegram_user_id").eq("id", userId).maybeSingle(),
+    supabase.from("profiles").select("telegram_user_id, telegram_username").eq("id", userId).maybeSingle(),
     supabase.from("vehicles").select("id, display_name, plate_number, make_model, fuel_norm_l_per_100km, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(50),
@@ -222,8 +222,12 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       id: person.id,
       displayName: person.display_name,
       email: person.email,
-      telegramUsername: person.telegram_username,
-      telegramLinked: person.telegram_user_id !== null,
+      telegramUsername: person.access_role_id === null
+        ? profileResult.data?.telegram_username ?? person.telegram_username
+        : person.telegram_username,
+      telegramLinked: person.access_role_id === null
+        ? profileResult.data?.telegram_user_id !== null && profileResult.data?.telegram_user_id !== undefined
+        : person.telegram_user_id !== null,
       status: person.status,
       accessRoleId: person.access_role_id,
       roleName: person.access_role_id ? asOne(person.organization_access_roles)?.name ?? "Сотрудник" : "Владелец",

@@ -114,6 +114,12 @@ td { font-size: 14px; }
 .team-driver-form input { min-width: 0; min-height: 38px; border: 1px solid #bfcfc7; border-radius: 8px; padding: 8px 10px; background: #fff; }
 .team-driver-form button { min-height: 38px !important; padding: 8px 11px !important; white-space: nowrap; }
 .team-driver-form small { color: var(--muted); font-size: 10px; }
+.driver-list-message { margin: 10px 0 0; }
+.driver-item-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.driver-inline-edit { width: 100%; display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(150px, .8fr) auto; align-items: end; gap: 9px; }
+.driver-inline-edit label { min-width: 0; display: grid; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 750; }
+.driver-inline-edit input, .driver-inline-edit select { width: 100%; min-width: 0; min-height: 38px; border: 1px solid #bfcfc7; border-radius: 8px; padding: 8px 10px; background: #fff; color: var(--ink); }
+.driver-inline-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .vehicle-create-form { margin-top: 16px; }
 .vehicle-create-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
 .vehicle-create-form button { width: 100%; }
@@ -337,6 +343,10 @@ td { font-size: 14px; }
   .expense-list strong { color: var(--green); font-size: 15px; }
   .driver-list li { display: grid; }
   .driver-actions { align-items: flex-start; }
+  .driver-item-buttons { width: 100%; justify-content: flex-start; }
+  .driver-item-buttons .tiny-button { flex: 1; min-height: 38px; }
+  .driver-inline-edit { grid-template-columns: 1fr; }
+  .driver-inline-actions .tiny-button { flex: 1; min-height: 38px; }
   .driver-invite-result { justify-items: start; }
   .driver-invite-result code { max-width: 100%; text-align: left; }
   .team-driver-form > div { grid-template-columns: 1fr; }
