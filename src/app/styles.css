@@ -248,13 +248,13 @@ td { font-size: 14px; }
 }
 
 @media (max-width: 900px) {
-  .app-shell { grid-template-columns: 1fr; }
-  .sidebar { position: static; width: 100%; height: auto; padding: 16px; flex-direction: row; align-items: center; overflow-x: auto; }
+  .app-shell { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+  .sidebar { position: static; width: 100%; max-width: 100vw; min-width: 0; height: auto; padding: 16px; flex-direction: row; align-items: center; overflow: hidden; }
   .brand { padding: 0 18px 0 0; }
-  .sidebar nav { display: flex; }
+  .sidebar nav { display: flex; flex: 1; min-width: 0; overflow-x: auto; }
   .sidebar nav a { white-space: nowrap; }
   .sidebar-note { display: none; }
-  .content { padding: 28px 20px 42px; }
+  .content { width: 100%; max-width: 100vw; min-width: 0; padding: 28px 20px 42px; overflow-x: clip; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .trip-grid { grid-template-columns: 1fr; gap: 18px; }
   .help-grid { grid-template-columns: 1fr; }
