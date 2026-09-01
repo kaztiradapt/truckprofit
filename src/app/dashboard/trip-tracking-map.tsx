@@ -19,6 +19,18 @@ type LocationPoint = {
 type Endpoint = { latitude: number | null; longitude: number | null; label: string; city: string };
 type RoutingAlternative = { coordinates: Array<[number, number]> };
 type ResolvedEndpoint = { latitude: number; longitude: number };
+type RouteRecord = {
+  title: string;
+  vehicleId: string;
+  driverId: string | null;
+  originCity: string;
+  destinationCity: string;
+  originAddress: string;
+  destinationAddress: string;
+  distanceKm: number | null;
+  loadState: string;
+  startedAt: string | null;
+};
 type GeocodingResponse = {
   results?: Array<{ latitude: number; longitude: number }>;
   error?: string;
@@ -101,9 +113,10 @@ function AnnotationForm({ organizationId, tripId, point, onSaved }: {
   </div>;
 }
 
-export function TripTrackingMap({ organizationId, tripId, origin, destination, initialPoints, canManage }: {
+export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, destination, initialPoints, canManage }: {
   organizationId: string;
   tripId: string;
+  routeRecord: RouteRecord;
   origin: Endpoint;
   destination: Endpoint;
   initialPoints: LocationPoint[];
@@ -113,8 +126,18 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<LeafletMap | null>(null);
   const pointMarkers = useRef<Map<string, Marker>>(new Map());
+  const routeEditingRef = useRef(false);
+  const activeRoutePointRef = useRef<"origin" | "destination">("origin");
+  const draftOriginRef = useRef<ResolvedEndpoint | null>(null);
+  const draftDestinationRef = useRef<ResolvedEndpoint | null>(null);
   const [annotationOverrides, setAnnotationOverrides] = useState<Record<string, { eventType: EventType; note: string | null }>>({});
   const [mapError, setMapError] = useState("");
+  const [routeEditing, setRouteEditing] = useState(false);
+  const [activeRoutePoint, setActiveRoutePoint] = useState<"origin" | "destination">("origin");
+  const [draftReady, setDraftReady] = useState(false);
+  const [savingRoute, setSavingRoute] = useState(false);
+  const [routeEditorMessage, setRouteEditorMessage] = useState("");
+  const [mapRevision, setMapRevision] = useState(0);
   const points = useMemo(() => initialPoints.map((point) => ({ ...point, ...annotationOverrides[point.id] })), [annotationOverrides, initialPoints]);
   const numberedPoints = useMemo(() => points.map((point, index) => ({ ...point, number: points.length - index })), [points]);
   const { latitude: originLatitude, longitude: originLongitude, label: originLabel, city: originCity } = origin;
@@ -155,6 +178,33 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
         if (!controller.signal.aborted) setMapError(caught instanceof Error ? caught.message : "Не удалось определить точки маршрута.");
       }
       if (cancelled || !mountedMap) return;
+      draftOriginRef.current = resolvedOrigin;
+      draftDestinationRef.current = resolvedDestination;
+      setDraftReady(Boolean(resolvedOrigin && resolvedDestination));
+
+      mountedMap.on("click", (event) => {
+        if (!routeEditingRef.current || !mountedMap) return;
+        const point = { latitude: Number(event.latlng.lat.toFixed(6)), longitude: Number(event.latlng.lng.toFixed(6)) };
+        routeLayer?.remove();
+        routeLayer = null;
+        if (activeRoutePointRef.current === "origin") {
+          draftOriginRef.current = point;
+          originMarker?.remove();
+          originMarker = leaflet.circleMarker([point.latitude, point.longitude], {
+            radius: 8, weight: 3, color: "#166b4f", fillColor: "#ffffff", fillOpacity: 1,
+          }).addTo(mountedMap).bindTooltip("Новая точка погрузки", { permanent: true, direction: "top" });
+          activeRoutePointRef.current = "destination";
+          setActiveRoutePoint("destination");
+        } else {
+          draftDestinationRef.current = point;
+          destinationMarker?.remove();
+          destinationMarker = leaflet.circleMarker([point.latitude, point.longitude], {
+            radius: 8, weight: 3, color: "#de7b32", fillColor: "#ffffff", fillOpacity: 1,
+          }).addTo(mountedMap).bindTooltip("Новая точка выгрузки", { permanent: true, direction: "top" });
+        }
+        setDraftReady(Boolean(draftOriginRef.current && draftDestinationRef.current));
+        setRouteEditorMessage("Точка установлена. После сохранения маршрут перестроится.");
+      });
 
       const bounds: Array<[number, number]> = [];
       if (resolvedOrigin) {
@@ -237,7 +287,79 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
       map.current = null;
       mountedPointMarkers.clear();
     };
-  }, [destinationCity, destinationLabel, destinationLatitude, destinationLongitude, numberedPoints, originCity, originLabel, originLatitude, originLongitude, points.length]);
+  }, [destinationCity, destinationLabel, destinationLatitude, destinationLongitude, mapRevision, numberedPoints, originCity, originLabel, originLatitude, originLongitude, points.length]);
+
+  function chooseRoutePoint(point: "origin" | "destination") {
+    activeRoutePointRef.current = point;
+    setActiveRoutePoint(point);
+    setRouteEditorMessage(point === "origin" ? "Нажмите точку погрузки на карте." : "Нажмите точку выгрузки на карте.");
+  }
+
+  function beginRouteEditing() {
+    routeEditingRef.current = true;
+    setRouteEditing(true);
+    chooseRoutePoint("origin");
+  }
+
+  function cancelRouteEditing() {
+    routeEditingRef.current = false;
+    setRouteEditing(false);
+    setRouteEditorMessage("");
+    setMapRevision((value) => value + 1);
+  }
+
+  async function saveRoutePoints() {
+    const draftOrigin = draftOriginRef.current;
+    const draftDestination = draftDestinationRef.current;
+    if (!draftOrigin || !draftDestination) {
+      setRouteEditorMessage("Укажите обе точки маршрута.");
+      return;
+    }
+    setSavingRoute(true);
+    setRouteEditorMessage("");
+    try {
+      const routeQuery = new URLSearchParams({
+        origin: `${draftOrigin.latitude},${draftOrigin.longitude}`,
+        destination: `${draftDestination.latitude},${draftDestination.longitude}`,
+      });
+      const routeResponse = await fetch(`/api/routing?${routeQuery}`);
+      const routePayload = await routeResponse.json() as { routes?: Array<RoutingAlternative & { distanceKm: number }>; error?: string };
+      if (!routeResponse.ok || !routePayload.routes?.[0]) throw new Error(routePayload.error ?? "Не удалось построить маршрут по выбранным точкам.");
+
+      const response = await fetch(`/api/trips/${tripId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId,
+          vehicleId: routeRecord.vehicleId,
+          driverId: routeRecord.driverId,
+          title: routeRecord.title,
+          originCity: routeRecord.originCity,
+          destinationCity: routeRecord.destinationCity,
+          originAddress: routeRecord.originAddress,
+          destinationAddress: routeRecord.destinationAddress,
+          originLatitude: draftOrigin.latitude,
+          originLongitude: draftOrigin.longitude,
+          destinationLatitude: draftDestination.latitude,
+          destinationLongitude: draftDestination.longitude,
+          distanceKm: routePayload.routes[0].distanceKm,
+          loadState: routeRecord.loadState,
+          startedAt: routeRecord.startedAt?.slice(0, 10),
+        }),
+      });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Не удалось сохранить маршрут.");
+      routeEditingRef.current = false;
+      setRouteEditing(false);
+      setRouteEditorMessage("Точки и километраж сохранены.");
+      router.refresh();
+      setMapRevision((value) => value + 1);
+    } catch (caught) {
+      setRouteEditorMessage(caught instanceof Error ? caught.message : "Не удалось сохранить маршрут.");
+    } finally {
+      setSavingRoute(false);
+    }
+  }
 
   function focusPoint(point: LocationPoint) {
     const marker = pointMarkers.current.get(point.id);
@@ -259,6 +381,20 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
     </div>
     <div ref={mapContainer} className="tracking-map" role="application" aria-label="Карта рейса и геопозиций водителя" />
     {mapError ? <p className="tracking-map-error" role="status">{mapError}</p> : null}
+    {canManage ? <div className="route-correction">
+      {!routeEditing ? <button type="button" className="tiny-button" onClick={beginRouteEditing}>Исправить точки маршрута</button> : <>
+        <span><b>Уточнение маршрута</b><small>Выберите тип точки, затем нажмите нужное место на карте.</small></span>
+        <div className="route-correction-points">
+          <button type="button" className={`tiny-button${activeRoutePoint === "origin" ? " active" : ""}`} onClick={() => chooseRoutePoint("origin")}>1. Погрузка</button>
+          <button type="button" className={`tiny-button${activeRoutePoint === "destination" ? " active" : ""}`} onClick={() => chooseRoutePoint("destination")}>2. Выгрузка</button>
+        </div>
+        <div className="route-correction-actions">
+          <button type="button" className="tiny-button" disabled={!draftReady || savingRoute} onClick={() => void saveRoutePoints()}>{savingRoute ? "Сохраняю…" : "Сохранить маршрут"}</button>
+          <button type="button" className="tiny-button" disabled={savingRoute} onClick={cancelRouteEditing}>Отмена</button>
+        </div>
+      </>}
+      {routeEditorMessage ? <small className={routeEditorMessage.includes("сохранены") ? "tracking-saved" : ""}>{routeEditorMessage}</small> : null}
+    </div> : null}
     <div className="tracking-points-heading"><b>История отметок</b><span>{pointCountLabel(numberedPoints.length)} · сохраняются в рейсе</span></div>
     {numberedPoints.length ? <ol className="tracking-points">
       {numberedPoints.map((point) => <li key={point.id}>

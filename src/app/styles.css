@@ -83,6 +83,11 @@ button { cursor: pointer; }
 .tracking-marker.latest { background: var(--green); box-shadow: 0 0 0 5px #d6f36b88, 0 3px 10px #15221c55; }
 .tracking-marker i { transform: rotate(45deg); font-style: normal; }
 .tracking-map-error { margin: 9px 0 0; color: #87502a; font-size: 11px; }
+.route-correction { margin-top: 10px; padding: 10px; border: 1px solid #dce5e0; border-radius: 9px; background: #fff; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.route-correction > span { min-width: 190px; margin-right: auto; display: grid; gap: 2px; }
+.route-correction > span small, .route-correction > small { color: var(--muted); font-size: 10px; }
+.route-correction-points, .route-correction-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.route-correction .tiny-button.active { border-color: var(--green); background: var(--green-soft); color: #174f3d; }
 .tracking-points-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 14px; padding-bottom: 8px; border-bottom: 1px solid #dfe7e2; }
 .tracking-points-heading b { font-size: 13px; }
 .tracking-points-heading span { color: var(--muted); font-size: 10px; }
@@ -440,6 +445,9 @@ td { font-size: 14px; }
   .table-action-buttons { width: 100%; }
   .table-action-buttons .tiny-button { flex: 1; min-height: 38px; }
   .tracking-map { height: 300px; }
+  .route-correction { align-items: stretch; display: grid; }
+  .route-correction-points, .route-correction-actions { width: 100%; }
+  .route-correction-points .tiny-button, .route-correction-actions .tiny-button { flex: 1; min-height: 38px; }
   .tracking-annotation { grid-template-columns: 1fr 1fr; }
   .tracking-annotation .tiny-button { width: 100%; }
   .route-map { height: 230px; }
