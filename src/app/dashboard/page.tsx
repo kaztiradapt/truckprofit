@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 
 import { signOut } from "@/app/actions/auth";
-import { completeTrip, createDriver, createIncome, createTrip, createVehicle, enableOwnerDriverMode, recalculateTripPnl, reviewExpense } from "@/app/actions/owner";
+import { completeTrip, createDriver, createTrip, createVehicle, enableOwnerDriverMode, recalculateTripPnl, reviewExpense } from "@/app/actions/owner";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { DriverInviteButton } from "./driver-invite-button";
+import { IncomeForm } from "./income-form";
 import { OwnerTelegramConnectButton } from "./owner-telegram-connect-button";
 import { RecordManagement } from "./record-management";
 import { TelegramMenuButton } from "./telegram-menu-button";
@@ -197,19 +198,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </div>
               <div className="flow-card-action"><button type="submit" disabled={!data.vehicles.length}>Создать рейс</button></div>
             </form> : null}
-            {canManageFinance ? <form action={createIncome} className="flow-card">
-              <div className="flow-card-heading"><span className="flow-step">3</span><span><b>Доход</b><small>Оплата от заказчика</small></span></div>
-              <input type="hidden" name="organization_id" value={data.organization.id} />
-              <input type="hidden" name="currency" value={data.organization.baseCurrency} />
-              <div className="flow-fields income-fields">
-                <label className="flow-field"><span>Рейс</span><select name="trip_id" required disabled={!data.trips.length}><option value="">Выберите рейс</option>{data.trips.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
-                <label className="flow-field"><span>Заказчик</span><input name="customer_name" placeholder="Название компании" /></label>
-                <label className="flow-field"><span>Сумма, {data.organization.baseCurrency}</span><input name="amount" inputMode="decimal" placeholder="0" required /></label>
-                <label className="flow-field"><span>Ожидаемая оплата</span><input name="expected_payment_at" type="date" /></label>
-                <label className="flow-field flow-field-wide"><span>Комментарий</span><input name="comment" placeholder="Необязательно" /></label>
-              </div>
-              <div className="flow-card-action"><button type="submit" disabled={!data.trips.length}>Добавить доход</button></div>
-            </form> : null}
+            {canManageFinance ? <IncomeForm organizationId={data.organization.id} baseCurrency={data.organization.baseCurrency} trips={data.trips.map(({ id, title }) => ({ id, title }))} /> : null}
             {canManageTrips || canManageFinance ? <div className="flow-card flow-card-closing">
               <div className="flow-card-heading"><span className="flow-step">4</span><span><b>Закрытие и P&amp;L</b><small>Завершите рейс и рассчитайте итог</small></span></div>
               <div className="closing-actions">

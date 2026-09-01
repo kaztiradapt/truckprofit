@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import { supportedCurrencies } from "@/domain/currencies";
 import type { PermissionCode } from "@/server/team-access";
 import { calculateAndPublishTripPnl } from "@/server/trip-pnl-service";
 
@@ -14,7 +15,7 @@ const text = (min: number, max = 160) => z.string().trim().min(min).max(max);
 const organizationInput = z.object({
   name: text(2),
   slug: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,62}$/),
-  currency: z.string().trim().regex(/^[A-Z]{3}$/),
+  currency: z.enum(supportedCurrencies),
   ownerDriver: z.boolean(),
 });
 
@@ -176,17 +177,27 @@ export async function createIncome(formData: FormData): Promise<void> {
     tripId: uuid,
     customerName: z.string().trim().max(160),
     amount: money,
-    currency: z.string().trim().regex(/^[A-Z]{3}$/),
+    currency: z.enum(supportedCurrencies),
+    fxRate: z.coerce.number().positive().finite().max(1_000_000_000).optional(),
     expectedPaymentAt: z.string().trim(),
     comment: z.string().trim().max(1000),
   }).safeParse({
     organizationId: formData.get("organization_id"), tripId: formData.get("trip_id"), customerName: formData.get("customer_name"), amount: String(formData.get("amount") ?? "").replace(",", "."),
-    currency: formData.get("currency"), expectedPaymentAt: formData.get("expected_payment_at"), comment: formData.get("comment"),
+    currency: formData.get("currency"), fxRate: formData.get("fx_rate") ? String(formData.get("fx_rate")).replace(",", ".") : undefined, expectedPaymentAt: formData.get("expected_payment_at"), comment: formData.get("comment"),
   });
   if (!parsed.success || (parsed.data.expectedPaymentAt && !z.string().date().safeParse(parsed.data.expectedPaymentAt).success)) {
     dashboardError("Проверьте сумму и дату ожидаемой оплаты.");
   }
   const supabase = await requirePermission(parsed.data.organizationId, "MANAGE_FINANCE");
+  const { data: organization, error: organizationError } = await supabase
+    .from("organizations")
+    .select("base_currency")
+    .eq("id", parsed.data.organizationId)
+    .single();
+  if (organizationError || !organization) dashboardError("Не удалось определить базовую валюту компании.");
+  if (parsed.data.currency !== organization.base_currency && !parsed.data.fxRate) {
+    dashboardError(`Для ${parsed.data.currency} укажите курс к ${organization.base_currency}.`);
+  }
   const { error } = await supabase.rpc("record_owner_income", {
     p_organization_id: parsed.data.organizationId,
     p_trip_id: parsed.data.tripId,
@@ -195,8 +206,9 @@ export async function createIncome(formData: FormData): Promise<void> {
     p_currency: parsed.data.currency,
     p_expected_payment_at: parsed.data.expectedPaymentAt || null,
     p_comment: parsed.data.comment || null,
+    p_fx_rate_to_reporting: parsed.data.currency === organization.base_currency ? 1 : parsed.data.fxRate,
   });
-  if (error) dashboardError("Не удалось сохранить доход.");
+  if (error) dashboardError("Не удалось сохранить доход. Проверьте сумму, валюту и курс.");
   revalidatePath("/dashboard");
 }
 

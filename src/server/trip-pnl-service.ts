@@ -35,6 +35,9 @@ type ExpenseRow = {
 
 type IncomeRow = {
   id: string;
+  currency: string;
+  reporting_currency: string;
+  fx_rate_to_reporting: number | string;
   reporting_amount_minor: number | string;
   payment_status: string;
   deleted_at: string | null;
@@ -175,7 +178,7 @@ export async function calculateAndPublishTripPnl(input: { organizationId: string
   const [legs, expenses, incomes, rules, tax] = await Promise.all([
     db.from("trip_legs").select("id, start_odometer_km, end_odometer_km, end_at, load_state").eq("trip_id", trip.id).eq("organization_id", trip.organization_id).is("deleted_at", null).order("sequence_no"),
     db.from("expenses").select("id, reporting_amount_minor, review_status, status, deleted_at, expense_categories(economic_group)").eq("trip_id", trip.id).eq("organization_id", trip.organization_id).order("occurred_at"),
-    db.from("incomes").select("id, reporting_amount_minor, payment_status, deleted_at").eq("trip_id", trip.id).eq("organization_id", trip.organization_id).order("created_at"),
+    db.from("incomes").select("id, currency, reporting_currency, fx_rate_to_reporting, reporting_amount_minor, payment_status, deleted_at").eq("trip_id", trip.id).eq("organization_id", trip.organization_id).order("created_at"),
     trip.driver_id
       ? db.from("driver_compensation_rules").select("id, name, rule_type, config, valid_from, valid_to").eq("organization_id", trip.organization_id).eq("driver_id", trip.driver_id).eq("is_active", true).order("valid_from")
       : Promise.resolve({ data: [], error: null }),
@@ -185,6 +188,9 @@ export async function calculateAndPublishTripPnl(input: { organizationId: string
 
   const pendingExpenses = (expenses.data as ExpenseRow[] ?? []).filter((row) => row.review_status === "PENDING" && !row.deleted_at && row.status !== "VOIDED");
   if (pendingExpenses.length) throw new Error(`P&L is blocked: ${pendingExpenses.length} pending expense(s)`);
+  const activeIncomes = (incomes.data as IncomeRow[] ?? []).filter((row) => !row.deleted_at && row.payment_status !== "VOIDED");
+  const mismatchedIncome = activeIncomes.find((row) => row.reporting_currency.trim() !== organization.base_currency.trim());
+  if (mismatchedIncome) throw new Error("P&L is blocked: income reporting currency does not match the organization");
 
   const completedDate = trip.completed_at?.slice(0, 10) ?? "";
   const activeRules = (rules.data as RuleRow[] ?? []).filter((row) => row.valid_from <= completedDate && (!row.valid_to || row.valid_to >= completedDate));
@@ -193,7 +199,7 @@ export async function calculateAndPublishTripPnl(input: { organizationId: string
 
   const calculationInput = {
     currency: organization.base_currency,
-    revenueMinor: (incomes.data as IncomeRow[] ?? []).filter((row) => !row.deleted_at && row.payment_status !== "VOIDED").map((row) => minor(row.reporting_amount_minor)),
+    revenueMinor: activeIncomes.map((row) => minor(row.reporting_amount_minor)),
     legs: (legs.data as LegRow[] ?? []).map((row) => ({
       id: row.id,
       startOdometerKm: wholeKm(row.start_odometer_km),
@@ -215,7 +221,15 @@ export async function calculateAndPublishTripPnl(input: { organizationId: string
   const result = calculateTripPnl(calculationInput);
   if (result.warnings.length) throw new Error(`P&L is blocked: ${result.warnings.join(", ")}`);
 
-  const revision = inputRevision(calculationInput);
+  const revision = inputRevision({
+    calculationInput,
+    incomeFx: activeIncomes.map((row) => ({
+      id: row.id,
+      currency: row.currency.trim(),
+      reportingCurrency: row.reporting_currency.trim(),
+      fxRateToReporting: String(row.fx_rate_to_reporting),
+    })),
+  });
   const lineItems = [
     ["REVENUE", "Выручка", result.revenueMinor],
     ["FUEL", "Топливо", result.expensesByGroupMinor.FUEL],
