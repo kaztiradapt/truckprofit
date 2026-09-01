@@ -4,6 +4,8 @@ import type { CircleMarker, Map as LeafletMap, Marker, Polyline } from "leaflet"
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { routeGeocodingQueries } from "@/domain/route-endpoint";
+
 type EventType = "CHECKPOINT" | "REST" | "LOADING" | "UNLOADING" | "OTHER";
 type LocationPoint = {
   id: string;
@@ -14,7 +16,7 @@ type LocationPoint = {
   eventType: EventType;
   note: string | null;
 };
-type Endpoint = { latitude: number | null; longitude: number | null; label: string };
+type Endpoint = { latitude: number | null; longitude: number | null; label: string; city: string };
 type RoutingAlternative = { coordinates: Array<[number, number]> };
 type ResolvedEndpoint = { latitude: number; longitude: number };
 type GeocodingResponse = {
@@ -46,14 +48,16 @@ async function resolveEndpoint(endpoint: Endpoint, signal: AbortSignal): Promise
   if (endpoint.latitude !== null && endpoint.longitude !== null) {
     return { latitude: endpoint.latitude, longitude: endpoint.longitude };
   }
-  const query = endpoint.label.trim();
-  if (query.length < 3) return null;
-  const response = await fetch(`/api/geocoding/search?q=${encodeURIComponent(query)}`, { signal });
-  const payload = await response.json() as GeocodingResponse;
-  if (!response.ok) throw new Error(payload.error ?? "Не удалось определить точку по адресу.");
-  const first = payload.results?.[0];
-  if (!first || !Number.isFinite(first.latitude) || !Number.isFinite(first.longitude)) return null;
-  return { latitude: first.latitude, longitude: first.longitude };
+  for (const query of routeGeocodingQueries(endpoint.label, endpoint.city)) {
+    const response = await fetch(`/api/geocoding/search?q=${encodeURIComponent(query)}`, { signal });
+    const payload = await response.json() as GeocodingResponse;
+    if (!response.ok) throw new Error(payload.error ?? "Не удалось определить точку по адресу.");
+    const first = payload.results?.[0];
+    if (first && Number.isFinite(first.latitude) && Number.isFinite(first.longitude)) {
+      return { latitude: first.latitude, longitude: first.longitude };
+    }
+  }
+  return null;
 }
 
 function AnnotationForm({ organizationId, tripId, point, onSaved }: {
@@ -113,8 +117,8 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
   const [mapError, setMapError] = useState("");
   const points = useMemo(() => initialPoints.map((point) => ({ ...point, ...annotationOverrides[point.id] })), [annotationOverrides, initialPoints]);
   const numberedPoints = useMemo(() => points.map((point, index) => ({ ...point, number: points.length - index })), [points]);
-  const { latitude: originLatitude, longitude: originLongitude, label: originLabel } = origin;
-  const { latitude: destinationLatitude, longitude: destinationLongitude, label: destinationLabel } = destination;
+  const { latitude: originLatitude, longitude: originLongitude, label: originLabel, city: originCity } = origin;
+  const { latitude: destinationLatitude, longitude: destinationLongitude, label: destinationLabel, city: destinationCity } = destination;
 
   useEffect(() => {
     let cancelled = false;
@@ -144,8 +148,8 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
         : null;
       try {
         [resolvedOrigin, resolvedDestination] = await Promise.all([
-          resolveEndpoint({ latitude: originLatitude, longitude: originLongitude, label: originLabel }, controller.signal),
-          resolveEndpoint({ latitude: destinationLatitude, longitude: destinationLongitude, label: destinationLabel }, controller.signal),
+          resolveEndpoint({ latitude: originLatitude, longitude: originLongitude, label: originLabel, city: originCity }, controller.signal),
+          resolveEndpoint({ latitude: destinationLatitude, longitude: destinationLongitude, label: destinationLabel, city: destinationCity }, controller.signal),
         ]);
       } catch (caught) {
         if (!controller.signal.aborted) setMapError(caught instanceof Error ? caught.message : "Не удалось определить точки маршрута.");
@@ -233,7 +237,7 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
       map.current = null;
       mountedPointMarkers.clear();
     };
-  }, [destinationLabel, destinationLatitude, destinationLongitude, numberedPoints, originLabel, originLatitude, originLongitude, points.length]);
+  }, [destinationCity, destinationLabel, destinationLatitude, destinationLongitude, numberedPoints, originCity, originLabel, originLatitude, originLongitude, points.length]);
 
   function focusPoint(point: LocationPoint) {
     const marker = pointMarkers.current.get(point.id);

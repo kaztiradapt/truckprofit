@@ -148,8 +148,8 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             <TripTrackingMap
               organizationId={data.organization.id}
               tripId={latestTrip.id}
-              origin={{ latitude: latestTrip.originLatitude, longitude: latestTrip.originLongitude, label: latestTrip.originAddress }}
-              destination={{ latitude: latestTrip.destinationLatitude, longitude: latestTrip.destinationLongitude, label: latestTrip.destinationAddress }}
+              origin={{ latitude: latestTrip.originLatitude, longitude: latestTrip.originLongitude, label: latestTrip.originAddress, city: latestTrip.originCity }}
+              destination={{ latitude: latestTrip.destinationLatitude, longitude: latestTrip.destinationLongitude, label: latestTrip.destinationAddress, city: latestTrip.destinationCity }}
               initialPoints={latestTrip.locationHistory}
               canManage={canManageTrips}
             />
