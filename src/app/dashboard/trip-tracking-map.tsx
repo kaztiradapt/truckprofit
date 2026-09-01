@@ -16,6 +16,11 @@ type LocationPoint = {
 };
 type Endpoint = { latitude: number | null; longitude: number | null; label: string };
 type RoutingAlternative = { coordinates: Array<[number, number]> };
+type ResolvedEndpoint = { latitude: number; longitude: number };
+type GeocodingResponse = {
+  results?: Array<{ latitude: number; longitude: number }>;
+  error?: string;
+};
 
 const eventLabels: Record<EventType, string> = {
   CHECKPOINT: "Контрольная точка",
@@ -35,6 +40,20 @@ function pointCountLabel(count: number) {
   if (last === 1 && lastTwo !== 11) return `${count} точка`;
   if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return `${count} точки`;
   return `${count} точек`;
+}
+
+async function resolveEndpoint(endpoint: Endpoint, signal: AbortSignal): Promise<ResolvedEndpoint | null> {
+  if (endpoint.latitude !== null && endpoint.longitude !== null) {
+    return { latitude: endpoint.latitude, longitude: endpoint.longitude };
+  }
+  const query = endpoint.label.trim();
+  if (query.length < 3) return null;
+  const response = await fetch(`/api/geocoding/search?q=${encodeURIComponent(query)}`, { signal });
+  const payload = await response.json() as GeocodingResponse;
+  if (!response.ok) throw new Error(payload.error ?? "Не удалось определить точку по адресу.");
+  const first = payload.results?.[0];
+  if (!first || !Number.isFinite(first.latitude) || !Number.isFinite(first.longitude)) return null;
+  return { latitude: first.latitude, longitude: first.longitude };
 }
 
 function AnnotationForm({ organizationId, tripId, point, onSaved }: {
@@ -94,6 +113,8 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
   const [mapError, setMapError] = useState("");
   const points = useMemo(() => initialPoints.map((point) => ({ ...point, ...annotationOverrides[point.id] })), [annotationOverrides, initialPoints]);
   const numberedPoints = useMemo(() => points.map((point, index) => ({ ...point, number: points.length - index })), [points]);
+  const { latitude: originLatitude, longitude: originLongitude, label: originLabel } = origin;
+  const { latitude: destinationLatitude, longitude: destinationLongitude, label: destinationLabel } = destination;
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +128,7 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
 
     void import("leaflet").then(async (leaflet) => {
       if (cancelled || !mapContainer.current) return;
+      setMapError("");
       mountedMap = leaflet.map(mapContainer.current, { zoomControl: true, attributionControl: true }).setView([48.1, 67.1], 4);
       map.current = mountedMap;
       leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -114,20 +136,36 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(mountedMap);
 
+      let resolvedOrigin: ResolvedEndpoint | null = originLatitude !== null && originLongitude !== null
+        ? { latitude: originLatitude, longitude: originLongitude }
+        : null;
+      let resolvedDestination: ResolvedEndpoint | null = destinationLatitude !== null && destinationLongitude !== null
+        ? { latitude: destinationLatitude, longitude: destinationLongitude }
+        : null;
+      try {
+        [resolvedOrigin, resolvedDestination] = await Promise.all([
+          resolveEndpoint({ latitude: originLatitude, longitude: originLongitude, label: originLabel }, controller.signal),
+          resolveEndpoint({ latitude: destinationLatitude, longitude: destinationLongitude, label: destinationLabel }, controller.signal),
+        ]);
+      } catch (caught) {
+        if (!controller.signal.aborted) setMapError(caught instanceof Error ? caught.message : "Не удалось определить точки маршрута.");
+      }
+      if (cancelled || !mountedMap) return;
+
       const bounds: Array<[number, number]> = [];
-      if (origin.latitude !== null && origin.longitude !== null) {
-        bounds.push([origin.latitude, origin.longitude]);
+      if (resolvedOrigin) {
+        bounds.push([resolvedOrigin.latitude, resolvedOrigin.longitude]);
         const originTooltip = document.createElement("span");
-        originTooltip.textContent = `Погрузка: ${origin.label}`;
-        originMarker = leaflet.circleMarker([origin.latitude, origin.longitude], {
+        originTooltip.textContent = `Погрузка: ${originLabel}`;
+        originMarker = leaflet.circleMarker([resolvedOrigin.latitude, resolvedOrigin.longitude], {
           radius: 8, weight: 3, color: "#166b4f", fillColor: "#ffffff", fillOpacity: 1,
         }).addTo(mountedMap).bindTooltip(originTooltip, { direction: "top" });
       }
-      if (destination.latitude !== null && destination.longitude !== null) {
-        bounds.push([destination.latitude, destination.longitude]);
+      if (resolvedDestination) {
+        bounds.push([resolvedDestination.latitude, resolvedDestination.longitude]);
         const destinationTooltip = document.createElement("span");
-        destinationTooltip.textContent = `Выгрузка: ${destination.label}`;
-        destinationMarker = leaflet.circleMarker([destination.latitude, destination.longitude], {
+        destinationTooltip.textContent = `Выгрузка: ${destinationLabel}`;
+        destinationMarker = leaflet.circleMarker([resolvedDestination.latitude, resolvedDestination.longitude], {
           radius: 8, weight: 3, color: "#de7b32", fillColor: "#ffffff", fillOpacity: 1,
         }).addTo(mountedMap).bindTooltip(destinationTooltip, { direction: "top" });
       }
@@ -160,10 +198,10 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
       if (bounds.length) mountedMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
       window.setTimeout(() => mountedMap?.invalidateSize(), 0);
 
-      if (origin.latitude !== null && origin.longitude !== null && destination.latitude !== null && destination.longitude !== null) {
+      if (resolvedOrigin && resolvedDestination) {
         const query = new URLSearchParams({
-          origin: `${origin.latitude},${origin.longitude}`,
-          destination: `${destination.latitude},${destination.longitude}`,
+          origin: `${resolvedOrigin.latitude},${resolvedOrigin.longitude}`,
+          destination: `${resolvedDestination.latitude},${resolvedDestination.longitude}`,
         });
         try {
           const response = await fetch(`/api/routing?${query}`, { signal: controller.signal });
@@ -175,9 +213,12 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
             color: "#166b4f", weight: 5, opacity: .82,
           }).addTo(mountedMap);
           routeLayer.bringToBack();
+          mountedMap.fitBounds(routeLayer.getBounds(), { padding: [30, 30], maxZoom: 14 });
         } catch (caught) {
           if (!controller.signal.aborted) setMapError(caught instanceof Error ? caught.message : "Маршрут временно недоступен.");
         }
+      } else if (!controller.signal.aborted) {
+        setMapError("Не удалось определить погрузку или выгрузку по сохранённому адресу. Уточните адреса рейса.");
       }
     }).catch(() => setMapError("Не удалось открыть карту внутри кабинета."));
 
@@ -192,7 +233,7 @@ export function TripTrackingMap({ organizationId, tripId, origin, destination, i
       map.current = null;
       mountedPointMarkers.clear();
     };
-  }, [destination.label, destination.latitude, destination.longitude, numberedPoints, origin.label, origin.latitude, origin.longitude, points.length]);
+  }, [destinationLabel, destinationLatitude, destinationLongitude, numberedPoints, originLabel, originLatitude, originLongitude, points.length]);
 
   function focusPoint(point: LocationPoint) {
     const marker = pointMarkers.current.get(point.id);
