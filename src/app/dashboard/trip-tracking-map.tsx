@@ -1,0 +1,222 @@
+"use client";
+
+import type { CircleMarker, Map as LeafletMap, Marker, Polyline } from "leaflet";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+type EventType = "CHECKPOINT" | "REST" | "LOADING" | "UNLOADING" | "OTHER";
+type LocationPoint = {
+  id: string;
+  latitude: number;
+  longitude: number;
+  horizontalAccuracyM: number | null;
+  recordedAt: string;
+  eventType: EventType;
+  note: string | null;
+};
+type Endpoint = { latitude: number | null; longitude: number | null; label: string };
+type RoutingAlternative = { coordinates: Array<[number, number]> };
+
+const eventLabels: Record<EventType, string> = {
+  CHECKPOINT: "Контрольная точка",
+  REST: "Ночёвка / отдых",
+  LOADING: "Погрузка",
+  UNLOADING: "Выгрузка",
+  OTHER: "Другое",
+};
+
+function dateTimeLabel(value: string) {
+  return new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function AnnotationForm({ organizationId, tripId, point, onSaved }: {
+  organizationId: string;
+  tripId: string;
+  point: LocationPoint;
+  onSaved: (eventType: EventType, note: string | null) => void;
+}) {
+  const [eventType, setEventType] = useState<EventType>(point.eventType);
+  const [note, setNote] = useState(point.note ?? "");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function save() {
+    setSaving(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/trips/${tripId}/locations/${point.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId, eventType, note }),
+      });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "Не удалось сохранить отметку.");
+      onSaved(eventType, note.trim() || null);
+      setMessage("Сохранено");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "Не удалось сохранить отметку.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <div className="tracking-annotation">
+    <select aria-label="Тип отметки" value={eventType} onChange={(event) => setEventType(event.target.value as EventType)}>
+      {Object.entries(eventLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+    </select>
+    <input aria-label="Комментарий к отметке" value={note} maxLength={300} onChange={(event) => setNote(event.target.value)} placeholder="Например: стоянка на ночь" />
+    <button type="button" className="tiny-button" disabled={saving} onClick={() => void save()}>{saving ? "Сохраняю…" : "Сохранить"}</button>
+    {message ? <small className={message === "Сохранено" ? "tracking-saved" : "inline-error"}>{message}</small> : null}
+  </div>;
+}
+
+export function TripTrackingMap({ organizationId, tripId, origin, destination, initialPoints, canManage }: {
+  organizationId: string;
+  tripId: string;
+  origin: Endpoint;
+  destination: Endpoint;
+  initialPoints: LocationPoint[];
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const map = useRef<LeafletMap | null>(null);
+  const pointMarkers = useRef<Map<string, Marker>>(new Map());
+  const [annotationOverrides, setAnnotationOverrides] = useState<Record<string, { eventType: EventType; note: string | null }>>({});
+  const [mapError, setMapError] = useState("");
+  const points = useMemo(() => initialPoints.map((point) => ({ ...point, ...annotationOverrides[point.id] })), [annotationOverrides, initialPoints]);
+  const numberedPoints = useMemo(() => points.map((point, index) => ({ ...point, number: points.length - index })), [points]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let mountedMap: LeafletMap | null = null;
+    let originMarker: CircleMarker | null = null;
+    let destinationMarker: CircleMarker | null = null;
+    let routeLayer: Polyline | null = null;
+    let historyLayer: Polyline | null = null;
+    const controller = new AbortController();
+    const mountedPointMarkers = pointMarkers.current;
+
+    void import("leaflet").then(async (leaflet) => {
+      if (cancelled || !mapContainer.current) return;
+      mountedMap = leaflet.map(mapContainer.current, { zoomControl: true, attributionControl: true }).setView([48.1, 67.1], 4);
+      map.current = mountedMap;
+      leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(mountedMap);
+
+      const bounds: Array<[number, number]> = [];
+      if (origin.latitude !== null && origin.longitude !== null) {
+        bounds.push([origin.latitude, origin.longitude]);
+        const originTooltip = document.createElement("span");
+        originTooltip.textContent = `Погрузка: ${origin.label}`;
+        originMarker = leaflet.circleMarker([origin.latitude, origin.longitude], {
+          radius: 8, weight: 3, color: "#166b4f", fillColor: "#ffffff", fillOpacity: 1,
+        }).addTo(mountedMap).bindTooltip(originTooltip, { direction: "top" });
+      }
+      if (destination.latitude !== null && destination.longitude !== null) {
+        bounds.push([destination.latitude, destination.longitude]);
+        const destinationTooltip = document.createElement("span");
+        destinationTooltip.textContent = `Выгрузка: ${destination.label}`;
+        destinationMarker = leaflet.circleMarker([destination.latitude, destination.longitude], {
+          radius: 8, weight: 3, color: "#de7b32", fillColor: "#ffffff", fillOpacity: 1,
+        }).addTo(mountedMap).bindTooltip(destinationTooltip, { direction: "top" });
+      }
+
+      const chronological = [...numberedPoints].reverse();
+      for (const point of numberedPoints) {
+        bounds.push([point.latitude, point.longitude]);
+        const marker = leaflet.marker([point.latitude, point.longitude], {
+          icon: leaflet.divIcon({
+            className: "tracking-marker-shell",
+            html: `<span class="tracking-marker${point.number === points.length ? " latest" : ""}"><i>${point.number}</i></span>`,
+            iconSize: [34, 40],
+            iconAnchor: [17, 36],
+          }),
+          title: `Точка ${point.number}: ${eventLabels[point.eventType]}`,
+        }).addTo(mountedMap);
+        const popup = document.createElement("span");
+        const popupTitle = document.createElement("b");
+        popupTitle.textContent = `Точка ${point.number}`;
+        popup.append(popupTitle, document.createElement("br"), eventLabels[point.eventType], document.createElement("br"), dateTimeLabel(point.recordedAt));
+        marker.bindPopup(popup);
+        mountedPointMarkers.set(point.id, marker);
+      }
+      if (chronological.length > 1) {
+        historyLayer = leaflet.polyline(chronological.map((point) => [point.latitude, point.longitude]), {
+          color: "#de7b32", weight: 3, opacity: .75, dashArray: "7 7",
+        }).addTo(mountedMap);
+      }
+
+      if (bounds.length) mountedMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+      window.setTimeout(() => mountedMap?.invalidateSize(), 0);
+
+      if (origin.latitude !== null && origin.longitude !== null && destination.latitude !== null && destination.longitude !== null) {
+        const query = new URLSearchParams({
+          origin: `${origin.latitude},${origin.longitude}`,
+          destination: `${destination.latitude},${destination.longitude}`,
+        });
+        try {
+          const response = await fetch(`/api/routing?${query}`, { signal: controller.signal });
+          const payload = await response.json() as { routes?: RoutingAlternative[]; error?: string };
+          if (!response.ok) throw new Error(payload.error ?? "Маршрут временно недоступен.");
+          const primary = payload.routes?.[0];
+          if (!primary || cancelled || !mountedMap) return;
+          routeLayer = leaflet.polyline(primary.coordinates.map(([longitude, latitude]) => [latitude, longitude]), {
+            color: "#166b4f", weight: 5, opacity: .82,
+          }).addTo(mountedMap);
+          routeLayer.bringToBack();
+        } catch (caught) {
+          if (!controller.signal.aborted) setMapError(caught instanceof Error ? caught.message : "Маршрут временно недоступен.");
+        }
+      }
+    }).catch(() => setMapError("Не удалось открыть карту внутри кабинета."));
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      originMarker?.remove();
+      destinationMarker?.remove();
+      routeLayer?.remove();
+      historyLayer?.remove();
+      mountedMap?.remove();
+      map.current = null;
+      mountedPointMarkers.clear();
+    };
+  }, [destination.label, destination.latitude, destination.longitude, numberedPoints, origin.label, origin.latitude, origin.longitude, points.length]);
+
+  function focusPoint(point: LocationPoint) {
+    const marker = pointMarkers.current.get(point.id);
+    map.current?.setView([point.latitude, point.longitude], 14);
+    marker?.openPopup();
+    mapContainer.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function updateAnnotation(id: string, eventType: EventType, note: string | null) {
+    setAnnotationOverrides((current) => ({ ...current, [id]: { eventType, note } }));
+    router.refresh();
+  }
+
+  const latest = numberedPoints[0] ?? null;
+  return <section className="trip-tracking" aria-label="Маршрут и история геопозиций">
+    <div className="tracking-heading">
+      <span><b>Маршрут и геопозиции водителя</b><small>{latest ? `Последняя точка: ${dateTimeLabel(latest.recordedAt)}` : "Водитель ещё не отправлял геопозицию"}</small></span>
+      <div><span className="tracking-legend route" />Маршрут <span className="tracking-legend history" />Фактические точки</div>
+    </div>
+    <div ref={mapContainer} className="tracking-map" role="application" aria-label="Карта рейса и геопозиций водителя" />
+    {mapError ? <p className="tracking-map-error" role="status">{mapError}</p> : null}
+    <div className="tracking-points-heading"><b>История отметок</b><span>{numberedPoints.length} точек · сохраняются в рейсе</span></div>
+    {numberedPoints.length ? <ol className="tracking-points">
+      {numberedPoints.map((point) => <li key={point.id}>
+        <button type="button" className={`tracking-point-number${point.number === points.length ? " latest" : ""}`} onClick={() => focusPoint(point)} aria-label={`Показать точку ${point.number} на карте`}>{point.number}</button>
+        <div className="tracking-point-copy">
+          <span><b>{eventLabels[point.eventType]}</b>{point.number === points.length ? <em>Текущая</em> : null}</span>
+          <small>{dateTimeLabel(point.recordedAt)} · {point.horizontalAccuracyM === null ? "точность не указана" : `точность около ${Math.round(point.horizontalAccuracyM)} м`}</small>
+          {point.note ? <p>{point.note}</p> : null}
+          {canManage ? <AnnotationForm organizationId={organizationId} tripId={tripId} point={point} onSaved={(eventType, note) => updateAnnotation(point.id, eventType, note)} /> : null}
+        </div>
+      </li>)}
+    </ol> : <p className="empty-state">После отправки геопозиции водителем здесь появятся пронумерованные метки и журнал перемещений.</p>}
+  </section>;
+}

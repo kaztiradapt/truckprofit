@@ -7,10 +7,12 @@ import { getDashboardData } from "@/lib/dashboard-data";
 import { DriverList } from "./driver-list";
 import { IncomeForm } from "./income-form";
 import { OwnerTelegramConnectButton } from "./owner-telegram-connect-button";
-import { RecordManagement } from "./record-management";
 import { TelegramMenuButton } from "./telegram-menu-button";
 import { TeamManagement } from "./team-management";
 import { TripCreateForm } from "./trip-create-form";
+import { TripList } from "./trip-list";
+import { TripTrackingMap } from "./trip-tracking-map";
+import { VehicleList } from "./vehicle-list";
 
 export const dynamic = "force-dynamic";
 
@@ -30,14 +32,6 @@ function dateLabel(value: string | null) {
   return value ? new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium" }).format(new Date(value)) : "—";
 }
 
-function dateTimeLabel(value: string) {
-  return new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
-function openStreetMapUrl(latitude: number, longitude: number) {
-  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=12/${latitude}/${longitude}`;
-}
-
 function statusLabel(value: string) {
   return ({ DRAFT: "Черновик", ACTIVE: "В рейсе", COMPLETED: "Закрыт", CANCELLED: "Отменён" } as Record<string, string>)[value] ?? value;
 }
@@ -50,11 +44,10 @@ const sectionTitles: Record<DashboardSection, string> = {
   expenses: "Расходы",
   team: "Сотрудники и роли",
   operations: "Создание и закрытие рейса",
-  records: "Редактирование данных",
   help: "Инструкции и ЧАВО",
 };
 
-export const dashboardSections = ["overview", "trips", "vehicles", "drivers", "expenses", "team", "operations", "records", "help"] as const;
+export const dashboardSections = ["overview", "trips", "vehicles", "drivers", "expenses", "team", "operations", "help"] as const;
 export type DashboardSection = (typeof dashboardSections)[number];
 
 export async function DashboardScreen({ section, searchParams }: { section: DashboardSection; searchParams: Promise<{ error?: string; message?: string }> }) {
@@ -87,7 +80,6 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
     { href: "/dashboard/expenses", label: "Расходы", visible: canViewFinance, key: "expenses" },
     { href: "/dashboard/team", label: "Сотрудники", visible: data.role === "OWNER", key: "team" },
     { href: "/dashboard/operations", label: "Создание рейса", visible: canOperate, key: "operations" },
-    { href: "/dashboard/records", label: "Редактирование", visible: canManageVehicles || canManageDrivers || canManageTrips, key: "records" },
     { href: "/dashboard/help", label: "Инструкция", visible: true, key: "help" },
   ].filter((item) => item.visible);
 
@@ -150,10 +142,14 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
               <div><p className="eyebrow">Последний рейс</p><h2>{latestTrip.title}</h2><p>{latestTrip.vehicleName} · {latestTrip.driverName ?? "Водитель не назначен"} · {dateLabel(latestTrip.startedAt)}</p></div>
               <span className="status">{statusLabel(latestTrip.status)}</span>
             </div>
-            {latestTrip.lastLocation ? <div className="trip-location">
-              <span><b>📍 Последняя геопозиция</b><small>{dateTimeLabel(latestTrip.lastLocation.recordedAt)} · {latestTrip.lastLocation.horizontalAccuracyM === null ? "точность не указана" : `точность около ${Math.round(latestTrip.lastLocation.horizontalAccuracyM)} м`}</small></span>
-              <a href={openStreetMapUrl(latestTrip.lastLocation.latitude, latestTrip.lastLocation.longitude)} target="_blank" rel="noreferrer">Открыть на карте</a>
-            </div> : null}
+            <TripTrackingMap
+              organizationId={data.organization.id}
+              tripId={latestTrip.id}
+              origin={{ latitude: latestTrip.originLatitude, longitude: latestTrip.originLongitude, label: latestTrip.originAddress }}
+              destination={{ latitude: latestTrip.destinationLatitude, longitude: latestTrip.destinationLongitude, label: latestTrip.destinationAddress }}
+              initialPoints={latestTrip.locationHistory}
+              canManage={canManageTrips}
+            />
             <div className="trip-grid">
               <div className="route-panel">
                 {latestTrip.legs.length ? latestTrip.legs.map((leg, index) => (
@@ -176,9 +172,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {["trips", "vehicles", "drivers", "expenses"].includes(section) ? <section className="board-grid compact-board section-board">
           {section === "trips" ? <article className="panel panel-wide">
             <div className="panel-title"><div><p className="eyebrow">Рейсы</p><h2>Активность и P&amp;L</h2></div><span>{data.trips.length} рейс(ов)</span></div>
-            {data.trips.length ? <div className="table-wrap"><table className="responsive-table"><thead><tr><th>Рейс</th><th>Машина</th><th>Водитель</th><th>Старт</th><th>Статус</th><th>P&amp;L</th></tr></thead><tbody>
-              {data.trips.map((trip) => <tr key={trip.id}><td data-label="Рейс">{trip.title}</td><td data-label="Машина">{trip.vehicleName}</td><td data-label="Водитель">{trip.driverName ?? "Не назначен"}</td><td data-label="Старт">{dateLabel(trip.startedAt)}</td><td data-label="Статус"><span className="badge">{statusLabel(trip.status)}</span></td><td data-label="P&L">{trip.pnl ? `${formatMinor(trip.pnl.managementProfitMinor, data.organization.baseCurrency)} · ${trip.pnl.totalKm} км` : "—"}</td></tr>)}
-            </tbody></table></div> : <p className="empty-state">Пока нет рейсов.</p>}
+            <TripList organizationId={data.organization.id} baseCurrency={data.organization.baseCurrency} trips={data.trips} vehicles={data.vehicles} drivers={data.drivers} canManage={canManageTrips} canDelete={canDelete} />
           </article> : null}
 
           {section === "vehicles" ? <>
@@ -196,7 +190,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
               </form>
             </article> : null}
             <article className={`panel ${canManageVehicles ? "" : "panel-wide"}`}><div className="panel-title"><div><p className="eyebrow">Парк</p><h2>Автомобили</h2></div><span>{data.vehicles.length} в списке</span></div>
-              <ul className="entity-list">{data.vehicles.length ? data.vehicles.map((vehicle) => <li key={vehicle.id}><span>{vehicle.displayName}<small>{vehicle.plateNumber}{vehicle.makeModel ? ` · ${vehicle.makeModel}` : ""}</small></span><span className="badge">{vehicle.status}</span></li>) : <li className="empty-state">Нет добавленных машин.</li>}</ul>
+              <VehicleList organizationId={data.organization.id} vehicles={data.vehicles} canManage={canManageVehicles} canDelete={canDelete} />
             </article>
           </> : null}
 
@@ -231,17 +225,6 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             </div> : null}
           </div>
         </section> : section === "operations" ? <section className="panel"><h2>Ваш доступ: {data.accessRoleName}</h2><p className="muted">Редактирование ограничено владельцем. Доступные данные остаются в режиме просмотра.</p></section> : null}
-
-        {section === "records" && (canManageVehicles || canManageDrivers || canManageTrips) ? <RecordManagement
-          organizationId={data.organization.id}
-          vehicles={data.vehicles}
-          drivers={data.drivers}
-          trips={data.trips}
-          canManageVehicles={canManageVehicles}
-          canManageDrivers={canManageDrivers}
-          canManageTrips={canManageTrips}
-          canDelete={canDelete}
-        /> : section === "records" ? <section className="panel"><h2>Доступ ограничен</h2><p className="muted">Владелец не выдал этой роли права редактирования.</p></section> : null}
 
         {section === "help" ? <section className="help-section">
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>

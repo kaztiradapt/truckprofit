@@ -49,6 +49,15 @@ export type DashboardData = {
       horizontalAccuracyM: number | null;
       recordedAt: string;
     } | null;
+    locationHistory: Array<{
+      id: string;
+      latitude: number;
+      longitude: number;
+      horizontalAccuracyM: number | null;
+      recordedAt: string;
+      eventType: "CHECKPOINT" | "REST" | "LOADING" | "UNLOADING" | "OTHER";
+      note: string | null;
+    }>;
     legs: Array<{
       id: string;
       sequenceNo: number;
@@ -134,11 +143,14 @@ type TripRow = {
 };
 
 type LocationRow = {
+  id: string;
   trip_id: string;
   latitude: number;
   longitude: number;
   horizontal_accuracy_m: number | string | null;
   recorded_at: string;
+  event_type: "CHECKPOINT" | "REST" | "LOADING" | "UNLOADING" | "OTHER";
+  note: string | null;
 };
 
 function asOne<T>(value: T | T[] | null): T | null {
@@ -179,7 +191,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
     supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()),
     supabase.from("organization_access_roles").select("id, name, permissions, is_system").eq("organization_id", membership.organization_id).order("is_system", { ascending: false }).order("name"),
     supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("created_at"),
-    supabase.from("trip_location_points").select("trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(100),
+    supabase.from("trip_location_points").select("id, trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at, event_type, note").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(500),
   ]);
   for (const result of [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, accessRolesResult, staffResult]) {
     if (result.error) throw new Error(result.error.message);
@@ -204,9 +216,11 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
 
   const summaries = summariesResult.data ?? [];
   const pendingInvitesByDriver = new Map((invitesResult.data ?? []).map((invite) => [invite.driver_id, invite.expires_at]));
-  const latestLocationByTrip = new Map<string, LocationRow>();
+  const locationsByTrip = new Map<string, LocationRow[]>();
   for (const point of (locationsResult.data as LocationRow[] ?? [])) {
-    if (!latestLocationByTrip.has(point.trip_id)) latestLocationByTrip.set(point.trip_id, point);
+    const points = locationsByTrip.get(point.trip_id) ?? [];
+    points.push(point);
+    locationsByTrip.set(point.trip_id, points);
   }
   const totalKm = summaries.reduce((sum, item) => sum + Number(item.total_km ?? 0), 0);
   const emptyKm = summaries.reduce((sum, item) => sum + Number(item.empty_km ?? 0), 0);
@@ -252,6 +266,16 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
     trips: ((tripsResult.data ?? []) as unknown as TripRow[]).map((trip) => {
       const legs = (trip.trip_legs ?? []).sort((left, right) => left.sequence_no - right.sequence_no);
       const firstLeg = legs[0];
+      const locationHistory = (locationsByTrip.get(trip.id) ?? []).map((point) => ({
+        id: point.id,
+        latitude: Number(point.latitude),
+        longitude: Number(point.longitude),
+        horizontalAccuracyM: point.horizontal_accuracy_m === null ? null : Number(point.horizontal_accuracy_m),
+        recordedAt: point.recorded_at,
+        eventType: point.event_type,
+        note: point.note,
+      }));
+      const lastLocation = locationHistory[0] ?? null;
       return {
       id: trip.id,
       title: trip.title,
@@ -270,14 +294,13 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       destinationLatitude: firstLeg?.destination_latitude === null || firstLeg?.destination_latitude === undefined ? null : Number(firstLeg.destination_latitude),
       destinationLongitude: firstLeg?.destination_longitude === null || firstLeg?.destination_longitude === undefined ? null : Number(firstLeg.destination_longitude),
       loadState: firstLeg?.load_state ?? "UNKNOWN",
-      lastLocation: latestLocationByTrip.has(trip.id) ? {
-        latitude: Number(latestLocationByTrip.get(trip.id)!.latitude),
-        longitude: Number(latestLocationByTrip.get(trip.id)!.longitude),
-        horizontalAccuracyM: latestLocationByTrip.get(trip.id)!.horizontal_accuracy_m === null
-          ? null
-          : Number(latestLocationByTrip.get(trip.id)!.horizontal_accuracy_m),
-        recordedAt: latestLocationByTrip.get(trip.id)!.recorded_at,
+      lastLocation: lastLocation ? {
+        latitude: lastLocation.latitude,
+        longitude: lastLocation.longitude,
+        horizontalAccuracyM: lastLocation.horizontalAccuracyM,
+        recordedAt: lastLocation.recordedAt,
       } : null,
+      locationHistory,
       legs: legs.map((leg) => ({
         id: leg.id,
         sequenceNo: leg.sequence_no,
