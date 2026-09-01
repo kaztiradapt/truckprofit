@@ -29,7 +29,6 @@ const permissionOptions = [
   ["MANAGE_DRIVERS", "Редактировать водителей"],
   ["MANAGE_TRIPS", "Редактировать рейсы"],
   ["MANAGE_FINANCE", "Редактировать финансы"],
-  ["REVIEW_EXPENSES", "Проверять расходы"],
   ["DELETE_RECORDS", "Удалять записи"],
 ] as const;
 

@@ -234,28 +234,6 @@ export async function createIncome(formData: FormData): Promise<void> {
   revalidatePath("/dashboard", "layout");
 }
 
-export async function reviewExpense(formData: FormData): Promise<void> {
-  const parsed = z.object({
-    organizationId: uuid,
-    expenseId: uuid,
-    decision: z.enum(["APPROVED", "REJECTED"]),
-  }).safeParse({
-    organizationId: formData.get("organization_id"),
-    expenseId: formData.get("expense_id"),
-    decision: formData.get("decision"),
-  });
-  if (!parsed.success) dashboardError("Проверьте решение по расходу.");
-  const supabase = await requirePermission(parsed.data.organizationId, "REVIEW_EXPENSES");
-  const { error } = await supabase.rpc("review_expense", {
-    p_organization_id: parsed.data.organizationId,
-    p_expense_id: parsed.data.expenseId,
-    p_decision: parsed.data.decision,
-    p_note: null,
-  });
-  if (error) dashboardError("Не удалось проверить расход. Возможно, он уже обработан.");
-  revalidatePath("/dashboard", "layout");
-}
-
 export async function completeTrip(formData: FormData): Promise<void> {
   const parsed = z.object({ organizationId: uuid, tripId: uuid }).safeParse({
     organizationId: formData.get("organization_id"),
@@ -281,7 +259,7 @@ export async function recalculateTripPnl(formData: FormData): Promise<void> {
   try {
     await calculateAndPublishTripPnl({ organizationId: parsed.data.organizationId, tripId: parsed.data.tripId });
   } catch {
-    dashboardError("P&L пока не рассчитан: проверьте утверждение расходов, плечи рейса и настройку сервера.");
+    dashboardError("P&L пока не рассчитан: проверьте плечи рейса и настройку сервера.");
   }
   revalidatePath("/dashboard", "layout");
 }

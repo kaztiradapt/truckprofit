@@ -8,8 +8,6 @@ describe("owner Telegram menu formatting", () => {
       vehicleCount: 3,
       driverCount: 4,
       activeTripCount: 2,
-      pendingExpenseCount: 1,
-      pendingExpenseMinor: 125_000_00,
       overdueIncomeCount: 1,
       revenueMinor: 900_000_00,
       expensesMinor: 350_000_00,
@@ -17,7 +15,7 @@ describe("owner Telegram menu formatting", () => {
     }, "KZT");
 
     expect(message).toContain("Активных рейсов: 2");
-    expect(message).toContain("Расходов на проверке: 1");
+    expect(message).toContain("Расходы:");
     expect(message).toContain("Результат:");
   });
 

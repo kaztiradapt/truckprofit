@@ -308,26 +308,20 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
 
   async getOwnerSummary(owner: OwnerIdentity): Promise<OwnerSummary> {
     const today = new Date().toISOString().slice(0, 10);
-    const [vehicles, drivers, activeTrips, pendingExpenses, overdueIncomes, financials] = await Promise.all([
+    const [vehicles, drivers, activeTrips, overdueIncomes, financials] = await Promise.all([
       this.client.from("vehicles").select("id", { count: "exact", head: true }).eq("organization_id", owner.organizationId).eq("status", "ACTIVE").is("deleted_at", null),
       this.client.from("drivers").select("id", { count: "exact", head: true }).eq("organization_id", owner.organizationId).eq("status", "ACTIVE").is("deleted_at", null),
       this.client.from("trips").select("id", { count: "exact", head: true }).eq("organization_id", owner.organizationId).eq("status", "ACTIVE").is("deleted_at", null),
-      this.client.from("expenses").select("amount, currency").eq("organization_id", owner.organizationId).eq("review_status", "PENDING").eq("status", "RECORDED").is("deleted_at", null),
       this.client.from("incomes").select("id", { count: "exact", head: true }).eq("organization_id", owner.organizationId).in("payment_status", ["PLANNED", "INVOICED", "PARTIAL", "OVERDUE"]).lt("expected_payment_at", today).is("deleted_at", null),
       this.client.from("trip_financial_summary").select("revenue, expenses, operating_profit").eq("organization_id", owner.organizationId),
     ]);
-    for (const result of [vehicles, drivers, activeTrips, pendingExpenses, overdueIncomes, financials]) throwOnError(result.error);
+    for (const result of [vehicles, drivers, activeTrips, overdueIncomes, financials]) throwOnError(result.error);
 
-    const pendingRows = pendingExpenses.data ?? [];
     const financialRows = financials.data ?? [];
     return {
       vehicleCount: vehicles.count ?? 0,
       driverCount: drivers.count ?? 0,
       activeTripCount: activeTrips.count ?? 0,
-      pendingExpenseCount: pendingRows.length,
-      pendingExpenseMinor: pendingRows
-        .filter((expense) => expense.currency === owner.baseCurrency)
-        .reduce((sum, expense) => sum + moneyToMinor(expense.amount), 0),
       overdueIncomeCount: overdueIncomes.count ?? 0,
       revenueMinor: financialRows.reduce((sum, item) => sum + moneyToMinor(item.revenue), 0),
       expensesMinor: financialRows.reduce((sum, item) => sum + moneyToMinor(item.expenses), 0),
@@ -374,12 +368,12 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
     }));
   }
 
-  async listOwnerPendingExpenses(owner: OwnerIdentity): Promise<OwnerExpenseSummary[]> {
+  async listOwnerRecentExpenses(owner: OwnerIdentity): Promise<OwnerExpenseSummary[]> {
     const { data, error } = await this.client
       .from("expenses")
       .select("id, amount, currency, occurred_at, expense_categories(display_name), trips(title), drivers(display_name)")
       .eq("organization_id", owner.organizationId)
-      .eq("review_status", "PENDING")
+      .neq("review_status", "REJECTED")
       .eq("status", "RECORDED")
       .is("deleted_at", null)
       .order("occurred_at", { ascending: false })

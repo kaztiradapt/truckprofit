@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signOut } from "@/app/actions/auth";
-import { completeTrip, createDriver, createVehicle, enableOwnerDriverMode, recalculateTripPnl, reviewExpense } from "@/app/actions/owner";
+import { completeTrip, createDriver, createVehicle, enableOwnerDriverMode, recalculateTripPnl } from "@/app/actions/owner";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { DriverInviteButton } from "./driver-invite-button";
 import { IncomeForm } from "./income-form";
@@ -66,10 +66,9 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
   const canManageDrivers = data.permissions.includes("MANAGE_DRIVERS");
   const canManageTrips = data.permissions.includes("MANAGE_TRIPS");
   const canManageFinance = data.permissions.includes("MANAGE_FINANCE");
-  const canReviewExpenses = data.permissions.includes("REVIEW_EXPENSES");
   const canViewFinance = data.permissions.includes("VIEW_FINANCE");
   const canDelete = data.permissions.includes("DELETE_RECORDS");
-  const canOperate = canManageVehicles || canManageDrivers || canManageTrips || canManageFinance || canReviewExpenses;
+  const canOperate = canManageVehicles || canManageDrivers || canManageTrips || canManageFinance;
   const ownerDriver = data.drivers.find((driver) => driver.isOwnerDriver) ?? null;
   const today = new Date().toISOString().slice(0, 10);
   const latestTrip = data.trips[0] ?? null;
@@ -80,22 +79,37 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
   const emptyShare = latestPnl && latestPnl.totalKm > 0
     ? `${((latestPnl.emptyKm / latestPnl.totalKm) * 100).toFixed(1)}%`
     : data.totals.emptyMileagePct === null ? "—" : `${data.totals.emptyMileagePct}%`;
+  const navigationItems = [
+    { href: "/dashboard", label: "Обзор", visible: true, key: "overview" },
+    { href: "/dashboard/trips", label: "Рейсы", visible: true, key: "trips" },
+    { href: "/dashboard/vehicles", label: "Автомобили", visible: true, key: "vehicles" },
+    { href: "/dashboard/drivers", label: "Водители", visible: true, key: "drivers" },
+    { href: "/dashboard/expenses", label: "Расходы", visible: canViewFinance, key: "expenses" },
+    { href: "/dashboard/team", label: "Сотрудники", visible: data.role === "OWNER", key: "team" },
+    { href: "/dashboard/operations", label: "Создание рейса", visible: canOperate, key: "operations" },
+    { href: "/dashboard/records", label: "Редактирование", visible: canManageVehicles || canManageDrivers || canManageTrips, key: "records" },
+    { href: "/dashboard/help", label: "Инструкция", visible: true, key: "help" },
+  ].filter((item) => item.visible);
 
   return (
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand"><span>TP</span><strong>TruckProfit</strong></div>
-        <nav aria-label="Основная навигация">
-          <Link className={section === "overview" ? "active" : ""} href="/dashboard">Обзор</Link>
-          <Link className={section === "trips" ? "active" : ""} href="/dashboard/trips">Рейсы</Link>
-          <Link className={section === "vehicles" ? "active" : ""} href="/dashboard/vehicles">Автомобили</Link>
-          <Link className={section === "drivers" ? "active" : ""} href="/dashboard/drivers">Водители</Link>
-          {canViewFinance || canReviewExpenses ? <Link className={section === "expenses" ? "active" : ""} href="/dashboard/expenses">Расходы</Link> : null}
-          {data.role === "OWNER" ? <Link className={section === "team" ? "active" : ""} href="/dashboard/team">Сотрудники</Link> : null}
-          {canOperate ? <Link className={section === "operations" ? "active" : ""} href="/dashboard/operations">Создание рейса</Link> : null}
-          {canManageVehicles || canManageDrivers || canManageTrips ? <Link className={section === "records" ? "active" : ""} href="/dashboard/records">Редактирование</Link> : null}
-          <Link className={section === "help" ? "active" : ""} href="/dashboard/help">Инструкция</Link>
+        <nav className="desktop-navigation" aria-label="Основная навигация">
+          {navigationItems.map((item) => <Link className={section === item.key ? "active" : ""} href={item.href} key={item.key}>{item.label}</Link>)}
         </nav>
+        <details className="mobile-navigation">
+          <summary><span>Меню</span><i aria-hidden="true" /></summary>
+          <div className="mobile-navigation-panel">
+            <nav aria-label="Мобильная навигация">
+              {navigationItems.map((item) => <Link className={section === item.key ? "active" : ""} href={item.href} key={item.key}>{item.label}</Link>)}
+            </nav>
+            <div className="mobile-account">
+              <span><b>{data.organization.name}</b><small>{data.accessRoleName} · {data.organization.baseCurrency}</small></span>
+              <form action={signOut}><button className="sidebar-signout" type="submit">Выйти</button></form>
+            </div>
+          </div>
+        </details>
         <div className="sidebar-note">
           <span>{data.organization.name}</span>
           <small>{data.vehicles.length} авто · {data.organization.baseCurrency}</small>
@@ -107,7 +121,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
       <section className="content">
         <header className="topbar">
           <div><p className="eyebrow">Экономика автопарка</p><h1>{sectionTitles[section]}</h1></div>
-          {canManageTrips && section !== "operations" ? <Link className="primary-link" href="/dashboard/operations">+ Новый рейс</Link> : null}
+          {canManageTrips && ["overview", "trips"].includes(section) ? <Link className="primary-link" href="/dashboard/operations">+ Новый рейс</Link> : null}
         </header>
 
         {error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -118,14 +132,14 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
           <OwnerTelegramConnectButton organizationId={data.organization.id} linked={data.ownerTelegramLinked} />
         </section> : null}
 
-        {section === "overview" && (canViewFinance || canReviewExpenses) ? <div className={data.pendingExpenses.length ? "signal signal-warning" : "signal"}>
-          <div><span className="signal-dot" />{data.pendingExpenses.length ? `${data.pendingExpenses.length} расход(а) ждут проверки` : "Все расходы проверены"}</div>
+        {section === "overview" && canViewFinance ? <div className="signal">
+          <div><span className="signal-dot" />Расходы учитываются автоматически</div>
           <p>{latestPnl ? "P&L последнего рейса зафиксирован" : "Данные поступают из рейсов и Telegram"}</p>
         </div> : section === "overview" ? <div className="signal"><div><span className="signal-dot" />Роль: {data.accessRoleName}</div><p>Финансовые показатели скрыты настройками доступа</p></div> : null}
 
         {section === "overview" && canViewFinance ? <section className="metrics" aria-label="Ключевые показатели">
           <article><span>Выручка</span><strong>{formatMoney(data.totals.revenue, data.organization.baseCurrency)}</strong><small>{data.totals.totalKm ? `${formatMoney(data.totals.revenue / data.totals.totalKm, data.organization.baseCurrency)} / км` : "Нет закрытого пробега"}</small></article>
-          <article><span>Все расходы</span><strong>{formatMoney(data.totals.expenses, data.organization.baseCurrency)}</strong><small>{data.totals.totalKm ? `${formatMoney(data.totals.expenses / data.totals.totalKm, data.organization.baseCurrency)} / км` : "Только утверждённые"}</small></article>
+          <article><span>Все расходы</span><strong>{formatMoney(data.totals.expenses, data.organization.baseCurrency)}</strong><small>{data.totals.totalKm ? `${formatMoney(data.totals.expenses / data.totals.totalKm, data.organization.baseCurrency)} / км` : "Учитываются сразу после записи"}</small></article>
           <article className="profit"><span>Результат</span><strong>{formatMoney(data.totals.profit, data.organization.baseCurrency)}</strong><small>{latestPnl ? `${margin} маржа последнего рейса` : "До оценочных налогов"}</small></article>
           <article><span>Порожний пробег</span><strong>{latestPnl ? formatKm(latestPnl.emptyKm) : emptyShare}</strong><small>{latestPnl ? `${emptyShare} от последнего рейса` : "Доля от общего"}</small></article>
         </section> : null}
@@ -162,8 +176,8 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {["trips", "vehicles", "drivers", "expenses"].includes(section) ? <section className="board-grid compact-board section-board">
           {section === "trips" ? <article className="panel panel-wide">
             <div className="panel-title"><div><p className="eyebrow">Рейсы</p><h2>Активность и P&amp;L</h2></div><span>{data.trips.length} рейс(ов)</span></div>
-            {data.trips.length ? <div className="table-wrap"><table><thead><tr><th>Рейс</th><th>Машина</th><th>Водитель</th><th>Старт</th><th>Статус</th><th>P&amp;L</th></tr></thead><tbody>
-              {data.trips.map((trip) => <tr key={trip.id}><td>{trip.title}</td><td>{trip.vehicleName}</td><td>{trip.driverName ?? "Не назначен"}</td><td>{dateLabel(trip.startedAt)}</td><td><span className="badge">{statusLabel(trip.status)}</span></td><td>{trip.pnl ? `${formatMinor(trip.pnl.managementProfitMinor, data.organization.baseCurrency)} · ${trip.pnl.totalKm} км` : "—"}</td></tr>)}
+            {data.trips.length ? <div className="table-wrap"><table className="responsive-table"><thead><tr><th>Рейс</th><th>Машина</th><th>Водитель</th><th>Старт</th><th>Статус</th><th>P&amp;L</th></tr></thead><tbody>
+              {data.trips.map((trip) => <tr key={trip.id}><td data-label="Рейс">{trip.title}</td><td data-label="Машина">{trip.vehicleName}</td><td data-label="Водитель">{trip.driverName ?? "Не назначен"}</td><td data-label="Старт">{dateLabel(trip.startedAt)}</td><td data-label="Статус"><span className="badge">{statusLabel(trip.status)}</span></td><td data-label="P&L">{trip.pnl ? `${formatMinor(trip.pnl.managementProfitMinor, data.organization.baseCurrency)} · ${trip.pnl.totalKm} км` : "—"}</td></tr>)}
             </tbody></table></div> : <p className="empty-state">Пока нет рейсов.</p>}
           </article> : null}
 
@@ -179,8 +193,9 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             {data.role === "OWNER" && !ownerDriver ? <form action={enableOwnerDriverMode} className="self-driver-cta"><input type="hidden" name="organization_id" value={data.organization.id} /><span><b>Вы сами за рулём?</b><small>Это дополнительный вариант — создадим отдельный водительский режим для вашего профиля.</small></span><button type="submit" className="tiny-button">Я владелец-водитель</button></form> : null}
           </article> : null}
 
-          {section === "expenses" && (canViewFinance || canReviewExpenses) ? <article className="panel panel-wide"><div className="panel-title"><div><p className="eyebrow">Финансовый контроль</p><h2>Расходы на проверке</h2></div><span>{data.pendingExpenses.length}</span></div>
-            <ul className="entity-list">{data.pendingExpenses.length ? data.pendingExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {dateLabel(expense.occurredAt)}{expense.comment ? ` · ${expense.comment}` : ""}</small></span><span>{formatMoney(expense.amount, expense.currency)}{canReviewExpenses ? <span className="review-actions"><form action={reviewExpense}><input type="hidden" name="organization_id" value={data.organization.id} /><input type="hidden" name="expense_id" value={expense.id} /><input type="hidden" name="decision" value="APPROVED" /><button type="submit">Принять</button></form><form action={reviewExpense}><input type="hidden" name="organization_id" value={data.organization.id} /><input type="hidden" name="expense_id" value={expense.id} /><input type="hidden" name="decision" value="REJECTED" /><button className="button-secondary" type="submit">Отклонить</button></form></span> : null}</span></li>) : <li className="empty-state">Новых расходов нет.</li>}</ul>
+          {section === "expenses" && canViewFinance ? <article className="panel panel-wide"><div className="panel-title"><div><p className="eyebrow">Финансовый учёт</p><h2>Последние расходы</h2></div><span>{data.recentExpenses.length}</span></div>
+            <p className="panel-note">Расход попадает в экономику рейса сразу после записи водителем.</p>
+            <ul className="entity-list expense-list">{data.recentExpenses.length ? data.recentExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {dateLabel(expense.occurredAt)}{expense.comment ? ` · ${expense.comment}` : ""}</small></span><strong>{formatMoney(expense.amount, expense.currency)}</strong></li>) : <li className="empty-state">Расходов пока нет.</li>}</ul>
           </article> : section === "expenses" ? <article className="panel panel-wide"><h2>Доступ ограничен</h2><p className="muted">Владелец не выдал этой роли доступ к финансовым данным.</p></article> : null}
         </section> : null}
 
@@ -227,15 +242,15 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {section === "help" ? <section className="help-section">
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>
           <div className="help-grid">
-            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль и водителя.</li><li>Создайте рейс, укажите маршрут и доход.</li><li>Подключите свой Telegram кнопкой выше.</li><li>Проверяйте расходы водителей и закрывайте рейс.</li><li>После закрытия рассчитайте P&amp;L.</li></ol></article>
+            <article className="panel"><h3>Владельцу</h3><ol><li>Добавьте автомобиль и водителя.</li><li>Создайте рейс, укажите маршрут и доход.</li><li>Подключите свой Telegram кнопкой выше.</li><li>Расходы водителей учитываются автоматически.</li><li>После закрытия рассчитайте P&amp;L.</li></ol></article>
             <article className="panel"><h3>Водителю</h3><ol><li>Откройте персональную ссылку владельца и нажмите START.</li><li>В «Мой рейс» проверьте адреса погрузки и выгрузки.</li><li>Там же одной кнопкой отмечайте ожидание, погрузку, путь и выгрузку.</li><li>Геопозиция передаётся только после вашего нажатия и разрешения Telegram.</li><li>После расхода отправьте фото чека; оплату смотрите в «Моя зарплата».</li></ol></article>
             <article className="panel"><h3>Mini App</h3><ol><li>Откройте «Открыть кабинет» возле поля ввода в Telegram.</li><li>При первом запуске войдите тем же email владельца.</li><li>Каждый раздел открывается на отдельной странице из верхнего или бокового меню.</li><li>Все данные синхронизируются с ботом автоматически.</li><li>Для сложных операций используйте кабинет, для быстрых — меню бота.</li></ol></article>
           </div>
           <div className="faq-list">
             <details><summary>Почему бот не видит мой профиль?</summary><p>Telegram ещё не привязан или открыта чужая/просроченная ссылка. Создайте новую ссылку в карточке владельца или водителя и нажмите START именно в нужном аккаунте Telegram.</p></details>
             <details><summary>Можно ли владельцу самому быть водителем?</summary><p>Да. Нажмите «Я владелец-водитель» в разделе команды. Один Telegram получит два режима, между ними можно переключаться в меню бота.</p></details>
-            <details><summary>Что делать, если ошибся в расходе?</summary><p>Не создавайте дубликат. Владелец может отклонить расход на проверке; затем водитель внесёт правильный.</p></details>
-            <details><summary>Где смотреть полную экономику?</summary><p>В Mini App: выручка, утверждённые расходы, прибыль, пробег и P&amp;L закрытых рейсов. Бот показывает быструю оперативную сводку.</p></details>
+            <details><summary>Как учитывается расход?</summary><p>Сразу после сохранения водителем. Дополнительное подтверждение владельца не требуется.</p></details>
+            <details><summary>Где смотреть полную экономику?</summary><p>В Mini App: выручка, расходы, прибыль, пробег и P&amp;L закрытых рейсов. Бот показывает быструю оперативную сводку.</p></details>
           </div>
         </section> : null}
 

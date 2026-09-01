@@ -184,11 +184,10 @@ export function formatOwnerSummary(summary: OwnerSummary, currency: string): str
     `🚛 Активных рейсов: ${summary.activeTripCount}`,
     `🚚 Машин: ${summary.vehicleCount}`,
     `👥 Водителей: ${summary.driverCount}`,
-    `🧾 Расходов на проверке: ${summary.pendingExpenseCount} · ${formatMoney(summary.pendingExpenseMinor, currency)}`,
     `⏰ Просроченных оплат: ${summary.overdueIncomeCount}`,
     "",
     `Выручка: ${formatMoney(summary.revenueMinor, currency)}`,
-    `Утверждённые расходы: ${formatMoney(summary.expensesMinor, currency)}`,
+    `Расходы: ${formatMoney(summary.expensesMinor, currency)}`,
     `Результат: ${formatMoney(summary.profitMinor, currency)}`,
   ].join("\n");
 }
@@ -201,8 +200,8 @@ export function formatOwnerTrips(trips: OwnerTripSummary[]): string {
 }
 
 export function formatOwnerExpenses(expenses: OwnerExpenseSummary[]): string {
-  if (!expenses.length) return "✅ Расходов на проверке нет.";
-  return ["💳 Расходы на проверке", "", ...expenses.map((expense, index) =>
+  if (!expenses.length) return "💳 Расходов пока нет.";
+  return ["💳 Последние расходы", "", ...expenses.map((expense, index) =>
     `${index + 1}. ${expense.categoryName} — ${formatMoney(expense.amountMinor, expense.currency)}\n${expense.tripTitle ?? "без рейса"} · ${expense.driverName ?? "водитель не указан"} · ${dateLabel(expense.occurredAt)}`,
   )].join("\n\n");
 }
@@ -561,8 +560,8 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
         "1. Добавьте автомобиль и водителя в Mini App.",
         "2. Создайте рейс, маршрут и доход.",
         "3. Подключите свой Telegram в кабинете.",
-        "4. В боте проверяйте сводку, рейсы и новые расходы.",
-        "5. В Mini App принимайте расходы, закрывайте рейс и рассчитывайте P&L.",
+        "4. В боте смотрите сводку, рейсы и последние расходы.",
+        "5. В Mini App смотрите расходы, закрывайте рейс и рассчитывайте P&L.",
       ].join("\n"), helpMenu());
       return;
     }
@@ -594,7 +593,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
         "",
         "• Бот не видит профиль — создайте новую ссылку и нажмите START в нужном Telegram-аккаунте.",
         "• Владелец сам за рулём — включите «Я владелец-водитель», появится переключение режимов.",
-        "• Ошибка в расходе — владелец отклоняет его, водитель вносит правильный.",
+        "• Расход учитывается сразу после сохранения, без подтверждения владельца.",
         "• Полная экономика — в Mini App; бот показывает быструю сводку.",
         "• Забыли пароль — на странице входа нажмите «Забыли пароль?».",
       ].join("\n"), helpMenu());
@@ -639,7 +638,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
           : "Водителей пока нет.";
         await replaceMenu(context, message, ownerMenu(context.session.driverAvailable));
       } else if (data === "owner:expenses") {
-        const expenses = await repository.listOwnerPendingExpenses(owner);
+        const expenses = await repository.listOwnerRecentExpenses(owner);
         await replaceMenu(context, formatOwnerExpenses(expenses), ownerMenu(context.session.driverAvailable));
       }
       return;

@@ -69,7 +69,7 @@ export type DashboardData = {
       emptyKm: number;
     } | null;
   }>;
-  pendingExpenses: Array<{ id: string; categoryName: string; tripTitle: string | null; amount: number; currency: string; occurredAt: string; comment: string | null }>;
+  recentExpenses: Array<{ id: string; categoryName: string; tripTitle: string | null; amount: number; currency: string; occurredAt: string; comment: string | null }>;
   totals: { revenue: number; expenses: number; profit: number; totalKm: number; emptyMileagePct: number | null };
 };
 
@@ -168,13 +168,13 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   const accessRole = asOne(membership.organization_access_roles);
   const permissions = membership.role === "OWNER" ? [...permissionCodes] : accessRole?.permissions ?? [];
 
-  const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, pendingExpensesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult] = await Promise.all([
+  const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult] = await Promise.all([
     supabase.from("profiles").select("telegram_user_id").eq("id", userId).maybeSingle(),
     supabase.from("vehicles").select("id, display_name, plate_number, make_model, fuel_norm_l_per_100km, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(50),
     supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id),
-    supabase.from("expenses").select("id, amount, currency, occurred_at, comment, expense_categories(display_name), trips(title)").eq("organization_id", membership.organization_id).eq("review_status", "PENDING").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(12),
+    supabase.from("expenses").select("id, amount, currency, occurred_at, comment, expense_categories(display_name), trips(title)").eq("organization_id", membership.organization_id).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(20),
     supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
     supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()),
     supabase.from("organization_access_roles").select("id, name, permissions, is_system").eq("organization_id", membership.organization_id).order("is_system", { ascending: false }).order("name"),
@@ -188,7 +188,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   // The web release may reach Vercel a few moments before the additive SQL migration.
   // Keep the current owner dashboard readable during that short window; any other
   // error still surfaces instead of being hidden.
-  for (const result of [pendingExpensesResult, pnlResult, invitesResult, locationsResult]) {
+  for (const result of [recentExpensesResult, pnlResult, invitesResult, locationsResult]) {
     if (result.error && !["42P01", "42703"].includes(result.error.code ?? "")) throw new Error(result.error.message);
   }
 
@@ -286,7 +286,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       })),
       pnl: pnlByTrip.get(trip.id) ?? null,
     }; }),
-    pendingExpenses: (pendingExpensesResult.data ?? []).map((expense) => ({
+    recentExpenses: (recentExpensesResult.data ?? []).map((expense) => ({
       id: expense.id,
       categoryName: asOne(expense.expense_categories)?.display_name ?? "Расход",
       tripTitle: asOne(expense.trips)?.title ?? null,

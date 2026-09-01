@@ -186,8 +186,6 @@ export async function calculateAndPublishTripPnl(input: { organizationId: string
   ]);
   for (const result of [legs, expenses, incomes, rules, tax]) if (result.error) throw result.error;
 
-  const pendingExpenses = (expenses.data as ExpenseRow[] ?? []).filter((row) => row.review_status === "PENDING" && !row.deleted_at && row.status !== "VOIDED");
-  if (pendingExpenses.length) throw new Error(`P&L is blocked: ${pendingExpenses.length} pending expense(s)`);
   const activeIncomes = (incomes.data as IncomeRow[] ?? []).filter((row) => !row.deleted_at && row.payment_status !== "VOIDED");
   const mismatchedIncome = activeIncomes.find((row) => row.reporting_currency.trim() !== organization.base_currency.trim());
   if (mismatchedIncome) throw new Error("P&L is blocked: income reporting currency does not match the organization");
@@ -211,7 +209,7 @@ export async function calculateAndPublishTripPnl(input: { organizationId: string
       id: row.id,
       group: expenseGroup(one(row.expense_categories)?.economic_group),
       amountMinor: minor(row.reporting_amount_minor),
-      approved: row.review_status === "APPROVED",
+      approved: row.review_status !== "REJECTED",
       voided: Boolean(row.deleted_at) || row.status === "VOIDED",
     })),
     compensationRules: parseRules(activeRules),

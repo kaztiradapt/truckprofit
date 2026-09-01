@@ -25,8 +25,6 @@ export type OwnerSummary = {
   vehicleCount: number;
   driverCount: number;
   activeTripCount: number;
-  pendingExpenseCount: number;
-  pendingExpenseMinor: number;
   overdueIncomeCount: number;
   revenueMinor: number;
   expensesMinor: number;
@@ -142,7 +140,7 @@ export interface DriverBotRepository {
   getOwnerSummary(owner: OwnerIdentity): Promise<OwnerSummary>;
   listOwnerActiveTrips(owner: OwnerIdentity): Promise<OwnerTripSummary[]>;
   listOwnerDrivers(owner: OwnerIdentity): Promise<OwnerDriverSummary[]>;
-  listOwnerPendingExpenses(owner: OwnerIdentity): Promise<OwnerExpenseSummary[]>;
+  listOwnerRecentExpenses(owner: OwnerIdentity): Promise<OwnerExpenseSummary[]>;
   findActiveTrip(driver: DriverIdentity): Promise<ActiveTrip | null>;
   recordExpense(input: RecordExpenseInput): Promise<{ expenseId: string }>;
   recordOdometer(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm" | "occurredAt">): Promise<void>;

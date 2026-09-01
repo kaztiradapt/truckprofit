@@ -9,7 +9,6 @@ export const permissionCodes = [
   "MANAGE_DRIVERS",
   "MANAGE_TRIPS",
   "MANAGE_FINANCE",
-  "REVIEW_EXPENSES",
   "MANAGE_TEAM",
   "DELETE_RECORDS",
 ] as const;
