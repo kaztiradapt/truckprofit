@@ -202,6 +202,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
           organizationId={data.organization.id}
           trips={data.trips}
           expenses={data.recentExpenses}
+          incomes={data.incomes}
           baseCurrency={data.organization.baseCurrency}
           canManage={canManageTrips}
           canViewFinance={canViewFinance}
@@ -210,7 +211,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {["trips", "vehicles", "drivers", "expenses"].includes(section) ? <section className="board-grid compact-board section-board">
           {section === "trips" ? <article className="panel panel-wide">
             <div className="panel-title"><div><p className="eyebrow">Рейсы</p><h2>Активность и P&amp;L</h2></div><span>{data.trips.length} рейс(ов)</span></div>
-            <TripList organizationId={data.organization.id} baseCurrency={data.organization.baseCurrency} trips={data.trips} vehicles={data.vehicles} drivers={data.drivers} canManage={canManageTrips} canDelete={canDelete} />
+            <TripList organizationId={data.organization.id} baseCurrency={data.organization.baseCurrency} trips={data.trips} incomes={data.incomes} vehicles={data.vehicles} drivers={data.drivers} canManage={canManageTrips} canDelete={canDelete} canViewFinance={canViewFinance} />
           </article> : null}
 
           {section === "vehicles" ? <>
@@ -276,6 +277,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
           <div className="faq-list">
             <details><summary>Почему бот не видит мой профиль?</summary><p>Telegram ещё не привязан или открыта чужая/просроченная ссылка. Создайте новую ссылку в карточке владельца или водителя и нажмите START именно в нужном аккаунте Telegram.</p></details>
             <details><summary>Можно ли владельцу самому быть водителем?</summary><p>Да. Нажмите «Я владелец-водитель» в разделе команды. Один Telegram получит два режима, между ними можно переключаться в меню бота.</p></details>
+            <details><summary>Где посмотреть доход и расходы конкретного рейса?</summary><p>Откройте раздел «Рейсы» и нажмите «Подробнее». Доход, указанный на шаге «Доход» при оформлении рейса, показывается вместе с заказчиком, статусом и ожидаемой датой оплаты. Ниже отображаются все расходы этого рейса.</p></details>
             <details><summary>Как учитывается расход?</summary><p>Сразу после сохранения водителем. Запись видна в раскрытой карточке активного рейса и в общем разделе «Расходы»: категория, водитель, дата, источник, комментарий, сумма и валюта. Если водитель приложил фотографию чека, рядом появится кнопка «Открыть чек». Суммы разных валют не смешиваются. Дополнительное подтверждение владельца не требуется.</p></details>
             <details><summary>Как работает основная валюта компании?</summary><p>При создании компании выберите валюту управленческого учёта: KZT, RUB, USD, CNY или UZS. Если доход записан в другой валюте, кабинет попросит курс именно к основной валюте компании. Например, для рублёвой компании: «1 USD = сколько RUB». Доход и P&amp;L будут пересчитаны в RUB.</p></details>
             <details><summary>Откуда берётся километраж рейса?</summary><p>После выбора погрузки и выгрузки кабинет строит автомобильный маршрут и подставляет его расстояние. Перед созданием рейса проверьте значение: при необходимости его можно заменить плановым километражем вручную.</p></details>

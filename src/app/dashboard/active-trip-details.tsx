@@ -8,6 +8,7 @@ import { TripTrackingMap } from "./trip-tracking-map";
 
 type Trip = DashboardData["trips"][number];
 type Expense = DashboardData["recentExpenses"][number];
+type Income = DashboardData["incomes"][number];
 
 function formatMoney(value: number, currency: string) {
   return new Intl.NumberFormat("ru-KZ", {
@@ -44,6 +45,47 @@ function expenseSourceLabel(value: string) {
   if (value === "TELEGRAM") return "Telegram водителя";
   if (value === "IMPORT") return "Импорт";
   return "Кабинет";
+}
+
+function paymentStatusLabel(value: string) {
+  return ({
+    PLANNED: "Запланирован",
+    INVOICED: "Счёт выставлен",
+    PARTIAL: "Оплачен частично",
+    PAID: "Оплачен",
+    OVERDUE: "Просрочен",
+  } as Record<string, string>)[value] ?? value;
+}
+
+function TripIncomePanel({ trip, incomes, baseCurrency, canViewFinance }: {
+  trip: Trip;
+  incomes: Income[];
+  baseCurrency: string;
+  canViewFinance: boolean;
+}) {
+  if (!canViewFinance) return null;
+  const totalReportingMinor = incomes.reduce((sum, income) => sum + income.reportingAmountMinor, 0);
+  return <section className="trip-expenses trip-incomes" aria-label={`Доход рейса ${trip.title}`}>
+    <div className="trip-expenses-heading">
+      <div><h3>Доход рейса</h3><p>Сумма, указанная при оформлении рейса, заказчик и состояние оплаты.</p></div>
+      <div className="trip-expense-totals">
+        <span><small>Итого в учёте, {baseCurrency}</small><strong>{formatMinor(totalReportingMinor, baseCurrency)}</strong></span>
+      </div>
+    </div>
+    {incomes.length ? <ul className="trip-expense-list">
+      {incomes.map((income) => <li key={income.id}>
+        <span className="trip-expense-copy">
+          <b>{income.customerName ?? "Заказчик не указан"}</b>
+          <small>{paymentStatusLabel(income.paymentStatus)}{income.expectedPaymentAt ? ` · ожидаемая оплата ${dateLabel(income.expectedPaymentAt)}` : ""}</small>
+          {income.comment ? <p>{income.comment}</p> : null}
+        </span>
+        <span className="income-amount">
+          <strong>{formatMoney(income.amount, income.currency)}</strong>
+          {income.currency !== income.reportingCurrency ? <small>В учёте: {formatMinor(income.reportingAmountMinor, income.reportingCurrency)} · курс {income.fxRateToReporting.toLocaleString("ru-RU")}</small> : null}
+        </span>
+      </li>)}
+    </ul> : <p className="trip-expense-empty">Доход для этого рейса ещё не указан. Его можно добавить на шаге «Доход» в разделе «Создание рейса».</p>}
+  </section>;
 }
 
 function TripExpensePanel({ trip, expenses, baseCurrency, canViewFinance }: {
@@ -84,15 +126,17 @@ function TripExpensePanel({ trip, expenses, baseCurrency, canViewFinance }: {
   </section>;
 }
 
-function ExpandedTrip({ organizationId, trip, expenses, baseCurrency, canManage, canViewFinance }: {
+function ExpandedTrip({ organizationId, trip, expenses, incomes, baseCurrency, canManage, canViewFinance }: {
   organizationId: string;
   trip: Trip;
   expenses: Expense[];
+  incomes: Income[];
   baseCurrency: string;
   canManage: boolean;
   canViewFinance: boolean;
 }) {
   const plannedKm = trip.distanceKm ?? (trip.legs.reduce((sum, leg) => sum + (leg.distanceKm ?? 0), 0) || null);
+  const incomeTotalMinor = incomes.reduce((sum, income) => sum + income.reportingAmountMinor, 0);
   return <div className="active-trip-detail">
     <TripTrackingMap
       organizationId={organizationId}
@@ -129,18 +173,21 @@ function ExpandedTrip({ organizationId, trip, expenses, baseCurrency, canManage,
       <div className="economics">
         <div><span>Плановый пробег</span><strong>{formatKm(plannedKm)}</strong></div>
         <div><span>Точек водителя</span><strong>{trip.locationHistory.length}</strong></div>
+        {canViewFinance ? <><div><span>Доход рейса</span><strong>{incomes.length ? formatMinor(incomeTotalMinor, baseCurrency) : "Не указан"}</strong></div>
         <div><span>Все расходы</span><strong>{trip.pnl ? formatMinor(trip.pnl.totalExpensesMinor, baseCurrency) : expenses.length ? `${expenses.length} записей` : "—"}</strong></div>
-        <div><span>Результат рейса</span><strong>{trip.pnl ? formatMinor(trip.pnl.managementProfitMinor, baseCurrency) : "После закрытия"}</strong></div>
+        <div><span>Результат рейса</span><strong>{trip.pnl ? formatMinor(trip.pnl.managementProfitMinor, baseCurrency) : "После закрытия"}</strong></div></> : null}
       </div>
     </div>
+    <TripIncomePanel trip={trip} incomes={incomes} baseCurrency={baseCurrency} canViewFinance={canViewFinance} />
     <TripExpensePanel trip={trip} expenses={expenses} baseCurrency={baseCurrency} canViewFinance={canViewFinance} />
   </div>;
 }
 
-export function ActiveTripDetails({ organizationId, trips, expenses, baseCurrency, canManage, canViewFinance }: {
+export function ActiveTripDetails({ organizationId, trips, expenses, incomes, baseCurrency, canManage, canViewFinance }: {
   organizationId: string;
   trips: Trip[];
   expenses: Expense[];
+  incomes: Income[];
   baseCurrency: string;
   canManage: boolean;
   canViewFinance: boolean;
@@ -154,12 +201,14 @@ export function ActiveTripDetails({ organizationId, trips, expenses, baseCurrenc
 
   return <section className="active-trip-browser" aria-label="Подробности активных рейсов">
     <div className="active-trip-browser-heading">
-      <div><p className="eyebrow">Активные рейсы</p><h2>Маршруты, отметки и расходы</h2><p>Откройте нужный рейс — карта и его финансовые записи загрузятся внутри карточки.</p></div>
+      <div><p className="eyebrow">Активные рейсы</p><h2>Маршруты, доходы и расходы</h2><p>Откройте нужный рейс — карта и его финансовые записи загрузятся внутри карточки.</p></div>
       <span>{activeTrips.length} в пути</span>
     </div>
     <div className="active-trip-list">
       {activeTrips.map((trip) => {
         const tripExpenses = expenses.filter((expense) => expense.tripId === trip.id);
+        const tripIncomes = incomes.filter((income) => income.tripId === trip.id);
+        const incomeTotalMinor = tripIncomes.reduce((sum, income) => sum + income.reportingAmountMinor, 0);
         const totals = groupExpensesByCurrency(tripExpenses, baseCurrency);
         const expanded = expandedTripId === trip.id;
         return <article className={`active-trip-card${expanded ? " expanded" : ""}`} key={trip.id}>
@@ -171,6 +220,7 @@ export function ActiveTripDetails({ organizationId, trips, expenses, baseCurrenc
             </span>
             <span className="active-trip-facts">
               <span><small>Пробег</small><b>{formatKm(trip.distanceKm)}</b></span>
+              {canViewFinance ? <span><small>Доход</small><b>{tripIncomes.length ? formatMinor(incomeTotalMinor, baseCurrency) : "Не указан"}</b></span> : null}
               {canViewFinance ? <span><small>Расходы</small><b>{totals.length ? totals.map((total) => formatMoney(total.amount, total.currency)).join(" · ") : "Нет"}</b></span> : null}
             </span>
             <button
@@ -181,7 +231,7 @@ export function ActiveTripDetails({ organizationId, trips, expenses, baseCurrenc
               onClick={() => setExpandedTripId(expanded ? null : trip.id)}
             >{expanded ? "Свернуть" : "Подробнее"}<i aria-hidden="true" /></button>
           </div>
-          {expanded ? <div id={`active-trip-${trip.id}`}><ExpandedTrip key={trip.id} organizationId={organizationId} trip={trip} expenses={tripExpenses} baseCurrency={baseCurrency} canManage={canManage} canViewFinance={canViewFinance} /></div> : null}
+          {expanded ? <div id={`active-trip-${trip.id}`}><ExpandedTrip key={trip.id} organizationId={organizationId} trip={trip} expenses={tripExpenses} incomes={tripIncomes} baseCurrency={baseCurrency} canManage={canManage} canViewFinance={canViewFinance} /></div> : null}
         </article>;
       })}
     </div>

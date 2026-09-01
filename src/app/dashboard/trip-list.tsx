@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 type Vehicle = { id: string; displayName: string; plateNumber: string };
 type Driver = { id: string; displayName: string };
+type Income = { tripId: string; reportingAmountMinor: number };
 type NotificationStatus = "SENT" | "NOT_LINKED" | "NOT_CONFIGURED" | "FAILED";
 type Trip = {
   id: string; title: string; status: string; vehicleId: string; driverId: string | null; vehicleName: string; driverName: string | null; startedAt: string | null;
@@ -19,12 +20,16 @@ function money(minor: number, currency: string) {
   return new Intl.NumberFormat("ru-KZ", { style: "currency", currency, maximumFractionDigits: 0 }).format(minor / 100);
 }
 
-export function TripList({ organizationId, baseCurrency, trips, vehicles, drivers, canManage, canDelete }: { organizationId: string; baseCurrency: string; trips: Trip[]; vehicles: Vehicle[]; drivers: Driver[]; canManage: boolean; canDelete: boolean }) {
+export function TripList({ organizationId, baseCurrency, trips, incomes, vehicles, drivers, canManage, canDelete, canViewFinance }: { organizationId: string; baseCurrency: string; trips: Trip[]; incomes: Income[]; vehicles: Vehicle[]; drivers: Driver[]; canManage: boolean; canDelete: boolean; canViewFinance: boolean }) {
   const router = useRouter();
   const [editingId, setEditingId] = useState("");
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const incomeByTrip = new Map<string, number>();
+  for (const income of incomes) incomeByTrip.set(income.tripId, (incomeByTrip.get(income.tripId) ?? 0) + income.reportingAmountMinor);
+  const showActions = canManage || canDelete;
+  const columnCount = 5 + (canViewFinance ? 2 : 0) + (showActions ? 1 : 0);
 
   async function request(tripId: string, method: "PATCH" | "DELETE", body: object, successMessage: string) {
     setBusy(`${method}-${tripId}`); setMessage(""); setError("");
@@ -72,9 +77,9 @@ export function TripList({ organizationId, baseCurrency, trips, vehicles, driver
   return <>
     {error ? <p className="form-error list-action-message" role="alert">{error}</p> : null}
     {message ? <p className="form-success list-action-message" role="status">{message}</p> : null}
-    <div className="table-wrap"><table className="responsive-table trip-manage-table"><thead><tr><th>Рейс</th><th>Машина</th><th>Водитель</th><th>Старт</th><th>Статус</th><th>P&amp;L</th>{canManage || canDelete ? <th>Действия</th> : null}</tr></thead><tbody>
-      {trips.map((trip) => <Fragment key={trip.id}><tr><td data-label="Рейс">{trip.title}</td><td data-label="Машина">{trip.vehicleName}</td><td data-label="Водитель">{trip.driverName ?? "Не назначен"}</td><td data-label="Старт">{trip.startedAt ? new Date(trip.startedAt).toLocaleDateString("ru-RU") : "—"}</td><td data-label="Статус"><span className="badge">{tripStatusLabels[trip.status] ?? trip.status}</span></td><td data-label="P&L">{trip.pnl ? `${money(trip.pnl.managementProfitMinor, baseCurrency)} · ${trip.pnl.totalKm} км` : "—"}</td>{canManage || canDelete ? <td data-label="Действия"><span className="table-action-buttons">{canManage ? <button type="button" className="tiny-button" onClick={() => setEditingId(editingId === trip.id ? "" : trip.id)}>Изменить</button> : null}{canDelete ? <button type="button" className="tiny-button danger-button" disabled={busy === `DELETE-${trip.id}`} onClick={() => void removeTrip(trip)}>{busy === `DELETE-${trip.id}` ? "Удаляю…" : "Удалить"}</button> : null}</span></td> : null}</tr>
-        {editingId === trip.id ? <tr className="trip-inline-edit-row"><td colSpan={7}><form className="record-edit-form trip-edit-form" onSubmit={(event) => updateTrip(event, trip.id)}>
+    <div className="table-wrap"><table className="responsive-table trip-manage-table"><thead><tr><th>Рейс</th><th>Машина</th><th>Водитель</th><th>Старт</th><th>Статус</th>{canViewFinance ? <><th>Доход</th><th>P&amp;L</th></> : null}{showActions ? <th>Действия</th> : null}</tr></thead><tbody>
+      {trips.map((trip) => <Fragment key={trip.id}><tr><td data-label="Рейс">{trip.title}</td><td data-label="Машина">{trip.vehicleName}</td><td data-label="Водитель">{trip.driverName ?? "Не назначен"}</td><td data-label="Старт">{trip.startedAt ? new Date(trip.startedAt).toLocaleDateString("ru-RU") : "—"}</td><td data-label="Статус"><span className="badge">{tripStatusLabels[trip.status] ?? trip.status}</span></td>{canViewFinance ? <><td data-label="Доход">{incomeByTrip.has(trip.id) ? money(incomeByTrip.get(trip.id) ?? 0, baseCurrency) : "—"}</td><td data-label="P&L">{trip.pnl ? `${money(trip.pnl.managementProfitMinor, baseCurrency)} · ${trip.pnl.totalKm} км` : "—"}</td></> : null}{showActions ? <td data-label="Действия"><span className="table-action-buttons">{canManage ? <button type="button" className="tiny-button" onClick={() => setEditingId(editingId === trip.id ? "" : trip.id)}>Изменить</button> : null}{canDelete ? <button type="button" className="tiny-button danger-button" disabled={busy === `DELETE-${trip.id}`} onClick={() => void removeTrip(trip)}>{busy === `DELETE-${trip.id}` ? "Удаляю…" : "Удалить"}</button> : null}</span></td> : null}</tr>
+        {editingId === trip.id ? <tr className="trip-inline-edit-row"><td colSpan={columnCount}><form className="record-edit-form trip-edit-form" onSubmit={(event) => updateTrip(event, trip.id)}>
           <label className="record-field-wide">Название<input name="title" defaultValue={trip.title} required /></label>
           <label>Машина<select name="vehicle_id" defaultValue={trip.vehicleId} required>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.displayName} · {vehicle.plateNumber}</option>)}</select></label>
           <label>Водитель<select name="driver_id" defaultValue={trip.driverId ?? ""}><option value="">Назначить позже</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.displayName}</option>)}</select></label>

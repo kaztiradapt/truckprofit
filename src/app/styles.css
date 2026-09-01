@@ -135,7 +135,7 @@ button { cursor: pointer; }
 .active-trip-main > small { color: var(--green); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .active-trip-main > b { overflow-wrap: anywhere; font-size: 19px; letter-spacing: -.025em; }
 .active-trip-main > em { overflow-wrap: anywhere; color: var(--muted); font-size: 12px; font-style: normal; }
-.active-trip-facts { min-width: 0; display: grid; grid-template-columns: minmax(95px, .6fr) minmax(150px, 1fr); gap: 9px; }
+.active-trip-facts { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(105px, 1fr)); gap: 9px; }
 .active-trip-facts > span { min-width: 0; padding: 10px 12px; border-radius: 9px; background: var(--paper); display: grid; gap: 4px; }
 .active-trip-facts small { color: var(--muted); font-size: 9px; font-weight: 750; text-transform: uppercase; }
 .active-trip-facts b { overflow-wrap: anywhere; font-size: 13px; }
@@ -168,6 +168,10 @@ button { cursor: pointer; }
 .trip-expense-empty { margin-top: 14px !important; padding: 13px; border-radius: 9px; background: var(--card); }
 .trip-expense-footnote { margin-top: 12px !important; padding-top: 10px; border-top: 1px solid #dfe7e2; }
 .trip-expenses-locked { margin-top: 2px; }
+.trip-incomes { margin-bottom: 10px; border-color: #d5e0dc; background: #fbfcfa; }
+.income-amount { flex: 0 0 auto; display: grid; justify-items: end; gap: 4px; text-align: right; }
+.income-amount strong { color: var(--green); font-size: 15px; }
+.income-amount small { max-width: 260px; color: var(--muted); font-size: 9px; }
 
 .board-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .compact-board { margin-top: 16px; }
@@ -546,6 +550,7 @@ td { font-size: 14px; }
   .active-trip-detail { padding: 0 10px 12px; }
   .trip-expenses { padding: 13px; }
   .trip-expense-list li { display: grid; gap: 7px; }
+  .income-amount { justify-items: start; text-align: left; }
   .expense-amount-actions { width: 100%; grid-template-columns: minmax(0, 1fr) auto; align-items: center; justify-items: start; }
   .expense-receipt-link { min-height: 34px; display: grid; place-items: center; }
   .trip-heading { display: grid; }
