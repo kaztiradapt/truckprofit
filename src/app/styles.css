@@ -100,6 +100,15 @@ td { font-size: 14px; }
 .entity-list li { align-items: center; border-bottom: 1px solid #e6ebe8; display: flex; gap: 12px; justify-content: space-between; padding-bottom: 10px; }
 .entity-list small { color: var(--muted); display: block; margin-top: 3px; }
 .driver-list li { align-items: flex-start; }
+.team-driver-form { margin: 14px 0 18px; padding: 14px; border: 1px solid #cfe1d7; border-radius: 10px; background: var(--green-soft); display: grid; gap: 7px; }
+.team-driver-form label { color: #315d4b; font-size: 12px; font-weight: 800; }
+.team-driver-form > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+.team-driver-form input { min-width: 0; min-height: 38px; border: 1px solid #bfcfc7; border-radius: 8px; padding: 8px 10px; background: #fff; }
+.team-driver-form button { min-height: 38px !important; padding: 8px 11px !important; white-space: nowrap; }
+.team-driver-form small { color: var(--muted); font-size: 10px; }
+.team-list-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid #e6ebe8; }
+.team-list-heading b { font-size: 13px; }
+.team-list-heading span { color: var(--muted); font-size: 10px; text-align: right; }
 .driver-actions { display: flex; align-items: flex-end; gap: 7px; flex-direction: column; }
 .driver-invite-control, .driver-invite-result { display: grid; justify-items: end; gap: 5px; max-width: 420px; }
 .driver-invite-result code { max-width: min(420px, 45vw); color: var(--green); font-size: 11px; overflow-wrap: anywhere; white-space: normal; text-align: right; }
@@ -200,6 +209,8 @@ td { font-size: 14px; }
   .driver-actions { align-items: flex-start; }
   .driver-invite-result { justify-items: start; }
   .driver-invite-result code { max-width: 100%; text-align: left; }
+  .team-driver-form > div { grid-template-columns: 1fr; }
+  .team-driver-form button { width: 100%; }
   .self-driver-cta { align-items: stretch; flex-direction: column; }
   .self-driver-cta .tiny-button { width: 100%; }
   .owner-telegram-card { align-items: stretch; flex-direction: column; }
