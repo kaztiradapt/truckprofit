@@ -5,6 +5,7 @@ import { signOut } from "@/app/actions/auth";
 import { completeTrip, createDriver, createVehicle, enableOwnerDriverMode, recalculateTripPnl } from "@/app/actions/owner";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { ActiveTripDetails } from "./active-trip-details";
+import { DashboardRefreshButton } from "./dashboard-refresh-button";
 import { DriverList } from "./driver-list";
 import { DriverReports } from "./driver-reports";
 import { IncomeForm } from "./income-form";
@@ -104,13 +105,17 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
       <aside className="sidebar">
         <div className="brand"><span>TP</span><strong>TruckProfit</strong></div>
         <nav className="desktop-navigation" aria-label="Основная навигация">
-          {navigationItems.map((item) => <Link className={section === item.key ? "active" : ""} href={item.href} key={item.key}>{item.label}</Link>)}
+          {navigationItems.map((item) => section === item.key
+            ? <span className="nav-current" aria-current="page" key={item.key}>{item.label}</span>
+            : <Link href={item.href} key={item.key}>{item.label}</Link>)}
         </nav>
         <details className="mobile-navigation">
           <summary><span>Меню</span><i aria-hidden="true" /></summary>
           <div className="mobile-navigation-panel">
             <nav aria-label="Мобильная навигация">
-              {navigationItems.map((item) => <Link className={section === item.key ? "active" : ""} href={item.href} key={item.key}>{item.label}</Link>)}
+              {navigationItems.map((item) => section === item.key
+                ? <span className="nav-current" aria-current="page" key={item.key}>{item.label}</span>
+                : <Link href={item.href} key={item.key}>{item.label}</Link>)}
             </nav>
             <div className="mobile-account">
               <span><b>{data.organization.name}</b><small>{data.accessRoleName} · {data.organization.baseCurrency}</small></span>
@@ -129,7 +134,10 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
       <section className="content">
         <header className="topbar">
           <div><p className="eyebrow">Экономика автопарка</p><h1>{sectionTitles[section]}</h1></div>
-          {canManageTrips && ["overview", "trips"].includes(section) ? <Link className="primary-link" href="/dashboard/operations">+ Новый рейс</Link> : null}
+          <div className="topbar-actions">
+            <DashboardRefreshButton />
+            {canManageTrips && ["overview", "trips"].includes(section) ? <Link className="primary-link" href="/dashboard/operations">+ Новый рейс</Link> : null}
+          </div>
         </header>
 
         {error ? <p className="form-error" role="alert">{error}</p> : null}
