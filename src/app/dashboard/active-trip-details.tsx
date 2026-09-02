@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { getDriverTripStatus } from "@/domain/driver-trip-status";
 import { groupExpensesByCurrency } from "@/domain/trip-expenses";
 import type { DashboardData } from "@/lib/dashboard-data";
+import { DeviceDateTime } from "./device-date-time";
 import { TripTrackingMap } from "./trip-tracking-map";
 
 type Trip = DashboardData["trips"][number];
@@ -26,14 +27,6 @@ function formatMinor(value: number, currency: string) {
 
 function formatKm(value: number | null) {
   return value === null ? "—" : `${value.toLocaleString("ru-RU")} км`;
-}
-
-function dateLabel(value: string | null) {
-  return value ? new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium" }).format(new Date(value)) : "—";
-}
-
-function dateTimeLabel(value: string) {
-  return new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function loadStateLabel(value: string) {
@@ -77,7 +70,7 @@ function TripIncomePanel({ trip, incomes, baseCurrency, canViewFinance }: {
       {incomes.map((income) => <li key={income.id}>
         <span className="trip-expense-copy">
           <b>{income.customerName ?? "Заказчик не указан"}</b>
-          <small>{paymentStatusLabel(income.paymentStatus)}{income.expectedPaymentAt ? ` · ожидаемая оплата ${dateLabel(income.expectedPaymentAt)}` : ""}</small>
+          <small>{paymentStatusLabel(income.paymentStatus)}{income.expectedPaymentAt ? <> · ожидаемая оплата <DeviceDateTime value={income.expectedPaymentAt} mode="date" /></> : null}</small>
           {income.comment ? <p>{income.comment}</p> : null}
         </span>
         <span className="income-amount">
@@ -113,7 +106,7 @@ function TripExpensePanel({ trip, expenses, baseCurrency, canViewFinance }: {
       {expenses.map((expense) => <li key={expense.id}>
         <span className="trip-expense-copy">
           <b>{expense.categoryName}</b>
-          <small>{expense.driverName ?? trip.driverName ?? "Водитель не указан"} · {dateTimeLabel(expense.occurredAt)} · {expenseSourceLabel(expense.source)}</small>
+          <small>{expense.driverName ?? trip.driverName ?? "Водитель не указан"} · <DeviceDateTime value={expense.occurredAt} /> · {expenseSourceLabel(expense.source)}</small>
           {expense.locationText ? <small>Место: {expense.locationText}</small> : null}
           {expense.comment ? <p>{expense.comment}</p> : null}
         </span>
@@ -176,7 +169,7 @@ function ExpandedTrip({ organizationId, trip, expenses, incomes, baseCurrency, c
         <div className={`driver-status-card ${driverStatus.tone}`}>
           <span>Статус водителя</span>
           <strong>{driverStatus.label}</strong>
-          <small>{trip.driverStatus ? `Обновлён ${dateTimeLabel(trip.driverStatus.recordedAt)}${trip.driverStatus.locationText ? ` · ${trip.driverStatus.locationText}` : ""}` : "Водитель ещё не выбрал статус в боте"}</small>
+          <small>{trip.driverStatus ? <>Обновлён <DeviceDateTime value={trip.driverStatus.recordedAt} />{trip.driverStatus.locationText ? ` · ${trip.driverStatus.locationText}` : ""} · по времени устройства</> : "Водитель ещё не выбрал статус в боте"}</small>
         </div>
         <div><span>Плановый пробег</span><strong>{formatKm(plannedKm)}</strong></div>
         <div><span>Точек водителя</span><strong>{trip.locationHistory.length}</strong></div>
@@ -224,11 +217,11 @@ export function ActiveTripDetails({ organizationId, trips, expenses, incomes, ba
             <div className="active-trip-main">
               <small>{trip.originCity || "Погрузка"} → {trip.destinationCity || "Выгрузка"}</small>
               <b>{trip.title}</b>
-              <em>{trip.vehicleName} · {trip.driverName ?? "Водитель не назначен"} · {dateLabel(trip.startedAt)}</em>
+              <em>{trip.vehicleName} · {trip.driverName ?? "Водитель не назначен"} · <DeviceDateTime value={trip.startedAt} mode="date" /></em>
               <span className={`driver-status-line ${driverStatus.tone}`}>
                 <i aria-hidden="true" />
                 <b>{driverStatus.label}</b>
-                {trip.driverStatus ? <small>{dateTimeLabel(trip.driverStatus.recordedAt)}</small> : null}
+                {trip.driverStatus ? <small><DeviceDateTime value={trip.driverStatus.recordedAt} /></small> : null}
               </span>
             </div>
             <span className="active-trip-facts">

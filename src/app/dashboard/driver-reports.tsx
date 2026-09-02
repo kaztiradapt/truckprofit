@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DeviceDateTime } from "./device-date-time";
 
 type DriverReport = {
   driverId: string;
@@ -37,10 +38,6 @@ function formatKm(value: number) {
 
 function formatMinor(value: number, currency: string) {
   return new Intl.NumberFormat("ru-KZ", { style: "currency", currency, maximumFractionDigits: 0 }).format(value / 100);
-}
-
-function formatDate(value: string | null) {
-  return value ? new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium" }).format(new Date(value)) : "Рейсов не было";
 }
 
 export function DriverReports({ reports, trips, vehicles, baseCurrency, canViewFinance }: {
@@ -120,7 +117,7 @@ export function DriverReports({ reports, trips, vehicles, baseCurrency, canViewF
           <td data-label="С грузом">{formatKm(report.loadedKm)}</td>
           <td data-label="Порожний">{formatKm(report.emptyKm)}</td>
           {canViewFinance ? <><td data-label="Оплата">{formatMinor(report.driverCompensationMinor, baseCurrency)}</td><td data-label="Результат">{formatMinor(report.managementProfitMinor, baseCurrency)}</td></> : null}
-          <td data-label="Последний рейс">{formatDate(report.latestTripAt)}</td>
+          <td data-label="Последний рейс"><DeviceDateTime value={report.latestTripAt} mode="date" fallback="Рейсов не было" /></td>
         </tr>)}</tbody>
       </table></div> : <p className="empty-state">По выбранным фильтрам рейсов не найдено.</p>}
     </article>

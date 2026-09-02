@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { closestRouteToPlannedDistance } from "@/domain/route-alternative";
 import { routeGeocodingQueries } from "@/domain/route-endpoint";
+import { DeviceDateTime } from "./device-date-time";
 
 type EventType = "CHECKPOINT" | "REST" | "LOADING" | "UNLOADING" | "OTHER";
 type LocationPoint = {
@@ -387,7 +388,7 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
   const latest = numberedPoints[0] ?? null;
   return <section className="trip-tracking" aria-label="Маршрут и история геопозиций">
     <div className="tracking-heading">
-      <span><b>Маршрут и геопозиции водителя</b><small>{latest ? `Последняя точка: ${dateTimeLabel(latest.recordedAt)}` : "Водитель ещё не отправлял геопозицию"}</small></span>
+      <span><b>Маршрут и геопозиции водителя</b><small>{latest ? <>Последняя точка: <DeviceDateTime value={latest.recordedAt} /></> : "Водитель ещё не отправлял геопозицию"}</small></span>
       <div><span className="tracking-legend route" />Маршрут <span className="tracking-legend history" />Фактические точки</div>
     </div>
     <div ref={mapContainer} className="tracking-map" role="application" aria-label="Карта рейса и геопозиций водителя" />
@@ -412,7 +413,7 @@ export function TripTrackingMap({ organizationId, tripId, routeRecord, origin, d
         <button type="button" className={`tracking-point-number${point.number === points.length ? " latest" : ""}`} onClick={() => focusPoint(point)} aria-label={`Показать точку ${point.number} на карте`}>{point.number}</button>
         <div className="tracking-point-copy">
           <span><b>{eventLabels[point.eventType]}</b>{point.number === points.length ? <em>Текущая</em> : null}</span>
-          <small>{dateTimeLabel(point.recordedAt)} · {point.horizontalAccuracyM === null ? "точность не указана" : `точность около ${Math.round(point.horizontalAccuracyM)} м`}</small>
+          <small><DeviceDateTime value={point.recordedAt} /> · {point.horizontalAccuracyM === null ? "точность не указана" : `точность около ${Math.round(point.horizontalAccuracyM)} м`}</small>
           {point.note ? <p>{point.note}</p> : null}
           {canManage ? <AnnotationForm organizationId={organizationId} tripId={tripId} point={point} onSaved={(eventType, note) => updateAnnotation(point.id, eventType, note)} /> : null}
         </div>

@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, type MouseEvent } from "react";
+import { DeviceDateTime } from "./device-date-time";
 
 type Invitation = { driverName: string; expiresAt: string; token: string; link: string | null };
-
-function expiryLabel(value: string) {
-  return new Intl.DateTimeFormat("ru-KZ", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
 
 export function DriverInviteButton({ driverId, driverName, pendingInviteExpiresAt, selfService = false }: { driverId: string; driverName: string; pendingInviteExpiresAt: string | null; selfService?: boolean }) {
   const [busy, setBusy] = useState(false);
@@ -70,7 +67,7 @@ export function DriverInviteButton({ driverId, driverName, pendingInviteExpiresA
         ) : null}
         {!selfService ? <code>{inviteUrl}</code> : null}
         <div className="invite-buttons">{!selfService ? <button type="button" className="tiny-button" onClick={copyInvitation}>Скопировать</button> : null}<button type="button" className="tiny-button" onClick={() => createInvitation(false)} disabled={busy}>{busy ? "Обновляю…" : selfService ? "Обновить подключение" : "Новая ссылка"}</button></div>
-        <small>Действует до {expiryLabel(invitation.expiresAt)}</small>
+        <small>Действует до <DeviceDateTime value={invitation.expiresAt} /></small>
         {message ? <span className="inline-message">{message}</span> : null}
       </div>
     );
@@ -81,7 +78,7 @@ export function DriverInviteButton({ driverId, driverName, pendingInviteExpiresA
       <button type="button" className="tiny-button" disabled={busy} onClick={() => createInvitation(selfService)}>
         {busy ? "Подключаю…" : selfService ? "Подключить мой Telegram" : pendingInviteExpiresAt ? "Создать новую ссылку" : "Создать приглашение"}
       </button>
-      {selfService ? <small>Откроется бот — останется нажать START.</small> : pendingInviteExpiresAt ? <small>Есть активное до {expiryLabel(pendingInviteExpiresAt)}</small> : null}
+      {selfService ? <small>Откроется бот — останется нажать START.</small> : pendingInviteExpiresAt ? <small>Есть активное до <DeviceDateTime value={pendingInviteExpiresAt} /></small> : null}
       {message ? <span className="inline-error">{message}</span> : null}
     </div>
   );

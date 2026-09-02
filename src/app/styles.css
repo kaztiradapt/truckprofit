@@ -46,6 +46,13 @@ button { cursor: pointer; }
 .topbar { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
 .topbar h1 { margin: 4px 0 0; font-size: clamp(28px, 3.2vw, 42px); letter-spacing: -.04em; }
 .topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; }
+.realtime-indicator { min-height: 38px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--muted); display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 750; white-space: nowrap; }
+.realtime-indicator i { width: 8px; height: 8px; border-radius: 50%; background: #9da9a3; }
+.realtime-indicator.online { border-color: #c9e1d5; background: var(--green-soft); color: var(--green); }
+.realtime-indicator.online i { background: #22a06b; box-shadow: 0 0 0 4px #22a06b1c; }
+.realtime-indicator.connecting i { animation: realtime-pulse 1s ease-in-out infinite alternate; }
+.realtime-indicator.offline { border-color: #efd8c8; background: #fff7f1; color: #9b5b35; }
+@keyframes realtime-pulse { to { opacity: .35; } }
 .eyebrow { margin: 0; color: var(--muted); font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .primary-link { border: 0; border-radius: 10px; padding: 12px 18px; background: var(--green); color: #fff; font-weight: 700; cursor: pointer; text-decoration: none; box-shadow: 0 5px 16px #166b4f22; }
 .primary-link:hover { background: #105b42; }
@@ -547,7 +554,9 @@ td { font-size: 14px; }
   .topbar-actions { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .topbar-actions > :only-child { grid-column: 1 / -1; }
   .primary-link { width: 100%; padding: 10px 12px; font-size: 13px; text-align: center; }
+  .topbar-actions .primary-link:last-child { grid-column: 1 / -1; }
   .dashboard-refresh-button { width: 100%; min-height: 39px; padding: 8px 11px; font-size: 12px; }
+  .realtime-indicator { width: 100%; min-height: 36px; justify-content: center; }
   .signal { display: grid; }
   .signal p { display: none; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

@@ -5,7 +5,9 @@ import { signOut } from "@/app/actions/auth";
 import { completeTrip, createDriver, createVehicle, enableOwnerDriverMode, recalculateTripPnl } from "@/app/actions/owner";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { ActiveTripDetails } from "./active-trip-details";
+import { DashboardRealtimeSync } from "./dashboard-realtime-sync";
 import { DashboardRefreshButton } from "./dashboard-refresh-button";
+import { DeviceDateTime } from "./device-date-time";
 import { DriverList } from "./driver-list";
 import { DriverReports } from "./driver-reports";
 import { IncomeForm } from "./income-form";
@@ -29,10 +31,6 @@ function formatMinor(value: number, currency: string) {
 
 function formatKm(value: number | null) {
   return value === null ? "—" : `${value.toLocaleString("ru-RU")} км`;
-}
-
-function dateLabel(value: string | null) {
-  return value ? new Intl.DateTimeFormat("ru-KZ", { dateStyle: "medium" }).format(new Date(value)) : "—";
 }
 
 function statusLabel(value: string) {
@@ -135,6 +133,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         <header className="topbar">
           <div><p className="eyebrow">Экономика автопарка</p><h1>{sectionTitles[section]}</h1></div>
           <div className="topbar-actions">
+            <DashboardRealtimeSync organizationId={data.organization.id} />
             <DashboardRefreshButton />
             {canManageTrips && ["overview", "trips"].includes(section) ? <Link className="primary-link" href="/dashboard/operations">+ Новый рейс</Link> : null}
           </div>
@@ -163,7 +162,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {section === "overview" ? <section className="trip-card">
           {latestTrip ? <>
             <div className="trip-heading">
-              <div><p className="eyebrow">Последний рейс</p><h2>{latestTrip.title}</h2><p>{latestTrip.vehicleName} · {latestTrip.driverName ?? "Водитель не назначен"} · {dateLabel(latestTrip.startedAt)}</p></div>
+              <div><p className="eyebrow">Последний рейс</p><h2>{latestTrip.title}</h2><p>{latestTrip.vehicleName} · {latestTrip.driverName ?? "Водитель не назначен"} · <DeviceDateTime value={latestTrip.startedAt} mode="date" /></p></div>
               <span className="status">{statusLabel(latestTrip.status)}</span>
             </div>
             <TripTrackingMap
@@ -251,7 +250,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
 
           {section === "expenses" && canViewFinance ? <article className="panel panel-wide"><div className="panel-title"><div><p className="eyebrow">Финансовый учёт</p><h2>Расходы</h2></div><span>{data.recentExpenses.length}</span></div>
             <p className="panel-note">Расход попадает в карточку назначенного рейса и его экономику сразу после записи водителем. Отдельного подтверждения владельца не требуется.</p>
-            <ul className="entity-list expense-list">{data.recentExpenses.length ? data.recentExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {expense.driverName ?? "Водитель не указан"} · {dateLabel(expense.occurredAt)} · {expense.source === "TELEGRAM" ? "Telegram" : "Кабинет"}{expense.locationText ? ` · ${expense.locationText}` : ""}{expense.comment ? ` · ${expense.comment}` : ""}</small></span><span className="expense-amount-actions"><strong>{formatMoney(expense.amount, expense.currency)}</strong>{expense.receipt ? <a className="expense-receipt-link" href={`/api/expenses/${expense.id}/receipt`} target="_blank" rel="noreferrer">Открыть чек</a> : null}</span></li>) : <li className="empty-state">Расходов пока нет.</li>}</ul>
+            <ul className="entity-list expense-list">{data.recentExpenses.length ? data.recentExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {expense.driverName ?? "Водитель не указан"} · <DeviceDateTime value={expense.occurredAt} /> · {expense.source === "TELEGRAM" ? "Telegram" : "Кабинет"}{expense.locationText ? ` · ${expense.locationText}` : ""}{expense.comment ? ` · ${expense.comment}` : ""}</small></span><span className="expense-amount-actions"><strong>{formatMoney(expense.amount, expense.currency)}</strong>{expense.receipt ? <a className="expense-receipt-link" href={`/api/expenses/${expense.id}/receipt`} target="_blank" rel="noreferrer">Открыть чек</a> : null}</span></li>) : <li className="empty-state">Расходов пока нет.</li>}</ul>
           </article> : section === "expenses" ? <article className="panel panel-wide"><h2>Доступ ограничен</h2><p className="muted">Владелец не выдал этой роли доступ к финансовым данным.</p></article> : null}
         </section> : null}
 
