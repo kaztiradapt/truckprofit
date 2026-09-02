@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDriverTrip, formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips, formatStaffSummary, normalizeLocationPoint } from "./driver-bot";
+import { formatDriverTrip, formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips, formatStaffSummary, normalizeLocationPoint, parseLocationComment } from "./driver-bot";
 
 describe("owner Telegram menu formatting", () => {
   it("renders an operational and financial summary", () => {
@@ -67,6 +67,12 @@ describe("owner Telegram menu formatting", () => {
     expect(normalizeLocationPoint({ latitude: 91, longitude: 63.6246 })).toBeNull();
     expect(normalizeLocationPoint({ latitude: 53.2144, longitude: 181 })).toBeNull();
     expect(normalizeLocationPoint({ latitude: 53.2144, longitude: 63.6246, horizontalAccuracyM: 1501 })).toBeNull();
+  });
+
+  it("normalizes an optional driver comment for a location point", () => {
+    expect(parseLocationComment("  ночёвка у трассы  ")).toEqual({ note: "ночёвка у трассы", tooLong: false });
+    expect(parseLocationComment("-")).toEqual({ note: null, tooLong: false });
+    expect(parseLocationComment("x".repeat(301))).toEqual({ note: null, tooLong: true });
   });
 
   it("shows route addresses and the latest driver status inside My Trip", () => {

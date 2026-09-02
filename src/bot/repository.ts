@@ -109,6 +109,7 @@ export type RecordLocationInput = {
   latitude: number;
   longitude: number;
   horizontalAccuracyM: number | null;
+  note: string | null;
   occurredAt: Date;
   telegramMessageId: number;
 };
@@ -151,7 +152,7 @@ export interface DriverBotRepository {
   startAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm"> & { loadState: "LOADED" | "EMPTY" }): Promise<void>;
   finishAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm">): Promise<void>;
   recordStatus(input: RecordStatusInput): Promise<void>;
-  recordLocation(input: RecordLocationInput): Promise<void>;
+  recordLocation(input: RecordLocationInput): Promise<{ locationId: string }>;
   findPreliminaryCompensation(driver: DriverIdentity, tripId: string): Promise<PreliminaryCompensation | null>;
   uploadReceipt(upload: ReceiptUpload): Promise<void>;
 }

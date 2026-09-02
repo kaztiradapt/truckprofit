@@ -493,18 +493,21 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
     throwOnError(error);
   }
 
-  async recordLocation(input: RecordLocationInput): Promise<void> {
-    const { error } = await this.client.rpc("record_telegram_trip_location", {
+  async recordLocation(input: RecordLocationInput): Promise<{ locationId: string }> {
+    const { data, error } = await this.client.rpc("record_telegram_trip_location", {
       p_organization_id: input.organizationId,
       p_driver_id: input.driverId,
       p_trip_id: input.tripId,
       p_latitude: input.latitude,
       p_longitude: input.longitude,
       p_horizontal_accuracy_m: input.horizontalAccuracyM,
+      p_note: input.note,
       p_recorded_at: input.occurredAt.toISOString(),
       p_telegram_message_id: input.telegramMessageId,
     });
     throwOnError(error);
+    if (!data) throw new Error("Location was not recorded");
+    return { locationId: String(data) };
   }
 
   async findPreliminaryCompensation(driver: DriverIdentity, tripId: string): Promise<PreliminaryCompensation | null> {
