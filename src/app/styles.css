@@ -196,8 +196,23 @@ button { cursor: pointer; }
 .trip-expense-list li { padding: 11px 0; border-top: 1px solid #dfe7e2; display: flex; align-items: start; justify-content: space-between; gap: 16px; }
 .expense-amount-actions { flex: 0 0 auto; display: grid; justify-items: end; gap: 6px; }
 .expense-amount-actions > strong { color: var(--green); font-size: 15px; }
-.expense-receipt-link { padding: 6px 9px; border: 1px solid #bfcfc7; border-radius: 7px; background: var(--card); color: var(--green); font-size: 10px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.expense-receipt-link { padding: 6px 9px; border: 1px solid #bfcfc7; border-radius: 7px; background: var(--card); color: var(--green); font: inherit; font-size: 10px; font-weight: 800; text-decoration: none; white-space: nowrap; }
 .expense-receipt-link:hover { border-color: var(--green); background: var(--green-soft); }
+.receipt-viewer-overlay { position: fixed; z-index: 1000; inset: 0; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); background: rgba(7, 24, 18, .72); backdrop-filter: blur(5px); display: grid; place-items: center; }
+.receipt-viewer { width: min(960px, 100%); height: min(860px, 100%); overflow: hidden; border: 1px solid rgba(255, 255, 255, .28); border-radius: 18px; background: var(--paper); box-shadow: 0 26px 80px rgba(3, 18, 12, .34); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.receipt-viewer > header { min-width: 0; padding: 15px 17px; border-bottom: 1px solid var(--line); background: var(--card); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.receipt-viewer > header div { min-width: 0; }
+.receipt-viewer > header small { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.receipt-viewer > header h2 { margin: 3px 0 0; overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.receipt-viewer-close { width: 38px; height: 38px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 50%; background: #fff; color: var(--ink); font-size: 25px; line-height: 1; }
+.receipt-viewer-content { min-height: 0; overflow: auto; background: #dfe6e2; }
+.receipt-viewer-content.image { padding: 14px; display: grid; place-items: center; }
+.receipt-viewer-content img { max-width: 100%; height: auto; border-radius: 8px; background: #fff; box-shadow: 0 8px 30px rgba(3, 18, 12, .15); }
+.receipt-viewer-content iframe { width: 100%; height: 100%; min-height: 420px; border: 0; background: #fff; }
+.receipt-viewer > footer { padding: 12px 17px; border-top: 1px solid var(--line); background: var(--card); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.receipt-viewer > footer p { margin: 0; color: var(--muted); font-size: 10px; }
+.receipt-viewer > footer div { flex: 0 0 auto; display: flex; gap: 8px; }
+.receipt-viewer > footer a { display: grid; place-items: center; text-decoration: none; }
 .trip-expense-copy { min-width: 0; display: grid; gap: 3px; }
 .trip-expense-copy b { font-size: 13px; }
 .trip-expense-copy small { color: var(--muted); font-size: 10px; }
@@ -393,8 +408,8 @@ td { font-size: 14px; }
 .flow-card-action { align-self: end; }
 .flow-card-action button { min-width: 164px; white-space: nowrap; }
 .flow-hint { color: var(--muted); font-size: 12px; line-height: 1.4; }
-.flow-card button, .closing-action button, .primary-action, button:not(.sidebar-signout):not(.sidebar-mini-app):not(.tiny-button):not(.button-secondary) { min-height: 44px; border: 0; border-radius: 9px; padding: 10px 14px; background: var(--green); color: #fff; font-weight: 750; }
-.flow-card button:hover, .closing-action button:hover, button:not(.sidebar-signout):not(.sidebar-mini-app):not(.tiny-button):not(.button-secondary):hover { background: #105b42; }
+.flow-card button, .closing-action button, .primary-action, button:not(.sidebar-signout):not(.sidebar-mini-app):not(.tiny-button):not(.button-secondary):not(.expense-receipt-link):not(.receipt-viewer-close) { min-height: 44px; border: 0; border-radius: 9px; padding: 10px 14px; background: var(--green); color: #fff; font-weight: 750; }
+.flow-card button:hover, .closing-action button:hover, button:not(.sidebar-signout):not(.sidebar-mini-app):not(.tiny-button):not(.button-secondary):not(.expense-receipt-link):not(.receipt-viewer-close):hover { background: #105b42; }
 .flow-card button:disabled, .closing-action button:disabled, button:disabled { opacity: .5; cursor: not-allowed; }
 .flow-card-closing { grid-template-columns: 190px minmax(0, 1fr); }
 .closing-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
@@ -595,6 +610,15 @@ td { font-size: 14px; }
   .income-amount { justify-items: start; text-align: left; }
   .expense-amount-actions { width: 100%; grid-template-columns: minmax(0, 1fr) auto; align-items: center; justify-items: start; }
   .expense-receipt-link { min-height: 34px; display: grid; place-items: center; }
+  .receipt-viewer-overlay { padding-right: 7px; padding-left: 7px; }
+  .receipt-viewer { height: 100%; border-radius: 13px; }
+  .receipt-viewer > header { padding: 12px; }
+  .receipt-viewer-content.image { padding: 8px; touch-action: pan-x pan-y pinch-zoom; }
+  .receipt-viewer-content iframe { min-height: 0; }
+  .receipt-viewer > footer { padding: 10px 12px; align-items: stretch; display: grid; }
+  .receipt-viewer > footer p { display: none; }
+  .receipt-viewer > footer div { display: grid; grid-template-columns: 1fr 1fr; }
+  .receipt-viewer > footer .tiny-button, .receipt-viewer > footer button { min-height: 40px; }
   .trip-heading { display: grid; }
   .tracking-heading { align-items: start; flex-direction: column; }
   .tracking-map { height: 245px; }

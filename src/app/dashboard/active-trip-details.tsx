@@ -6,6 +6,7 @@ import { getDriverTripStatus } from "@/domain/driver-trip-status";
 import { groupExpensesByCurrency } from "@/domain/trip-expenses";
 import type { DashboardData } from "@/lib/dashboard-data";
 import { DeviceDateTime } from "./device-date-time";
+import { ReceiptViewerButton } from "./receipt-viewer-button";
 import { TripTrackingMap } from "./trip-tracking-map";
 
 type Trip = DashboardData["trips"][number];
@@ -112,7 +113,7 @@ function TripExpensePanel({ trip, expenses, baseCurrency, canViewFinance }: {
         </span>
         <span className="expense-amount-actions">
           <strong>{formatMoney(expense.amount, expense.currency)}</strong>
-          {expense.receipt ? <a className="expense-receipt-link" href={`/api/expenses/${expense.id}/receipt`} target="_blank" rel="noreferrer">Открыть чек</a> : null}
+          {expense.receipt ? <ReceiptViewerButton expenseId={expense.id} filename={expense.receipt.originalFilename} contentType={expense.receipt.contentType} /> : null}
         </span>
       </li>)}
     </ul> : <p className="trip-expense-empty">Расходов пока нет. После сохранения расхода водителем в Telegram он автоматически появится в этой карточке и в разделе «Расходы».</p>}
