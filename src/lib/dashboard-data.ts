@@ -1,5 +1,3 @@
-import { cache } from "react";
-
 import { normalizeRouteGeometry } from "@/domain/route-geometry";
 import { createClient } from "@/lib/supabase/server";
 import { permissionCodes } from "@/server/team-access";
@@ -76,6 +74,13 @@ export type DashboardData = {
       locationText: string | null;
       recordedAt: string;
     } | null;
+    driverStatusHistory: Array<{
+      id: string;
+      code: string;
+      loadState: string;
+      locationText: string | null;
+      recordedAt: string;
+    }>;
     lastLocation: {
       latitude: number;
       longitude: number;
@@ -227,6 +232,7 @@ type LocationRow = {
 };
 
 type VehicleStatusRow = {
+  id: string;
   trip_id: string | null;
   status_code: string;
   load_state: string;
@@ -238,7 +244,7 @@ function asOne<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
-export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => {
+export async function getDashboardData(): Promise<DashboardLoadResult> {
   const supabase = await createClient();
   const { data: claimsResult, error: claimsError } = await supabase.auth.getClaims();
   const userId = claimsResult?.claims?.sub;
@@ -274,7 +280,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
     supabase.from("organization_access_roles").select("id, name, permissions, is_system").eq("organization_id", membership.organization_id).order("is_system", { ascending: false }).order("name"),
     supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("created_at"),
     supabase.from("trip_location_points").select("id, trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at, event_type, note").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(500),
-    supabase.from("vehicle_status_records").select("trip_id, status_code, load_state, location_text, recorded_at").eq("organization_id", membership.organization_id).not("trip_id", "is", null).order("recorded_at", { ascending: false }).limit(1000),
+    supabase.from("vehicle_status_records").select("id, trip_id, status_code, load_state, location_text, recorded_at").eq("organization_id", membership.organization_id).not("trip_id", "is", null).order("recorded_at", { ascending: false }).limit(1000),
   ]);
   for (const result of [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, incomesResult, accessRolesResult, staffResult]) {
     if (result.error) throw new Error(result.error.message);
@@ -305,9 +311,12 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
     points.push(point);
     locationsByTrip.set(point.trip_id, points);
   }
-  const latestStatusByTrip = new Map<string, VehicleStatusRow>();
+  const statusesByTrip = new Map<string, VehicleStatusRow[]>();
   for (const status of (vehicleStatusesResult.data as VehicleStatusRow[] ?? [])) {
-    if (status.trip_id && !latestStatusByTrip.has(status.trip_id)) latestStatusByTrip.set(status.trip_id, status);
+    if (!status.trip_id) continue;
+    const statuses = statusesByTrip.get(status.trip_id) ?? [];
+    statuses.push(status);
+    statusesByTrip.set(status.trip_id, statuses);
   }
   const totalKm = summaries.reduce((sum, item) => sum + Number(item.total_km ?? 0), 0);
   const emptyKm = summaries.reduce((sum, item) => sum + Number(item.empty_km ?? 0), 0);
@@ -423,7 +432,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       routeGeometry: normalizeRouteGeometry(firstLeg?.route_geometry),
       loadState: firstLeg?.load_state ?? "UNKNOWN",
       driverStatus: (() => {
-        const status = latestStatusByTrip.get(trip.id);
+        const status = statusesByTrip.get(trip.id)?.[0];
         return status ? {
           code: status.status_code,
           loadState: status.load_state,
@@ -431,6 +440,13 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
           recordedAt: status.recorded_at,
         } : null;
       })(),
+      driverStatusHistory: (statusesByTrip.get(trip.id) ?? []).map((status) => ({
+        id: status.id,
+        code: status.status_code,
+        loadState: status.load_state,
+        locationText: status.location_text,
+        recordedAt: status.recorded_at,
+      })),
       lastLocation: lastLocation ? {
         latitude: lastLocation.latitude,
         longitude: lastLocation.longitude,
@@ -492,4 +508,4 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       emptyMileagePct: totalKm > 0 ? Number(((emptyKm / totalKm) * 100).toFixed(2)) : null,
     },
   };
-});
+}

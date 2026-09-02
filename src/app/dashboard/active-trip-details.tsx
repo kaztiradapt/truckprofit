@@ -120,6 +120,24 @@ function TripExpensePanel({ trip, expenses, baseCurrency, canViewFinance }: {
   </section>;
 }
 
+function DriverStatusHistory({ trip }: { trip: Trip }) {
+  return <section className="driver-status-history" aria-label={`История статусов водителя рейса ${trip.title}`}>
+    <div className="driver-status-history-heading">
+      <div><h3>История статусов водителя</h3><p>Все отметки из Telegram сохраняются в хронологии рейса.</p></div>
+      <span>{trip.driverStatusHistory.length}</span>
+    </div>
+    {trip.driverStatusHistory.length ? <ol>
+      {trip.driverStatusHistory.map((status) => {
+        const definition = getDriverTripStatus(status.code);
+        return <li className={definition.tone} key={status.id}>
+          <i aria-hidden="true" />
+          <span><strong>{definition.label}</strong><small><DeviceDateTime value={status.recordedAt} />{status.locationText ? ` · ${status.locationText}` : ""}</small></span>
+        </li>;
+      })}
+    </ol> : <p className="trip-expense-empty">Водитель ещё не передавал статусы по этому рейсу.</p>}
+  </section>;
+}
+
 function ExpandedTrip({ organizationId, trip, expenses, incomes, baseCurrency, canManage, canViewFinance }: {
   organizationId: string;
   trip: Trip;
@@ -178,6 +196,7 @@ function ExpandedTrip({ organizationId, trip, expenses, incomes, baseCurrency, c
         <div><span>Результат рейса</span><strong>{trip.pnl ? formatMinor(trip.pnl.managementProfitMinor, baseCurrency) : "После закрытия"}</strong></div></> : null}
       </div>
     </div>
+    <DriverStatusHistory trip={trip} />
     <TripIncomePanel trip={trip} incomes={incomes} baseCurrency={baseCurrency} canViewFinance={canViewFinance} />
     <TripExpensePanel trip={trip} expenses={expenses} baseCurrency={baseCurrency} canViewFinance={canViewFinance} />
   </div>;

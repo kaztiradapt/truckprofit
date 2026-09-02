@@ -169,6 +169,20 @@ button { cursor: pointer; }
 .active-trip-grid { padding-bottom: 22px; }
 .economics .driver-status-card { align-content: start; }
 .economics .driver-status-card small { color: inherit; font-size: 10px; line-height: 1.4; opacity: .78; }
+.driver-status-history { margin-bottom: 14px; padding: 18px; border: 1px solid #cfe1d7; border-radius: 12px; background: #f7faf8; }
+.driver-status-history-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.driver-status-history-heading h3 { margin: 0 0 4px; font-size: 17px; letter-spacing: -.02em; }
+.driver-status-history-heading p { margin: 0; color: var(--muted); font-size: 11px; }
+.driver-status-history-heading > span { min-width: 30px; padding: 5px 8px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 11px; font-weight: 800; text-align: center; }
+.driver-status-history ol { margin: 14px 0 0; padding: 0; display: grid; list-style: none; }
+.driver-status-history li { position: relative; min-width: 0; padding: 10px 0 10px 25px; border-top: 1px solid #dfe7e2; color: #58665f; display: grid; }
+.driver-status-history li > i { position: absolute; top: 15px; left: 2px; width: 9px; height: 9px; border: 2px solid currentColor; border-radius: 50%; background: #fff; }
+.driver-status-history li > span { min-width: 0; display: grid; gap: 3px; }
+.driver-status-history li strong { font-size: 13px; }
+.driver-status-history li small { overflow-wrap: anywhere; color: var(--muted); font-size: 10px; }
+.driver-status-history li.waiting { color: #9a6415; }
+.driver-status-history li.active, .driver-status-history li.complete { color: var(--green); }
+.driver-status-history li.attention { color: #b64e1e; }
 .trip-expenses { padding: 18px; border: 1px solid #cfe1d7; border-radius: 12px; background: #f7faf8; }
 .trip-expenses-heading { display: flex; align-items: start; justify-content: space-between; gap: 18px; }
 .trip-expenses-heading > div:first-child { min-width: 0; }
