@@ -141,6 +141,14 @@ button { cursor: pointer; }
 .active-trip-main > small { color: var(--green); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .active-trip-main > b { overflow-wrap: anywhere; font-size: 19px; letter-spacing: -.025em; }
 .active-trip-main > em { overflow-wrap: anywhere; color: var(--muted); font-size: 12px; font-style: normal; }
+.driver-status-line { width: fit-content; max-width: 100%; margin-top: 4px; padding: 5px 8px; border-radius: 999px; background: #eef2f0; color: #58665f; display: flex; align-items: center; gap: 6px; }
+.driver-status-line > i { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.driver-status-line > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.driver-status-line > small { color: inherit; font-size: 9px; opacity: .78; white-space: nowrap; }
+.driver-status-line.waiting, .driver-status-card.waiting { background: #fff4dd; color: #9a6415; }
+.driver-status-line.active, .driver-status-card.active { background: var(--green-soft); color: var(--green); }
+.driver-status-line.complete, .driver-status-card.complete { background: #e8f7ee; color: #1d7548; }
+.driver-status-line.attention, .driver-status-card.attention { background: #fff0e8; color: #b64e1e; }
 .active-trip-facts { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(105px, 1fr)); gap: 9px; }
 .active-trip-facts > span { min-width: 0; padding: 10px 12px; border-radius: 9px; background: var(--paper); display: grid; gap: 4px; }
 .active-trip-facts small { color: var(--muted); font-size: 9px; font-weight: 750; text-transform: uppercase; }
@@ -152,6 +160,8 @@ button { cursor: pointer; }
 .active-trip-detail { padding: 0 18px 20px; border-top: 1px solid #e6ebe8; }
 .active-trip-detail .trip-tracking { margin-top: 18px; }
 .active-trip-grid { padding-bottom: 22px; }
+.economics .driver-status-card { align-content: start; }
+.economics .driver-status-card small { color: inherit; font-size: 10px; line-height: 1.4; opacity: .78; }
 .trip-expenses { padding: 18px; border: 1px solid #cfe1d7; border-radius: 12px; background: #f7faf8; }
 .trip-expenses-heading { display: flex; align-items: start; justify-content: space-between; gap: 18px; }
 .trip-expenses-heading > div:first-child { min-width: 0; }

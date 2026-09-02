@@ -70,6 +70,12 @@ export type DashboardData = {
     distanceKm: number | null;
     routeGeometry: Array<[number, number]> | null;
     loadState: string;
+    driverStatus: {
+      code: string;
+      loadState: string;
+      locationText: string | null;
+      recordedAt: string;
+    } | null;
     lastLocation: {
       latitude: number;
       longitude: number;
@@ -220,6 +226,14 @@ type LocationRow = {
   note: string | null;
 };
 
+type VehicleStatusRow = {
+  trip_id: string | null;
+  status_code: string;
+  load_state: string;
+  location_text: string | null;
+  recorded_at: string;
+};
+
 function asOne<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
@@ -247,7 +261,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   const accessRole = asOne(membership.organization_access_roles);
   const permissions = membership.role === "OWNER" ? [...permissionCodes] : accessRole?.permissions ?? [];
 
-  const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, incomesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult] = await Promise.all([
+  const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, incomesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult, vehicleStatusesResult] = await Promise.all([
     supabase.from("profiles").select("telegram_user_id, telegram_username").eq("id", userId).maybeSingle(),
     supabase.from("vehicles").select("id, display_name, plate_number, make_model, fuel_norm_l_per_100km, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id, assigned_vehicle_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
@@ -260,6 +274,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
     supabase.from("organization_access_roles").select("id, name, permissions, is_system").eq("organization_id", membership.organization_id).order("is_system", { ascending: false }).order("name"),
     supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("created_at"),
     supabase.from("trip_location_points").select("id, trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at, event_type, note").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(500),
+    supabase.from("vehicle_status_records").select("trip_id, status_code, load_state, location_text, recorded_at").eq("organization_id", membership.organization_id).not("trip_id", "is", null).order("recorded_at", { ascending: false }).limit(1000),
   ]);
   for (const result of [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, incomesResult, accessRolesResult, staffResult]) {
     if (result.error) throw new Error(result.error.message);
@@ -268,7 +283,7 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
   // The web release may reach Vercel a few moments before the additive SQL migration.
   // Keep the current owner dashboard readable during that short window; any other
   // error still surfaces instead of being hidden.
-  for (const result of [recentExpensesResult, pnlResult, invitesResult, locationsResult]) {
+  for (const result of [recentExpensesResult, pnlResult, invitesResult, locationsResult, vehicleStatusesResult]) {
     if (result.error && !["42P01", "42703"].includes(result.error.code ?? "")) throw new Error(result.error.message);
   }
 
@@ -289,6 +304,10 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
     const points = locationsByTrip.get(point.trip_id) ?? [];
     points.push(point);
     locationsByTrip.set(point.trip_id, points);
+  }
+  const latestStatusByTrip = new Map<string, VehicleStatusRow>();
+  for (const status of (vehicleStatusesResult.data as VehicleStatusRow[] ?? [])) {
+    if (status.trip_id && !latestStatusByTrip.has(status.trip_id)) latestStatusByTrip.set(status.trip_id, status);
   }
   const totalKm = summaries.reduce((sum, item) => sum + Number(item.total_km ?? 0), 0);
   const emptyKm = summaries.reduce((sum, item) => sum + Number(item.empty_km ?? 0), 0);
@@ -403,6 +422,15 @@ export const getDashboardData = cache(async (): Promise<DashboardLoadResult> => 
       distanceKm: firstLeg?.distance_km === null || firstLeg?.distance_km === undefined ? null : Number(firstLeg.distance_km),
       routeGeometry: normalizeRouteGeometry(firstLeg?.route_geometry),
       loadState: firstLeg?.load_state ?? "UNKNOWN",
+      driverStatus: (() => {
+        const status = latestStatusByTrip.get(trip.id);
+        return status ? {
+          code: status.status_code,
+          loadState: status.load_state,
+          locationText: status.location_text,
+          recordedAt: status.recorded_at,
+        } : null;
+      })(),
       lastLocation: lastLocation ? {
         latitude: lastLocation.latitude,
         longitude: lastLocation.longitude,

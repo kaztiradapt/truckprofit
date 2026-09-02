@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { getDriverTripStatus } from "@/domain/driver-trip-status";
 import { groupExpensesByCurrency } from "@/domain/trip-expenses";
 import type { DashboardData } from "@/lib/dashboard-data";
 import { TripTrackingMap } from "./trip-tracking-map";
@@ -137,6 +138,7 @@ function ExpandedTrip({ organizationId, trip, expenses, incomes, baseCurrency, c
 }) {
   const plannedKm = trip.distanceKm ?? (trip.legs.reduce((sum, leg) => sum + (leg.distanceKm ?? 0), 0) || null);
   const incomeTotalMinor = incomes.reduce((sum, income) => sum + income.reportingAmountMinor, 0);
+  const driverStatus = getDriverTripStatus(trip.driverStatus?.code);
   return <div className="active-trip-detail">
     <TripTrackingMap
       organizationId={organizationId}
@@ -171,6 +173,11 @@ function ExpandedTrip({ organizationId, trip, expenses, incomes, baseCurrency, c
         </div>) : <p className="empty-state">Плечи рейса ещё не заполнены.</p>}
       </div>
       <div className="economics">
+        <div className={`driver-status-card ${driverStatus.tone}`}>
+          <span>Статус водителя</span>
+          <strong>{driverStatus.label}</strong>
+          <small>{trip.driverStatus ? `Обновлён ${dateTimeLabel(trip.driverStatus.recordedAt)}${trip.driverStatus.locationText ? ` · ${trip.driverStatus.locationText}` : ""}` : "Водитель ещё не выбрал статус в боте"}</small>
+        </div>
         <div><span>Плановый пробег</span><strong>{formatKm(plannedKm)}</strong></div>
         <div><span>Точек водителя</span><strong>{trip.locationHistory.length}</strong></div>
         {canViewFinance ? <><div><span>Доход рейса</span><strong>{incomes.length ? formatMinor(incomeTotalMinor, baseCurrency) : "Не указан"}</strong></div>
@@ -211,13 +218,19 @@ export function ActiveTripDetails({ organizationId, trips, expenses, incomes, ba
         const incomeTotalMinor = tripIncomes.reduce((sum, income) => sum + income.reportingAmountMinor, 0);
         const totals = groupExpensesByCurrency(tripExpenses, baseCurrency);
         const expanded = expandedTripId === trip.id;
+        const driverStatus = getDriverTripStatus(trip.driverStatus?.code);
         return <article className={`active-trip-card${expanded ? " expanded" : ""}`} key={trip.id}>
           <div className="active-trip-summary">
-            <span className="active-trip-main">
+            <div className="active-trip-main">
               <small>{trip.originCity || "Погрузка"} → {trip.destinationCity || "Выгрузка"}</small>
               <b>{trip.title}</b>
               <em>{trip.vehicleName} · {trip.driverName ?? "Водитель не назначен"} · {dateLabel(trip.startedAt)}</em>
-            </span>
+              <span className={`driver-status-line ${driverStatus.tone}`}>
+                <i aria-hidden="true" />
+                <b>{driverStatus.label}</b>
+                {trip.driverStatus ? <small>{dateTimeLabel(trip.driverStatus.recordedAt)}</small> : null}
+              </span>
+            </div>
             <span className="active-trip-facts">
               <span><small>Пробег</small><b>{formatKm(trip.distanceKm)}</b></span>
               {canViewFinance ? <span><small>Доход</small><b>{tripIncomes.length ? formatMinor(incomeTotalMinor, baseCurrency) : "Не указан"}</b></span> : null}
