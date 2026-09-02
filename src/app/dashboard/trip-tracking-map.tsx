@@ -84,6 +84,7 @@ function AnnotationForm({ organizationId, tripId, point, onSaved }: {
   const [note, setNote] = useState(point.note ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [editing, setEditing] = useState(false);
 
   async function save() {
     setSaving(true);
@@ -98,11 +99,19 @@ function AnnotationForm({ organizationId, tripId, point, onSaved }: {
       if (!response.ok) throw new Error(payload.error ?? "Не удалось сохранить отметку.");
       onSaved(eventType, note.trim() || null);
       setMessage("Сохранено");
+      setEditing(false);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "Не удалось сохранить отметку.");
     } finally {
       setSaving(false);
     }
+  }
+
+  if (!editing) {
+    return <div className="tracking-annotation-summary">
+      <button type="button" className="tiny-button" onClick={() => { setMessage(""); setEditing(true); }}>Исправить отметку</button>
+      {message ? <small className="tracking-saved">{message}</small> : null}
+    </div>;
   }
 
   return <div className="tracking-annotation">
@@ -111,6 +120,7 @@ function AnnotationForm({ organizationId, tripId, point, onSaved }: {
     </select>
     <input aria-label="Комментарий к отметке" value={note} maxLength={300} onChange={(event) => setNote(event.target.value)} placeholder="Например: стоянка на ночь" />
     <button type="button" className="tiny-button" disabled={saving} onClick={() => void save()}>{saving ? "Сохраняю…" : "Сохранить"}</button>
+    <button type="button" className="tiny-button subtle" disabled={saving} onClick={() => { setEventType(point.eventType); setNote(point.note ?? ""); setMessage(""); setEditing(false); }}>Отмена</button>
     {message ? <small className={message === "Сохранено" ? "tracking-saved" : "inline-error"}>{message}</small> : null}
   </div>;
 }

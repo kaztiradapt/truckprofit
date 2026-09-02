@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDriverTrip, formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips, formatStaffSummary, normalizeLocationPoint, parseLocationComment } from "./driver-bot";
+import { formatDriverTrip, formatOwnerExpenses, formatOwnerSummary, formatOwnerTrips, formatStaffSummary, isLocationEventType, normalizeLocationPoint, parseLocationComment } from "./driver-bot";
 
 describe("owner Telegram menu formatting", () => {
   it("renders an operational and financial summary", () => {
@@ -73,6 +73,13 @@ describe("owner Telegram menu formatting", () => {
     expect(parseLocationComment("  ночёвка у трассы  ")).toEqual({ note: "ночёвка у трассы", tooLong: false });
     expect(parseLocationComment("-")).toEqual({ note: null, tooLong: false });
     expect(parseLocationComment("x".repeat(301))).toEqual({ note: null, tooLong: true });
+  });
+
+  it("accepts only supported Telegram location event types", () => {
+    expect(isLocationEventType("REST")).toBe(true);
+    expect(isLocationEventType("OTHER")).toBe(true);
+    expect(isLocationEventType("toString")).toBe(false);
+    expect(isLocationEventType("BREAKDOWN")).toBe(false);
   });
 
   it("shows route addresses and the latest driver status inside My Trip", () => {

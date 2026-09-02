@@ -118,7 +118,10 @@ button { cursor: pointer; }
 .tracking-annotation { display: grid; grid-template-columns: minmax(140px, .8fr) minmax(180px, 1.4fr) auto auto; align-items: center; gap: 6px; margin-top: 5px; }
 .tracking-annotation select, .tracking-annotation input { width: 100%; min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid #cbd7d1; border-radius: 7px; background: #fff; color: var(--ink); font-size: 11px; }
 .tracking-annotation .tiny-button { min-height: 34px; }
+.tracking-annotation .tiny-button.subtle { background: #f5f7f5; color: var(--muted); }
 .tracking-annotation > small { font-size: 10px; }
+.tracking-annotation-summary { min-height: 34px; margin-top: 5px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.tracking-annotation-summary small { font-size: 10px; }
 .tracking-saved { color: var(--green); font-weight: 750; }
 .trip-grid { padding-top: 24px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 44px; }
 .route-panel { display: grid; align-content: start; }
@@ -259,7 +262,11 @@ td { font-size: 14px; }
 .driver-inline-edit input, .driver-inline-edit select { width: 100%; min-width: 0; min-height: 38px; border: 1px solid #bfcfc7; border-radius: 8px; padding: 8px 10px; background: #fff; color: var(--ink); }
 .driver-inline-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .driver-reports { margin-top: 32px; display: grid; gap: 16px; }
-.report-filters { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)) auto; align-items: end; gap: 12px; }
+.report-dashboard-intro { min-width: 0; padding: 22px; border: 1px solid #c7ded3; border-radius: 16px; background: linear-gradient(135deg, #f8fcf9, #e7f4ed); display: flex; align-items: end; justify-content: space-between; gap: 20px; }
+.report-dashboard-intro h2 { margin: 4px 0 6px; font-size: clamp(22px, 2.6vw, 34px); letter-spacing: -.04em; }
+.report-dashboard-intro p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 13px; }
+.report-dashboard-intro > span { flex: 0 0 auto; padding: 7px 10px; border-radius: 999px; background: #fff; color: var(--green); font-size: 11px; font-weight: 800; box-shadow: 0 5px 18px #164c3612; }
+.report-filters { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)) auto; align-items: end; gap: 12px; }
 .report-filters label { min-width: 0; display: grid; gap: 6px; }
 .report-filters label span { color: var(--muted); font-size: 11px; font-weight: 750; }
 .report-filters select { min-width: 0; min-height: 42px; border: 1px solid #c8d5cf; border-radius: 9px; padding: 8px 34px 8px 11px; background: #fff; color: var(--ink); }
@@ -268,6 +275,21 @@ td { font-size: 14px; }
 .report-summary article { min-width: 0; min-height: 122px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); display: grid; align-content: space-between; box-shadow: 0 8px 30px #22352b08; }
 .report-summary span, .report-summary small { color: var(--muted); font-size: 12px; }
 .report-summary strong { font-size: clamp(21px, 2vw, 29px); letter-spacing: -.04em; overflow-wrap: anywhere; }
+.report-summary .report-profit { border-color: #174f3d; background: var(--green-dark); color: #fff; }
+.report-summary .report-profit span, .report-summary .report-profit small { color: #b8c9c1; }
+.report-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.report-chart-card { min-width: 0; padding: 19px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: 0 8px 30px #22352b08; }
+.report-chart-heading { margin-bottom: 16px; display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.report-chart-heading h3 { margin: 3px 0 0; font-size: 18px; letter-spacing: -.025em; }
+.report-chart-heading > span { color: var(--muted); font-size: 10px; font-weight: 750; }
+.report-bars { display: grid; gap: 15px; }
+.report-bar-row { min-width: 0; display: grid; grid-template-columns: minmax(130px, .8fr) minmax(100px, 1.2fr) auto; align-items: center; gap: 10px; }
+.report-bar-row > div:first-child { min-width: 0; display: grid; gap: 2px; }
+.report-bar-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.report-bar-row span, .report-bar-row small { color: var(--muted); font-size: 9px; white-space: nowrap; }
+.report-bar-track { height: 9px; border-radius: 99px; overflow: hidden; background: #e8efeb; }
+.report-bar-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #176d50, #40a77c); }
+.report-bar-track.vehicle i { background: linear-gradient(90deg, #d47332, #f2a05c); }
 .report-table-panel { min-width: 0; }
 .driver-report-table { min-width: 940px; }
 .driver-report-table td strong, .driver-report-table td small { display: block; }
@@ -445,6 +467,8 @@ td { font-size: 14px; }
   .flow-card-action { grid-column: 2; }
   .flow-card-action button { width: 100%; }
   .closing-actions { grid-template-columns: 1fr; }
+  .report-filters { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+  .report-filters .tiny-button { width: 100%; }
 }
 
 @media (max-width: 900px) {
@@ -457,6 +481,7 @@ td { font-size: 14px; }
   .content { width: 100%; max-width: 100vw; min-width: 0; padding: 28px 20px 42px; overflow-x: clip; }
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .report-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-charts { grid-template-columns: 1fr; }
   .trip-grid { grid-template-columns: 1fr; gap: 18px; }
   .active-trip-summary { grid-template-columns: minmax(0, 1fr) auto; }
   .active-trip-facts { grid-column: 1 / -1; grid-row: 2; }
@@ -596,6 +621,12 @@ td { font-size: 14px; }
   .report-summary article { min-height: 104px; padding: 13px; border-radius: 12px; box-shadow: none; }
   .report-summary strong { font-size: clamp(18px, 5.3vw, 23px); }
   .report-summary span, .report-summary small { font-size: 10px; }
+  .report-dashboard-intro { padding: 16px; align-items: flex-start; flex-direction: column; gap: 12px; }
+  .report-dashboard-intro > span { align-self: flex-start; }
+  .report-chart-card { padding: 14px; box-shadow: none; }
+  .report-bar-row { grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+  .report-bar-track { grid-column: 1 / -1; grid-row: 2; }
+  .report-bar-row > small { grid-column: 2; grid-row: 1; }
   .trip-card, .panel { padding: 14px; border-radius: 12px; }
   .active-trip-browser-heading { display: grid; gap: 12px; }
   .active-trip-browser-heading > span { justify-self: start; }

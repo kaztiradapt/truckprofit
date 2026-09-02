@@ -501,6 +501,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
       p_latitude: input.latitude,
       p_longitude: input.longitude,
       p_horizontal_accuracy_m: input.horizontalAccuracyM,
+      p_event_type: input.eventType,
       p_note: input.note,
       p_recorded_at: input.occurredAt.toISOString(),
       p_telegram_message_id: input.telegramMessageId,

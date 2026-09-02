@@ -15,6 +15,7 @@ import type {
   OwnerIdentity,
   OwnerSummary,
   OwnerTripSummary,
+  RecordLocationInput,
   RecordStatusInput,
   StaffIdentity,
 } from "./repository";
@@ -23,7 +24,12 @@ type PendingExpense = { state: ExpenseWizardState; trip: ActiveTrip };
 type PendingReceipt = { expenseId: string; organizationId: string; driverId: string };
 type PendingOdometer = { trip: ActiveTrip };
 type PendingStatus = { trip: ActiveTrip; statusCode: RecordStatusInput["statusCode"]; loadState: RecordStatusInput["loadState"] };
-type PendingLocation = { trip: ActiveTrip; step: "COMMENT" | "LOCATION"; note: string | null };
+type PendingLocation = {
+  trip: ActiveTrip;
+  step: "TYPE" | "COMMENT" | "LOCATION";
+  eventType: RecordLocationInput["eventType"] | null;
+  note: string | null;
+};
 
 type BotSession = {
   expense?: PendingExpense;
@@ -60,6 +66,32 @@ const statusDefinitions: Record<string, { title: string; statusCode: RecordStatu
   IDLE: { title: "Простой", statusCode: "IDLE", loadState: "EMPTY" },
   DELAY: { title: "Задержка", statusCode: "DELAY", loadState: "UNKNOWN" },
 };
+
+const locationEventLabels: Record<RecordLocationInput["eventType"], string> = {
+  CHECKPOINT: "Контрольная точка",
+  REST: "Ночёвка / отдых",
+  LOADING: "Погрузка",
+  UNLOADING: "Выгрузка",
+  OTHER: "Прочее",
+};
+
+export function isLocationEventType(value: string): value is RecordLocationInput["eventType"] {
+  return Object.prototype.hasOwnProperty.call(locationEventLabels, value);
+}
+
+function locationEventMenu(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text("Контрольная точка", "location-type:CHECKPOINT")
+    .row()
+    .text("🛌 Ночёвка / отдых", "location-type:REST")
+    .row()
+    .text("📦 Погрузка", "location-type:LOADING")
+    .text("🏁 Выгрузка", "location-type:UNLOADING")
+    .row()
+    .text("✍️ Прочее", "location-type:OTHER")
+    .row()
+    .text("Отмена", "flow:cancel");
+}
 
 function driverMenu(ownerAvailable = false): InlineKeyboard {
   const keyboard = new InlineKeyboard()
@@ -398,11 +430,15 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
   }
 
   async function requestTripLocation(context: DriverBotContext, pending: PendingLocation): Promise<void> {
+    if (!pending.eventType) {
+      await showDriverMenu(context, "Тип геометки не выбран. Начните заново.");
+      return;
+    }
     context.session.location = { ...pending, step: "LOCATION" };
     await clearPreviousMenu(context);
     const commentLine = pending.note ? `Комментарий: ${pending.note}` : "Без комментария";
     const sent = await context.reply(
-      `Передача геопозиции для рейса «${pending.trip.title}».\n${commentLine}\n\nНажмите кнопку ниже и разрешите Telegram отправить текущие координаты.`,
+      `Передача геопозиции для рейса «${pending.trip.title}».\nТип: ${locationEventLabels[pending.eventType]}\n${commentLine}\n\nНажмите кнопку ниже и разрешите Telegram отправить текущие координаты.`,
       { reply_markup: new Keyboard().requestLocation("📍 Отправить геопозицию").resized().oneTime() },
     );
     context.session.locationPromptMessageId = sent.message_id;
@@ -624,7 +660,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     }
     if (data === "location-comment:skip") {
       const pending = context.session.location;
-      if (!pending || pending.step !== "COMMENT") {
+      if (!pending || pending.step !== "COMMENT" || !pending.eventType || pending.eventType === "OTHER") {
         await showDriverMenu(context, "Ввод геопозиции истёк. Начните заново.");
         return;
       }
@@ -656,7 +692,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
         "2. Когда вам назначат рейс, бот пришлёт маршрут, автомобиль, дату и кнопку «Мой рейс».",
         "3. Проверьте назначение в «Мой рейс».",
         "4. Внутри «Мой рейс» меняйте статусы ожидания, погрузки и выгрузки одной кнопкой.",
-        "5. В «📍 Геопозиция» добавьте к точке комментарий (например, «ночёвка») или пропустите его, затем разрешите Telegram передать координаты.",
+        "5. В «📍 Геопозиция» выберите тип точки. Для «Прочее» напишите свой вариант, затем разрешите Telegram передать координаты.",
         "6. После расхода отправьте фото чека; предварительный расчёт смотрите в «Моя зарплата».",
         "7. Mini App водителю не нужен — все водительские действия доступны в чате.",
       ].join("\n"), helpMenu());
@@ -872,11 +908,32 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       const trip = await findTrip(context, driver);
       if (!trip) return;
       resetFlow(context);
-      context.session.location = { trip, step: "COMMENT", note: null };
+      context.session.location = { trip, step: "TYPE", eventType: null, note: null };
       await replaceMenu(
         context,
-        `Добавьте короткий комментарий к геометке рейса «${trip.title}».\n\nНапример: «ночёвка», «ожидаю очередь», «ремонт». До 300 символов.`,
-        new InlineKeyboard().text("Без комментария", "location-comment:skip").row().text("Отмена", "flow:cancel"),
+        `Выберите, что означает геометка для рейса «${trip.title}».`,
+        locationEventMenu(),
+      );
+      return;
+    }
+
+    if (data.startsWith("location-type:")) {
+      const eventType = data.replace("location-type:", "");
+      const pending = context.session.location;
+      if (!pending || pending.step !== "TYPE" || !isLocationEventType(eventType)) {
+        await showDriverMenu(context, "Ввод геопозиции истёк. Начните заново.");
+        return;
+      }
+      context.session.location = { ...pending, step: "COMMENT", eventType, note: null };
+      const isOther = eventType === "OTHER";
+      await replaceMenu(
+        context,
+        isOther
+          ? "Напишите свой вариант для геометки. Например: «ремонт» или «ожидаю очередь». До 300 символов."
+          : `Выбрано: ${locationEventLabels[eventType]}.\n\nМожно написать дополнительный комментарий до 300 символов или пропустить этот шаг.`,
+        isOther
+          ? new InlineKeyboard().text("Отмена", "flow:cancel")
+          : new InlineKeyboard().text("Без комментария", "location-comment:skip").row().text("Отмена", "flow:cancel"),
       );
       return;
     }
@@ -924,6 +981,15 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       const parsed = parseLocationComment(text);
       if (parsed.tooLong) {
         await context.reply("Комментарий слишком длинный. Оставьте не более 300 символов.");
+        return;
+      }
+      if (!pending.eventType) {
+        resetFlow(context);
+        await showDriverMenu(context, "Тип геометки не выбран. Начните заново.");
+        return;
+      }
+      if (pending.eventType === "OTHER" && !parsed.note) {
+        await context.reply("Для типа «Прочее» напишите, что именно произошло.");
         return;
       }
       await requestTripLocation(context, { ...pending, note: parsed.note });
@@ -1021,6 +1087,7 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       driverId: trip.driverId,
       tripId: trip.id,
       ...location,
+      eventType: pendingLocation?.eventType ?? "CHECKPOINT",
       note: pendingLocation?.note ?? null,
       occurredAt: new Date(context.message.date * 1000),
       telegramMessageId: context.message.message_id,
@@ -1038,8 +1105,9 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     const accuracyText = location.horizontalAccuracyM === null
       ? "точность не указана"
       : `точность около ${Math.round(location.horizontalAccuracyM)} м`;
+    const selectedEventType = pendingLocation?.eventType ?? "CHECKPOINT";
     const commentText = pendingLocation?.note ? `\nКомментарий: ${pendingLocation.note}` : "";
-    await showDriverMenu(context, `📍 Геопозиция сохранена для рейса «${trip.title}» (${accuracyText}).${commentText}`);
+    await showDriverMenu(context, `📍 Геопозиция сохранена для рейса «${trip.title}» (${accuracyText}).\nТип: ${locationEventLabels[selectedEventType]}.${commentText}`);
   });
 
   bot.on("message:photo", async (context) => {

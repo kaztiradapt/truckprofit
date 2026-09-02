@@ -109,6 +109,7 @@ export type RecordLocationInput = {
   latitude: number;
   longitude: number;
   horizontalAccuracyM: number | null;
+  eventType: "CHECKPOINT" | "REST" | "LOADING" | "UNLOADING" | "OTHER";
   note: string | null;
   occurredAt: Date;
   telegramMessageId: number;
