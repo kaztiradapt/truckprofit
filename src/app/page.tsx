@@ -129,6 +129,7 @@ export default function Home() {
         <nav className={styles.nav} aria-label="Навигация по презентации">
           <Link href="/" aria-label="TruckProfit — главная"><Brand /></Link>
           <div className={styles.navLinks}>
+            <a href="#demo">Видео</a>
             <a href="#product">Возможности</a>
             <a href="#workflow">Как работает</a>
             <a href="#reports">Отчёты</a>
@@ -156,7 +157,7 @@ export default function Home() {
             <a className={styles.primaryCta} href="https://t.me/mxxxn4k" target="_blank" rel="noreferrer">
               Получить бета-доступ <span>↗</span>
             </a>
-            <a className={styles.textCta} href="#workflow">Посмотреть, как работает <span>↓</span></a>
+            <a className={styles.textCta} href="#demo">Смотреть обзор за 2 минуты <span>↓</span></a>
           </div>
           <div className={styles.heroNotes} aria-label="Ключевые преимущества">
             <span><i>✓</i> Водителю достаточно Telegram</span>
@@ -243,6 +244,30 @@ export default function Home() {
         <span><b>5 валют</b><small>KZT · RUB · USD · CNY · UZS</small></span>
         <span><b>2 интерфейса</b><small>кабинет владельца + Telegram</small></span>
         <span><b>1 картина</b><small>от рейса до прибыли</small></span>
+      </section>
+
+      <section className={`${styles.section} ${styles.videoSection}`} id="demo">
+        <div className={styles.videoCopy}>
+          <p className={styles.kicker}><span /> Обучение · 2 минуты</p>
+          <h2>Первый рейс:<br />от создания до отчёта.</h2>
+          <p>
+            Посмотрите полный рабочий сценарий: подготовка автопарка, назначение рейса,
+            действия водителя в Telegram, расходы с чеками и итоговая аналитика.
+          </p>
+          <div className={styles.videoChapters} aria-label="Содержание ролика">
+            <span><b>01</b> Автомобиль и водитель</span>
+            <span><b>02</b> Маршрут и назначение</span>
+            <span><b>03</b> Статусы и расходы</span>
+            <span><b>04</b> Отчёт и ИИ-анализ</span>
+          </div>
+        </div>
+        <div className={styles.videoFrame}>
+          <video controls preload="metadata" poster="/training/first-trip-poster.png">
+            <source src="/training/first-trip.mp4" type="video/mp4" />
+            Ваш браузер не поддерживает воспроизведение видео.
+          </video>
+          <span className={styles.videoBadge}>01 · ПЕРВЫЙ РЕЙС</span>
+        </div>
       </section>
 
       <section className={styles.section} id="product">

@@ -458,6 +458,12 @@ td { font-size: 14px; }
 .record-field-wide { grid-column: span 2; }
 .record-edit-actions { display: flex; align-items: end; gap: 6px; }
 .help-section { margin-top: 42px; scroll-margin-top: 24px; }
+.training-video-card { margin-bottom: 14px; padding: 20px; border: 1px solid #27473a; border-radius: 16px; display: grid; grid-template-columns: minmax(250px, .62fr) minmax(0, 1.38fr); align-items: center; gap: 24px; overflow: hidden; background: var(--green-dark); color: #fff; }
+.training-video-copy h3 { margin: 5px 0 10px; font-size: 24px; line-height: 1.1; letter-spacing: -.035em; }
+.training-video-copy > p:last-child { margin: 0; color: #aebfb8; font-size: 12px; line-height: 1.55; }
+.training-video-copy .eyebrow { color: #cbe94a; }
+.training-video-frame { min-width: 0; aspect-ratio: 16 / 9; border: 1px solid #ffffff1c; border-radius: 11px; overflow: hidden; background: #07120e; box-shadow: 0 14px 34px #06100c66; }
+.training-video-frame video { width: 100%; height: 100%; display: block; object-fit: cover; }
 .help-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .help-grid ol { margin: 15px 0 0; padding-left: 20px; color: #43514b; font-size: 13px; line-height: 1.55; }
 .help-grid li + li { margin-top: 7px; }
@@ -616,6 +622,7 @@ td { font-size: 14px; }
   .active-trip-summary { grid-template-columns: minmax(0, 1fr) auto; }
   .active-trip-facts { grid-column: 1 / -1; grid-row: 2; }
   .active-trip-toggle { grid-column: 2; grid-row: 1; }
+  .training-video-card { grid-template-columns: 1fr; }
   .help-grid { grid-template-columns: 1fr; }
   .support-layout { grid-template-columns: 1fr; }
   .team-management-grid { grid-template-columns: 1fr; }
@@ -666,6 +673,8 @@ td { font-size: 14px; }
   .topbar h1 { font-size: clamp(25px, 7.3vw, 31px); line-height: 1.04; overflow-wrap: anywhere; }
   .eyebrow { font-size: 10px; }
   .section-board, .operations, .record-management, .help-section, .team-management, .driver-reports, .support-section { margin-top: 18px; }
+  .training-video-card { padding: 14px; gap: 16px; border-radius: 13px; }
+  .training-video-copy h3 { font-size: 21px; }
   .report-filters { grid-template-columns: 1fr; padding: 12px; }
   .report-filters .tiny-button { width: 100%; }
   .start-intro { padding: 8px 0 18px; }

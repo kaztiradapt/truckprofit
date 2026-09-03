@@ -1,0 +1,45 @@
+{
+  "intro": [
+    {"text":"TruckProfit помогает владельцу автопарка видеть реальную экономику каждого рейса.","startMs":500,"endMs":5000,"timestampMs":null,"confidence":null},
+    {"text":"Покажем весь путь: от добавления автомобиля до итогового отчёта.","startMs":5000,"endMs":10100,"timestampMs":null,"confidence":null}
+  ],
+  "fleet": [
+    {"text":"Начните с раздела «Автомобили».","startMs":500,"endMs":3500,"timestampMs":null,"confidence":null},
+    {"text":"Добавьте тягач, государственный номер и основные данные.","startMs":3500,"endMs":7700,"timestampMs":null,"confidence":null},
+    {"text":"Затем создайте водителя и закрепите за ним автомобиль.","startMs":7700,"endMs":12300,"timestampMs":null,"confidence":null},
+    {"text":"При назначении рейса машина подставится автоматически.","startMs":12300,"endMs":16750,"timestampMs":null,"confidence":null}
+  ],
+  "trip": [
+    {"text":"Теперь создайте рейс и укажите маршрут.","startMs":500,"endMs":3600,"timestampMs":null,"confidence":null},
+    {"text":"Введите точные адреса погрузки и выгрузки.","startMs":3600,"endMs":7000,"timestampMs":null,"confidence":null},
+    {"text":"Выберите вариант на карте и проверьте километраж.","startMs":7000,"endMs":10500,"timestampMs":null,"confidence":null},
+    {"text":"Назначьте водителя, автомобиль, заказчика, доход и валюту.","startMs":10500,"endMs":15800,"timestampMs":null,"confidence":null}
+  ],
+  "telegram": [
+    {"text":"После назначения водитель получает уведомление в Telegram.","startMs":500,"endMs":4300,"timestampMs":null,"confidence":null},
+    {"text":"В меню «Мой рейс» он видит маршрут и выбирает текущий статус.","startMs":4300,"endMs":9000,"timestampMs":null,"confidence":null},
+    {"text":"Ожидает погрузку, на погрузке, в пути, ожидает выгрузку или выгружен.","startMs":9000,"endMs":14400,"timestampMs":null,"confidence":null},
+    {"text":"Для нестандартной ситуации можно выбрать «Прочее» и написать комментарий.","startMs":14400,"endMs":19400,"timestampMs":null,"confidence":null}
+  ],
+  "expense": [
+    {"text":"Расходы водитель также передаёт через Telegram.","startMs":500,"endMs":3600,"timestampMs":null,"confidence":null},
+    {"text":"Он выбирает категорию, сумму и валюту.","startMs":3600,"endMs":6900,"timestampMs":null,"confidence":null},
+    {"text":"Добавляет комментарий и фотографирует чек.","startMs":6900,"endMs":10200,"timestampMs":null,"confidence":null},
+    {"text":"Запись появляется в рейсе, а чек открывается внутри кабинета.","startMs":10200,"endMs":14300,"timestampMs":null,"confidence":null}
+  ],
+  "live": [
+    {"text":"Статус, расходы и геопозиции обновляются в кабинете владельца.","startMs":500,"endMs":4700,"timestampMs":null,"confidence":null},
+    {"text":"На карте сохраняется история отметок с временем и комментариями.","startMs":4700,"endMs":9000,"timestampMs":null,"confidence":null},
+    {"text":"Ход рейса можно проверить без постоянных звонков.","startMs":9000,"endMs":12800,"timestampMs":null,"confidence":null}
+  ],
+  "reports": [
+    {"text":"В разделе «Отчёты» выберите период, машину или водителя.","startMs":500,"endMs":4700,"timestampMs":null,"confidence":null},
+    {"text":"TruckProfit покажет выручку, расходы, прибыль и маржу.","startMs":4700,"endMs":9000,"timestampMs":null,"confidence":null},
+    {"text":"А также стоимость километра и порожний пробег.","startMs":9000,"endMs":12600,"timestampMs":null,"confidence":null},
+    {"text":"ИИ-аналитик поможет сравнить результаты только по данным TruckProfit.","startMs":12600,"endMs":18000,"timestampMs":null,"confidence":null}
+  ],
+  "outro": [
+    {"text":"Один рейс превращается в понятную цепочку фактов — от водителя до владельца.","startMs":500,"endMs":5600,"timestampMs":null,"confidence":null},
+    {"text":"TruckProfit. Прибыль каждого рейса под контролем.","startMs":5600,"endMs":9000,"timestampMs":null,"confidence":null}
+  ]
+}
