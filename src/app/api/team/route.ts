@@ -3,7 +3,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { authenticatedTeamRequest, isOrganizationOwner, normalizeTelegramUsername } from "@/server/team-access";
+import { prepareTeamWebAccount } from "@/server/team-accounts";
+import { authenticatedTeamRequest, getOrganizationTeamAccess, normalizeTelegramUsername } from "@/server/team-access";
 import { telegramBotUsername, telegramStartLink } from "@/server/telegram";
 
 const inputSchema = z.object({
@@ -13,35 +14,6 @@ const inputSchema = z.object({
   email: z.union([z.email().trim().toLowerCase(), z.literal("")]).optional(),
   telegramUsername: z.string().trim().max(33).optional(),
 });
-
-async function findUserIdByEmail(email: string): Promise<string | null> {
-  const admin = createAdminClient();
-  for (let page = 1; page <= 20; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error) throw error;
-    const match = data.users.find((user) => user.email?.toLowerCase() === email);
-    if (match) return match.id;
-    if (data.users.length < 1000) return null;
-  }
-  throw new Error("User directory is too large to scan safely");
-}
-
-async function ensureWebAccount(input: {
-  email: string;
-  displayName: string;
-  origin: string;
-}): Promise<{ userId: string; invited: boolean }> {
-  const admin = createAdminClient();
-  const existingUserId = await findUserIdByEmail(input.email);
-  if (existingUserId) return { userId: existingUserId, invited: false };
-
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(input.email, {
-    data: { full_name: input.displayName },
-    redirectTo: `${input.origin}/auth/confirm?next=/dashboard`,
-  });
-  if (error || !data.user) throw error ?? new Error("Invitation user was not created");
-  return { userId: data.user.id, invited: true };
-}
 
 export async function POST(request: Request): Promise<Response> {
   const parsed = inputSchema.safeParse(await request.json().catch(() => null));
@@ -58,31 +30,37 @@ export async function POST(request: Request): Promise<Response> {
 
   const context = await authenticatedTeamRequest();
   if (!context) return Response.json({ error: "Требуется вход." }, { status: 401 });
-  if (!await isOrganizationOwner(context, parsed.data.organizationId)) {
-    return Response.json({ error: "Добавлять сотрудников может только владелец." }, { status: 403 });
-  }
+  const teamAccess = await getOrganizationTeamAccess(context, parsed.data.organizationId);
+  if (!teamAccess.canManageTeam) return Response.json({ error: "Недостаточно прав для управления командой." }, { status: 403 });
 
   const { data: accessRole, error: roleError } = await context.supabase
     .from("organization_access_roles")
-    .select("id, name")
+    .select("id, name, system_code")
     .eq("id", parsed.data.accessRoleId)
     .eq("organization_id", parsed.data.organizationId)
     .maybeSingle();
   if (roleError || !accessRole) return Response.json({ error: "Выбранная роль недоступна." }, { status: 400 });
+  if (accessRole.system_code === "CO_OWNER" && !teamAccess.isPrimaryOwner) {
+    return Response.json({ error: "Назначать совладельцев может только основной владелец." }, { status: 403 });
+  }
+  if (accessRole.system_code === "CO_OWNER" && !email) {
+    return Response.json({ error: "Для входа совладельца в личный кабинет укажите email." }, { status: 400 });
+  }
 
   const admin = createAdminClient();
   let profileId: string | null = null;
   let emailInvited = false;
   if (email) {
     try {
-      const account = await ensureWebAccount({ email, displayName: parsed.data.displayName, origin: new URL(request.url).origin });
+      const account = await prepareTeamWebAccount({
+        email,
+        displayName: parsed.data.displayName,
+        organizationId: parsed.data.organizationId,
+        origin: new URL(request.url).origin,
+      });
+      if (!account.ok) return Response.json({ error: account.error }, { status: account.status });
       profileId = account.userId;
       emailInvited = account.invited;
-      const { error: profileError } = await admin.from("profiles").upsert({
-        id: profileId,
-        display_name: parsed.data.displayName,
-      }, { onConflict: "id" });
-      if (profileError) throw profileError;
       const { error: membershipError } = await admin.from("organization_memberships").upsert({
         organization_id: parsed.data.organizationId,
         user_id: profileId,
@@ -149,7 +127,7 @@ export async function POST(request: Request): Promise<Response> {
     action: "INVITED",
     actor_user_id: context.userId,
     source: "WEB",
-    after_data: { access_role_id: accessRole.id, email_invited: emailInvited, telegram_invited: Boolean(telegramUsername) },
+    after_data: { access_role_id: accessRole.id, system_code: accessRole.system_code, email_invited: emailInvited, telegram_invited: Boolean(telegramUsername) },
   });
 
   return Response.json({

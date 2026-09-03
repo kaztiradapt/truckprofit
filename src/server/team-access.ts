@@ -9,6 +9,7 @@ export const permissionCodes = [
   "MANAGE_DRIVERS",
   "MANAGE_TRIPS",
   "MANAGE_FINANCE",
+  "REVIEW_EXPENSES",
   "MANAGE_TEAM",
   "DELETE_RECORDS",
 ] as const;
@@ -40,6 +41,27 @@ export async function isOrganizationOwner(
     .eq("status", "ACTIVE")
     .maybeSingle();
   return !error && Boolean(data);
+}
+
+export async function getOrganizationTeamAccess(
+  context: TeamRequestContext,
+  organizationId: string,
+): Promise<{ canManageTeam: boolean; isPrimaryOwner: boolean }> {
+  const { data, error } = await context.supabase
+    .from("organization_memberships")
+    .select("role, organization_access_roles(permissions)")
+    .eq("organization_id", organizationId)
+    .eq("user_id", context.userId)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
+  if (error || !data) return { canManageTeam: false, isPrimaryOwner: false };
+  const nestedRole = data.organization_access_roles;
+  const accessRole = Array.isArray(nestedRole) ? nestedRole[0] : nestedRole;
+  const isPrimaryOwner = data.role === "OWNER";
+  return {
+    isPrimaryOwner,
+    canManageTeam: isPrimaryOwner || Boolean(accessRole?.permissions?.includes("MANAGE_TEAM")),
+  };
 }
 
 export function normalizeTelegramUsername(value: unknown): string | null {

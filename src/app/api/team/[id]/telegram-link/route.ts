@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { z } from "zod";
 
-import { authenticatedTeamRequest, isOrganizationOwner } from "@/server/team-access";
+import { authenticatedTeamRequest, getOrganizationTeamAccess } from "@/server/team-access";
 import { telegramBotUsername, telegramStartLink } from "@/server/telegram";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
@@ -12,12 +12,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!z.uuid().safeParse(id).success || !z.uuid().safeParse(organizationId).success) return Response.json({ error: "Некорректный сотрудник." }, { status: 400 });
   const auth = await authenticatedTeamRequest();
   if (!auth) return Response.json({ error: "Требуется вход." }, { status: 401 });
-  if (!await isOrganizationOwner(auth, organizationId)) return Response.json({ error: "Создать приглашение может только владелец." }, { status: 403 });
+  const teamAccess = await getOrganizationTeamAccess(auth, organizationId);
+  if (!teamAccess.canManageTeam) return Response.json({ error: "Недостаточно прав для управления командой." }, { status: 403 });
 
   const { data: staff, error: staffError } = await auth.supabase.from("organization_staff")
-    .select("id, telegram_username, telegram_user_id")
+    .select("id, telegram_username, telegram_user_id, organization_access_roles(system_code)")
     .eq("id", id).eq("organization_id", organizationId).is("deleted_at", null).maybeSingle();
   if (staffError || !staff) return Response.json({ error: "Сотрудник не найден." }, { status: 404 });
+  const nestedRole = staff.organization_access_roles;
+  const staffRole = Array.isArray(nestedRole) ? nestedRole[0] : nestedRole;
+  if (staffRole?.system_code === "CO_OWNER" && !teamAccess.isPrimaryOwner) {
+    return Response.json({ error: "Создавать ссылку совладельца может только основной владелец." }, { status: 403 });
+  }
   if (!staff.telegram_username) return Response.json({ error: "Сначала укажите Telegram @тег." }, { status: 400 });
   if (staff.telegram_user_id) return Response.json({ error: "Telegram сотрудника уже привязан по ID." }, { status: 409 });
 

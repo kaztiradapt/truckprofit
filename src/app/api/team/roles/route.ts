@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { authenticatedTeamRequest, isOrganizationOwner, permissionCodes } from "@/server/team-access";
+import { authenticatedTeamRequest, getOrganizationTeamAccess, permissionCodes } from "@/server/team-access";
 
 const inputSchema = z.object({
   organizationId: z.uuid(),
@@ -13,8 +13,10 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return Response.json({ error: "Проверьте название и права роли." }, { status: 400 });
   const context = await authenticatedTeamRequest();
   if (!context) return Response.json({ error: "Требуется вход." }, { status: 401 });
-  if (!await isOrganizationOwner(context, parsed.data.organizationId)) {
-    return Response.json({ error: "Создавать роли может только владелец." }, { status: 403 });
+  const teamAccess = await getOrganizationTeamAccess(context, parsed.data.organizationId);
+  if (!teamAccess.canManageTeam) return Response.json({ error: "Недостаточно прав для управления ролями." }, { status: 403 });
+  if (["совладелец", "управляющий", "диспетчер", "наблюдатель"].includes(parsed.data.name.toLocaleLowerCase("ru-RU"))) {
+    return Response.json({ error: "Это название зарезервировано для системной роли." }, { status: 409 });
   }
 
   const permissions = Array.from(new Set(["VIEW_DASHBOARD", ...parsed.data.permissions]));
@@ -23,6 +25,7 @@ export async function POST(request: Request): Promise<Response> {
     name: parsed.data.name,
     permissions,
     is_system: false,
+    system_code: null,
     created_by: context.userId,
   }).select("id, name, permissions").single();
   if (error || !data) return Response.json({ error: "Роль с таким названием уже существует." }, { status: 409 });

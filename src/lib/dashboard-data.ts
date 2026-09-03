@@ -8,10 +8,12 @@ export type DashboardData = {
   organization: { id: string; name: string; baseCurrency: string };
   isPlatformAdmin: boolean;
   role: MembershipRole;
+  isPrimaryOwner: boolean;
   permissions: string[];
   accessRoleName: string;
+  accessRoleSystemCode: string | null;
   ownerTelegramLinked: boolean;
-  accessRoles: Array<{ id: string; name: string; permissions: string[]; isSystem: boolean }>;
+  accessRoles: Array<{ id: string; name: string; permissions: string[]; isSystem: boolean; systemCode: string | null }>;
   staff: Array<{
     id: string;
     displayName: string;
@@ -22,6 +24,7 @@ export type DashboardData = {
     accessRoleId: string | null;
     roleName: string;
     isOwner: boolean;
+    isCoOwner: boolean;
   }>;
   vehicles: Array<{ id: string; displayName: string; plateNumber: string; makeModel: string | null; fuelNorm: number | null; status: string }>;
   drivers: Array<{
@@ -181,7 +184,7 @@ type MembershipRow = {
   organization_id: string;
   role: MembershipRole;
   access_role_id: string | null;
-  organization_access_roles: { name: string; permissions: string[] } | { name: string; permissions: string[] }[] | null;
+  organization_access_roles: { name: string; permissions: string[]; system_code: string | null } | { name: string; permissions: string[]; system_code: string | null }[] | null;
   organizations: { name: string; base_currency: string } | { name: string; base_currency: string }[] | null;
 };
 
@@ -194,7 +197,7 @@ type StaffRow = {
   telegram_username: string | null;
   telegram_user_id: number | null;
   status: "INVITED" | "ACTIVE" | "SUSPENDED";
-  organization_access_roles: { name: string } | { name: string }[] | null;
+  organization_access_roles: { name: string; system_code: string | null } | { name: string; system_code: string | null }[] | null;
 };
 
 type PnlRow = {
@@ -294,7 +297,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
 
   const { data: membershipData, error: membershipError } = await supabase
     .from("organization_memberships")
-    .select("organization_id, role, access_role_id, organizations(name, base_currency), organization_access_roles(name, permissions)")
+    .select("organization_id, role, access_role_id, organizations(name, base_currency), organization_access_roles(name, permissions, system_code)")
     .eq("user_id", userId)
     .eq("status", "ACTIVE")
     .order("created_at", { ascending: true })
@@ -319,8 +322,8 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
     supabase.from("incomes").select("id, trip_id, customer_name, amount, currency, reporting_currency, reporting_amount_minor, fx_rate_to_reporting, expected_payment_at, payment_status, comment").eq("organization_id", membership.organization_id).neq("payment_status", "VOIDED").is("deleted_at", null).order("created_at", { ascending: false }).limit(500),
     supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
     supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()),
-    supabase.from("organization_access_roles").select("id, name, permissions, is_system").eq("organization_id", membership.organization_id).order("is_system", { ascending: false }).order("name"),
-    supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("created_at"),
+    supabase.from("organization_access_roles").select("id, name, permissions, is_system, system_code").eq("organization_id", membership.organization_id).order("is_system", { ascending: false }).order("name"),
+    supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name, system_code)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("created_at"),
     supabase.from("trip_location_points").select("id, trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at, event_type, note").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(500),
     supabase.from("vehicle_status_records").select("id, trip_id, status_code, load_state, location_text, recorded_at").eq("organization_id", membership.organization_id).not("trip_id", "is", null).order("recorded_at", { ascending: false }).limit(1000),
     supabase.from("support_tickets").select("id, ticket_number, category, priority, status, subject, description, steps_to_reproduce, contact, response_text, responded_at, attachment_filename, created_at, updated_at").eq("organization_id", membership.organization_id).order("created_at", { ascending: false }).limit(50),
@@ -405,10 +408,12 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
     organization: { id: membership.organization_id, name: organization.name, baseCurrency: organization.base_currency },
     isPlatformAdmin: !platformAdminResult.error && Boolean(platformAdminResult.data),
     role: membership.role,
+    isPrimaryOwner: membership.role === "OWNER",
     permissions,
     accessRoleName: membership.role === "OWNER" ? "Владелец" : accessRole?.name ?? membership.role,
+    accessRoleSystemCode: accessRole?.system_code ?? null,
     ownerTelegramLinked: profileResult.data?.telegram_user_id !== null && profileResult.data?.telegram_user_id !== undefined,
-    accessRoles: (accessRolesResult.data ?? []).map((role) => ({ id: role.id, name: role.name, permissions: role.permissions ?? [], isSystem: role.is_system })),
+    accessRoles: (accessRolesResult.data ?? []).map((role) => ({ id: role.id, name: role.name, permissions: role.permissions ?? [], isSystem: role.is_system, systemCode: role.system_code ?? null })),
     staff: ((staffResult.data ?? []) as unknown as StaffRow[]).map((person) => ({
       id: person.id,
       displayName: person.display_name,
@@ -423,6 +428,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
       accessRoleId: person.access_role_id,
       roleName: person.access_role_id ? asOne(person.organization_access_roles)?.name ?? "Сотрудник" : "Владелец",
       isOwner: person.access_role_id === null,
+      isCoOwner: asOne(person.organization_access_roles)?.system_code === "CO_OWNER",
     })),
     vehicles: (vehiclesResult.data ?? []).map((vehicle) => ({
       id: vehicle.id,
