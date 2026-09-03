@@ -104,6 +104,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
     { href: "/dashboard/operations", label: "Создание рейса", visible: canOperate, key: "operations" },
     { href: "/dashboard/help", label: "Инструкция", visible: true, key: "help" },
     { href: "/dashboard/support", label: "Поддержка", visible: true, key: "support" },
+    { href: "/admin", label: "Beta-доступ", visible: data.isPlatformAdmin, key: "admin" },
   ].filter((item) => item.visible);
 
   return (

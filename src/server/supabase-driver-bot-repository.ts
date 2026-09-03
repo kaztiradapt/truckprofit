@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type {
   ActiveTrip,
+  ClaimedBetaInvitation,
   DriverBotRepository,
   DriverIdentity,
   OwnerDriverSummary,
@@ -39,6 +40,11 @@ type ClaimedOwnerInvitation = {
   owner_name: string;
   organization_name: string;
   base_currency: string;
+};
+
+type RawClaimedBetaInvitation = {
+  display_name: string | null;
+  expires_at: string;
 };
 
 type RawStaff = {
@@ -186,6 +192,20 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
       driverId: invitation.driver_id,
       driverName: invitation.driver_name,
       baseCurrency: invitation.base_currency,
+    };
+  }
+
+  async claimBetaInvitation(invitationCode: string, telegramUserId: number, telegramUsername: string | null): Promise<ClaimedBetaInvitation> {
+    const { data, error } = await this.client.rpc("claim_beta_telegram_invite", {
+      p_invitation_code: invitationCode,
+      p_telegram_user_id: telegramUserId,
+      p_telegram_username: telegramUsername,
+    }).single();
+    throwOnError(error);
+    const invitation = data as RawClaimedBetaInvitation;
+    return {
+      displayName: invitation.display_name,
+      expiresAt: invitation.expires_at,
     };
   }
 

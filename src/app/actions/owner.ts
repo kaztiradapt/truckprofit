@@ -77,14 +77,18 @@ export async function createOrganization(formData: FormData): Promise<void> {
   if (!parsed.success) redirect("/onboarding?error=Проверьте%20название%2C%20код%20и%20валюту.");
 
   const { supabase } = await getAuthenticatedUser();
-  const { error } = await supabase.rpc("bootstrap_organization_with_owner", {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const invitationCode = String(userData.user?.user_metadata?.beta_invite_token ?? "").trim();
+  if (userError || !invitationCode) redirect("/onboarding?error=Для%20создания%20компании%20нужно%20действующее%20beta-приглашение.");
+  const { error } = await supabase.rpc("bootstrap_beta_organization_with_owner", {
+    p_invitation_code: invitationCode,
     input_name: parsed.data.name,
     input_slug: parsed.data.slug,
     input_currency: parsed.data.currency,
     input_timezone: "Asia/Qostanay",
     input_create_owner_driver: parsed.data.ownerDriver,
   });
-  if (error) redirect("/onboarding?error=Не%20удалось%20создать%20организацию.%20Возможно%2C%20код%20уже%20занят.");
+  if (error) redirect("/onboarding?error=Не%20удалось%20создать%20организацию.%20Проверьте%20приглашение%20и%20короткий%20код.");
   revalidatePath("/dashboard", "layout");
   redirect("/dashboard");
 }

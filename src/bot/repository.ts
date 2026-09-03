@@ -121,6 +121,11 @@ export type PreliminaryCompensation = {
   status: "PRELIMINARY" | "APPROVED";
 };
 
+export type ClaimedBetaInvitation = {
+  displayName: string | null;
+  expiresAt: string;
+};
+
 export type ReceiptUpload = {
   expenseId: string;
   organizationId: string;
@@ -137,6 +142,7 @@ export interface DriverBotRepository {
   reserveIncomingUpdate(updateId: number): Promise<boolean>;
   finishIncomingUpdate(updateId: number, outcome: "PROCESSED" | "FAILED", safeErrorSummary?: string): Promise<void>;
   claimInvitation(invitationCode: string, telegramUserId: number): Promise<DriverIdentity>;
+  claimBetaInvitation(invitationCode: string, telegramUserId: number, telegramUsername: string | null): Promise<ClaimedBetaInvitation>;
   claimOwnerInvitation(invitationCode: string, telegramUserId: number): Promise<OwnerIdentity>;
   claimStaffInvitation(invitationCode: string, telegramUserId: number, telegramUsername: string | null): Promise<StaffIdentity>;
   syncTelegramUsername(telegramUserId: number, telegramUsername: string | null): Promise<void>;

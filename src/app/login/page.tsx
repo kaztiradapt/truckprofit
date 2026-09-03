@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </form>
         <p className="muted"><a href="/forgot-password">Забыли пароль?</a></p>
         <p className="muted">Не получили письмо для подтверждения? <a href="/resend-confirmation">Отправить повторно</a></p>
-        <p className="muted">Первый раз здесь? <a href="/register">Создать аккаунт собственника</a></p>
+        <p className="muted">Новые компании подключаются только по beta-приглашению.</p>
       </section>
     </main>
   );

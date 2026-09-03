@@ -196,6 +196,11 @@ function routePointUrl(latitude: number, longitude: number): string {
   return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`;
 }
 
+function betaRegistrationUrl(code: string): string {
+  const origin = MINI_APP_URL.replace(/\/dashboard\/?$/, "");
+  return `${origin}/register?invite=${encodeURIComponent(code)}`;
+}
+
 function tripMenu(trip: ActiveTrip, ownerAvailable = false): InlineKeyboard {
   const keyboard = new InlineKeyboard()
     .text("⏳ Ожидаю погрузку", "trip-status:WAITING_LOADING")
@@ -565,7 +570,16 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     }
     if (code) {
       try {
-        if (code.startsWith("owner_")) {
+        if (code.startsWith("beta_")) {
+          const invitation = await repository.claimBetaInvitation(code, userId, context.from?.username ?? null);
+          const name = invitation.displayName ? `, ${invitation.displayName}` : "";
+          await replaceMenu(
+            context,
+            `Telegram подтверждён${name}. Теперь создайте защищённый вход и компанию TruckProfit. Ссылка одноразовая.`,
+            new InlineKeyboard().url("Создать кабинет", betaRegistrationUrl(code)),
+          );
+          await ensureChatMenuButton(context, "COMMANDS");
+        } else if (code.startsWith("owner_")) {
           const owner = await repository.claimOwnerInvitation(code, userId);
           await showOwnerMenu(context, owner, `Готово, ${owner.ownerName}. Кабинет владельца подключён к Telegram.`);
         } else if (code.startsWith("staff_")) {
@@ -581,7 +595,10 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
           }
         }
       } catch {
-        await replaceMenu(context, "Не удалось использовать приглашение. Возможно, оно истекло, уже использовано другим аккаунтом или профиль уже связан. Создайте новую ссылку в кабинете.", accessHelpMenu());
+        const message = code.startsWith("beta_")
+          ? "Не удалось подтвердить beta-приглашение. Откройте ссылку из Telegram-аккаунта с тем @тегом, на который она выдана. Если тег изменился или ссылка истекла, запросите новую."
+          : "Не удалось использовать приглашение. Возможно, оно истекло, уже использовано другим аккаунтом или профиль уже связан. Создайте новую ссылку в кабинете.";
+        await replaceMenu(context, message, accessHelpMenu());
       }
       return;
     }

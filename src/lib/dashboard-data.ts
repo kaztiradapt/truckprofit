@@ -6,6 +6,7 @@ export type MembershipRole = "OWNER" | "MANAGER" | "DRIVER";
 
 export type DashboardData = {
   organization: { id: string; name: string; baseCurrency: string };
+  isPlatformAdmin: boolean;
   role: MembershipRole;
   permissions: string[];
   accessRoleName: string;
@@ -308,7 +309,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
   const accessRole = asOne(membership.organization_access_roles);
   const permissions = membership.role === "OWNER" ? [...permissionCodes] : accessRole?.permissions ?? [];
 
-  const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, incomesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult, vehicleStatusesResult, supportTicketsResult] = await Promise.all([
+  const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, incomesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult, vehicleStatusesResult, supportTicketsResult, platformAdminResult] = await Promise.all([
     supabase.from("profiles").select("telegram_user_id, telegram_username").eq("id", userId).maybeSingle(),
     supabase.from("vehicles").select("id, display_name, plate_number, make_model, fuel_norm_l_per_100km, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id, assigned_vehicle_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
@@ -323,6 +324,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
     supabase.from("trip_location_points").select("id, trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at, event_type, note").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(500),
     supabase.from("vehicle_status_records").select("id, trip_id, status_code, load_state, location_text, recorded_at").eq("organization_id", membership.organization_id).not("trip_id", "is", null).order("recorded_at", { ascending: false }).limit(1000),
     supabase.from("support_tickets").select("id, ticket_number, category, priority, status, subject, description, steps_to_reproduce, contact, response_text, responded_at, attachment_filename, created_at, updated_at").eq("organization_id", membership.organization_id).order("created_at", { ascending: false }).limit(50),
+    supabase.from("platform_admins").select("user_id").eq("user_id", userId).maybeSingle(),
   ]);
   for (const result of [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, incomesResult, accessRolesResult, staffResult]) {
     if (result.error) throw new Error(result.error.message);
@@ -331,7 +333,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
   // The web release may reach Vercel a few moments before the additive SQL migration.
   // Keep the current owner dashboard readable during that short window; any other
   // error still surfaces instead of being hidden.
-  for (const result of [recentExpensesResult, pnlResult, invitesResult, locationsResult, vehicleStatusesResult, supportTicketsResult]) {
+  for (const result of [recentExpensesResult, pnlResult, invitesResult, locationsResult, vehicleStatusesResult, supportTicketsResult, platformAdminResult]) {
     if (result.error && !["42P01", "42703"].includes(result.error.code ?? "")) throw new Error(result.error.message);
   }
 
@@ -401,6 +403,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
 
   return {
     organization: { id: membership.organization_id, name: organization.name, baseCurrency: organization.base_currency },
+    isPlatformAdmin: !platformAdminResult.error && Boolean(platformAdminResult.data),
     role: membership.role,
     permissions,
     accessRoleName: membership.role === "OWNER" ? "Владелец" : accessRole?.name ?? membership.role,

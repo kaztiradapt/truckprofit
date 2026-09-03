@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { reserveBetaInvite, validateBetaInviteForSignup } from "@/server/beta-access";
 
 const credentialsSchema = z.object({
   email: z.email("Введите корректный email").trim().toLowerCase(),
@@ -19,8 +21,9 @@ function loginError(message: string): never {
   redirect(`/login?error=${encodeURIComponent(message)}`);
 }
 
-function registerError(message: string): never {
-  redirect(`/register?error=${encodeURIComponent(message)}`);
+function registerError(message: string, inviteCode = ""): never {
+  const invite = inviteCode ? `&invite=${encodeURIComponent(inviteCode)}` : "";
+  redirect(`/register?error=${encodeURIComponent(message)}${invite}`);
 }
 
 function resendConfirmationPage(email: string, message: string): never {
@@ -74,10 +77,14 @@ export async function signIn(formData: FormData): Promise<void> {
 }
 
 export async function signUp(formData: FormData): Promise<void> {
+  const inviteCode = String(formData.get("invite_code") ?? "").trim();
   const parsed = credentialsSchema.safeParse({ email: formData.get("email"), password: formData.get("password") });
   const displayName = String(formData.get("display_name") ?? "").trim();
   if (!parsed.success || displayName.length < 2 || displayName.length > 160) {
-    registerError("Укажите имя, корректный email и пароль от 12 символов.");
+    registerError("Укажите имя, корректный email и пароль от 12 символов.", inviteCode);
+  }
+  if (!await validateBetaInviteForSignup(inviteCode, parsed.data.email)) {
+    registerError("Приглашение недействительно, уже использовано или выдано на другой email.", inviteCode);
   }
 
   const origin = (await headers()).get("origin");
@@ -85,7 +92,7 @@ export async function signUp(formData: FormData): Promise<void> {
   const { data, error } = await supabase.auth.signUp({
     ...parsed.data,
     options: {
-      data: { full_name: displayName },
+      data: { full_name: displayName, beta_invite_token: inviteCode },
       emailRedirectTo: confirmationRedirectTo(origin),
     },
   });
@@ -93,7 +100,16 @@ export async function signUp(formData: FormData): Promise<void> {
     if (isExistingUserError(error.message)) {
       resendConfirmationPage(parsed.data.email, "Аккаунт уже создан. Если email ещё не подтверждён, отправьте новое письмо.");
     }
-    registerError("Не удалось создать аккаунт. Попробуйте ещё раз.");
+    registerError("Не удалось создать аккаунт. Попробуйте ещё раз.", inviteCode);
+  }
+
+  if (Array.isArray(data.user?.identities) && data.user.identities.length === 0) {
+    registerError("Аккаунт с таким email уже существует. Войдите или попросите новое приглашение на другой email.", inviteCode);
+  }
+
+  if (!data.user || !await reserveBetaInvite(inviteCode, data.user.id, parsed.data.email)) {
+    if (data.user) await createAdminClient().auth.admin.deleteUser(data.user.id).catch(() => undefined);
+    registerError("Аккаунт создан, но приглашение уже занято. Обратитесь к администратору беты.", inviteCode);
   }
 
   if (!data.session) {

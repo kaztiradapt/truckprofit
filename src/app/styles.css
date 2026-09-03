@@ -751,3 +751,64 @@ td { font-size: 14px; }
 .telegram-mini-app .app-shell { min-height: 100dvh; }
 .telegram-mini-app .sidebar { padding-top: max(10px, env(safe-area-inset-top)); }
 .telegram-mini-app .content { padding-bottom: max(42px, calc(env(safe-area-inset-bottom) + 18px)); background: var(--paper); }
+
+.beta-admin-page { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 38px 0 64px; }
+.beta-admin-topbar { margin-bottom: 22px; display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.beta-admin-topbar h1 { margin: 4px 0 5px; font-size: clamp(31px, 4vw, 48px); letter-spacing: -.045em; }
+.beta-admin-topbar p:last-child { margin: 0; color: var(--muted); }
+.secondary-link { min-height: 42px; padding: 10px 14px; border: 1px solid #c5d2cc; border-radius: 10px; background: var(--card); color: var(--green); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.secondary-link:hover { border-color: var(--green); background: var(--green-soft); }
+.beta-admin-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(290px, .75fr); gap: 16px; }
+.beta-invite-form, .beta-flow-card, .beta-result, .beta-invite-list { padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: 0 8px 30px #22352b08; }
+.beta-invite-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 15px; }
+.beta-section-heading { grid-column: 1 / -1; display: flex; align-items: start; justify-content: space-between; gap: 14px; }
+.beta-section-heading h2, .beta-flow-card h2 { margin: 4px 0 0; font-size: 22px; letter-spacing: -.03em; }
+.beta-section-heading > span { padding: 6px 9px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.beta-invite-form > label { min-width: 0; display: grid; gap: 6px; color: #3d4c46; font-size: 13px; font-weight: 750; }
+.beta-invite-form > label small { color: var(--muted); font-weight: 500; }
+.beta-invite-form input, .beta-invite-form textarea, .beta-result input { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #cdd6d1; border-radius: 9px; background: #fbfcfa; color: var(--ink); }
+.beta-invite-form textarea { min-height: 86px; resize: vertical; }
+.beta-invite-form input:focus, .beta-invite-form textarea:focus { border-color: #3a7454; box-shadow: 0 0 0 3px #dceddf; outline: 0; }
+.beta-invite-form > label:nth-of-type(3), .beta-invite-form > label:nth-of-type(4), .beta-invite-form > .form-error, .beta-invite-form > button { grid-column: 1 / -1; }
+.beta-invite-form > button, .beta-result button { min-height: 44px; padding: 10px 15px; border: 0; border-radius: 9px; background: var(--green); color: #fff; font-weight: 800; }
+.beta-invite-form > button:disabled { cursor: wait; opacity: .65; }
+.beta-type-choice { grid-column: 1 / -1; margin: 0; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.beta-type-choice legend { width: 100%; margin-bottom: 6px; color: #3d4c46; font-size: 13px; font-weight: 750; }
+.beta-type-choice label { padding: 10px 12px; border: 1px solid #cdd8d2; border-radius: 9px; background: #fbfcfa; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 750; cursor: pointer; }
+.beta-type-choice input { accent-color: var(--green); }
+.beta-flow-card { background: #173e31; border-color: #173e31; color: #fff; }
+.beta-flow-card .eyebrow, .beta-flow-card p { color: #bad0c7; }
+.beta-flow-card ol { margin: 22px 0; padding-left: 21px; display: grid; gap: 15px; }
+.beta-flow-card li { padding-left: 5px; line-height: 1.5; }
+.beta-flow-card p:last-child { margin: 0; font-size: 12px; line-height: 1.55; }
+.beta-result { margin-top: 16px; border-color: #bdd9cb; background: var(--green-soft); display: grid; gap: 7px; }
+.beta-result > b { color: var(--green); font-size: 17px; }
+.beta-result > span { color: #486158; font-size: 12px; }
+.beta-result > div { margin-top: 5px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.beta-invite-list { margin-top: 16px; }
+.beta-table-wrap { margin-top: 18px; overflow-x: auto; }
+.beta-invite-list table { width: 100%; border-collapse: collapse; }
+.beta-invite-list th { padding: 8px 10px; color: var(--muted); font-size: 10px; text-align: left; text-transform: uppercase; letter-spacing: .05em; }
+.beta-invite-list td { min-width: 130px; padding: 13px 10px; border-top: 1px solid var(--line); vertical-align: middle; font-size: 12px; }
+.beta-invite-list td:first-child { min-width: 195px; }
+.beta-invite-list td:last-child { min-width: 88px; text-align: right; }
+.beta-invite-list td > b, .beta-invite-list td > small { display: block; }
+.beta-invite-list td > small { margin-top: 3px; color: var(--muted); }
+.beta-invite-list td > span { overflow-wrap: anywhere; }
+.beta-status { width: fit-content; padding: 5px 8px; border-radius: 999px; background: #eef2f0; color: #58665f; display: inline-flex; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.beta-status.claimed, .beta-status.reserved { background: #fff4dd; color: #93600f; }
+.beta-status.used { background: var(--green-soft); color: var(--green); }
+.beta-status.revoked, .beta-status.expired { background: #f7ecea; color: #9b443b; }
+.beta-empty { margin: 18px 0 0; color: var(--muted); }
+
+@media (max-width: 780px) {
+  .beta-admin-page { width: min(100% - 24px, 1180px); padding: max(18px, env(safe-area-inset-top)) 0 max(36px, env(safe-area-inset-bottom)); }
+  .beta-admin-topbar { align-items: start; flex-direction: column; gap: 13px; }
+  .beta-admin-topbar .secondary-link { width: 100%; }
+  .beta-admin-grid { grid-template-columns: 1fr; }
+  .beta-invite-form, .beta-flow-card, .beta-result, .beta-invite-list { padding: 16px; border-radius: 13px; box-shadow: none; }
+  .beta-invite-form { grid-template-columns: 1fr; }
+  .beta-invite-form > label, .beta-invite-form > label:nth-of-type(3), .beta-invite-form > label:nth-of-type(4) { grid-column: 1; }
+  .beta-result > div { grid-template-columns: 1fr; }
+  .beta-table-wrap { margin-right: -16px; padding-right: 16px; }
+}
