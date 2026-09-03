@@ -10,7 +10,6 @@ import { DashboardRefreshButton } from "./dashboard-refresh-button";
 import { DeviceDateTime } from "./device-date-time";
 import { DriverList } from "./driver-list";
 import { DriverReports } from "./driver-reports";
-import { IncomeForm } from "./income-form";
 import { OwnerTelegramConnectButton } from "./owner-telegram-connect-button";
 import { ReceiptViewerButton } from "./receipt-viewer-button";
 import { TelegramMenuButton } from "./telegram-menu-button";
@@ -268,10 +267,9 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
           <div className="start-intro"><p className="eyebrow">End-to-end контур</p><h2>Провести настоящий рейс</h2><p>Организация уже подключена. Пройдите шаги по порядку — данные сохраняются в защищённом контуре компании.</p></div>
           <div className="workbench">
             <div className="workbench-status"><span className="ready" />Supabase, Telegram и расчётный слой подключены</div>
-            {canManageTrips ? <TripCreateForm organizationId={data.organization.id} vehicles={data.vehicles} drivers={data.drivers} today={today} /> : null}
-            {canManageFinance ? <IncomeForm organizationId={data.organization.id} baseCurrency={data.organization.baseCurrency} trips={data.trips.map(({ id, title }) => ({ id, title }))} /> : null}
+            {canManageTrips ? <TripCreateForm organizationId={data.organization.id} vehicles={data.vehicles} drivers={data.drivers} baseCurrency={data.organization.baseCurrency} canManageFinance={canManageFinance} today={today} /> : null}
             {canManageTrips || canManageFinance ? <div className="flow-card flow-card-closing">
-              <div className="flow-card-heading"><span className="flow-step">3</span><span><b>Закрытие и P&amp;L</b><small>Завершите рейс и рассчитайте итог</small></span></div>
+              <div className="flow-card-heading"><span className="flow-step">2</span><span><b>Закрытие и P&amp;L</b><small>Завершите рейс и рассчитайте итог</small></span></div>
               <div className="closing-actions">
                 {canManageTrips ? <form action={completeTrip} className="closing-action"><input type="hidden" name="organization_id" value={data.organization.id} /><label className="flow-field"><span>Завершить рейс</span><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "ACTIVE")}><option value="">Выберите активный рейс</option>{data.trips.filter((item) => item.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><button type="submit" disabled={!data.trips.some((item) => item.status === "ACTIVE")}>Закрыть</button></form> : null}
                 {canManageFinance ? <form action={recalculateTripPnl} className="closing-action"><input type="hidden" name="organization_id" value={data.organization.id} /><label className="flow-field"><span>Рассчитать результат</span><select name="trip_id" required disabled={!data.trips.some((item) => item.status === "COMPLETED")}><option value="">Выберите закрытый рейс</option>{data.trips.filter((item) => item.status === "COMPLETED").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><button type="submit" disabled={!data.trips.some((item) => item.status === "COMPLETED")}>Рассчитать P&amp;L</button></form> : null}
@@ -290,7 +288,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
           <div className="faq-list">
             <details><summary>Почему бот не видит мой профиль?</summary><p>Telegram ещё не привязан или открыта чужая/просроченная ссылка. Создайте новую ссылку в карточке владельца или водителя и нажмите START именно в нужном аккаунте Telegram.</p></details>
             <details><summary>Можно ли владельцу самому быть водителем?</summary><p>Да. Нажмите «Я владелец-водитель» в разделе команды. Один Telegram получит два режима, между ними можно переключаться в меню бота.</p></details>
-            <details><summary>Где посмотреть доход и расходы конкретного рейса?</summary><p>Откройте раздел «Рейсы» и нажмите «Подробнее». Доход, указанный на шаге «Доход» при оформлении рейса, показывается вместе с заказчиком, статусом и ожидаемой датой оплаты. Ниже отображаются все расходы этого рейса.</p></details>
+            <details><summary>Где посмотреть доход и расходы конкретного рейса?</summary><p>Откройте раздел «Рейсы» и нажмите «Подробнее». Доход, указанный прямо при создании рейса, показывается вместе с заказчиком, валютой, статусом и ожидаемой датой оплаты. Ниже отображаются все расходы этого рейса.</p></details>
             <details><summary>Как учитывается расход?</summary><p>Сразу после сохранения водителем. Запись видна в раскрытой карточке активного рейса и в общем разделе «Расходы»: категория, водитель, дата, источник, комментарий, сумма и валюта. Если водитель приложил фотографию или PDF чека, кнопка «Посмотреть чек» откроет его прямо в Mini App. Суммы разных валют не смешиваются. Дополнительное подтверждение владельца не требуется.</p></details>
             <details><summary>Как работает основная валюта компании?</summary><p>При создании компании выберите валюту управленческого учёта: KZT, RUB, USD, CNY или UZS. Если доход записан в другой валюте, кабинет попросит курс именно к основной валюте компании. Например, для рублёвой компании: «1 USD = сколько RUB». Доход и P&amp;L будут пересчитаны в RUB.</p></details>
             <details><summary>Откуда берётся километраж рейса?</summary><p>После выбора погрузки и выгрузки кабинет строит автомобильный маршрут и подставляет его расстояние. Перед созданием рейса проверьте значение: при необходимости его можно заменить плановым километражем вручную.</p></details>

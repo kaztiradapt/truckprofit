@@ -150,6 +150,7 @@ export async function createTrip(formData: FormData): Promise<void> {
   if (typeof routeGeometryValue === "string" && routeGeometryValue.trim() && !routeGeometry) {
     dashboardError("Не удалось проверить выбранную линию маршрута.");
   }
+  const includesIncome = formData.has("income_amount");
   const parsed = z.object({
     organizationId: uuid,
     vehicleId: uuid,
@@ -166,14 +167,28 @@ export async function createTrip(formData: FormData): Promise<void> {
     distanceKm: z.preprocess((value) => Number(String(value ?? "").replace(",", ".")), z.number().positive().finite().max(100_000)),
     loadState: z.enum(["LOADED", "EMPTY", "UNKNOWN"]),
     startedAt: z.string().date(),
+    customerName: includesIncome ? text(2) : z.string().optional(),
+    incomeAmount: includesIncome ? money : z.number().optional(),
+    incomeCurrency: includesIncome ? z.enum(supportedCurrencies) : z.enum(supportedCurrencies).optional(),
+    fxRate: z.coerce.number().positive().finite().max(1_000_000_000).optional(),
+    expectedPaymentAt: z.string().trim(),
+    incomeComment: z.string().trim().max(1000),
   }).safeParse({
     organizationId: formData.get("organization_id"), vehicleId: formData.get("vehicle_id"), driverId: formData.get("driver_id"), title: formData.get("title"),
     originCity: formData.get("origin_city"), destinationCity: formData.get("destination_city"), originAddress: formData.get("origin_address"), destinationAddress: formData.get("destination_address"),
     originLatitude: formData.get("origin_latitude"), originLongitude: formData.get("origin_longitude"), destinationLatitude: formData.get("destination_latitude"), destinationLongitude: formData.get("destination_longitude"),
     distanceKm: formData.get("distance_km"),
     loadState: formData.get("load_state"), startedAt: formData.get("started_at"),
+    customerName: includesIncome ? formData.get("customer_name") : undefined,
+    incomeAmount: includesIncome ? String(formData.get("income_amount") ?? "").replace(",", ".") : undefined,
+    incomeCurrency: includesIncome ? formData.get("income_currency") : undefined,
+    fxRate: formData.get("fx_rate") ? String(formData.get("fx_rate")).replace(",", ".") : undefined,
+    expectedPaymentAt: String(formData.get("expected_payment_at") ?? ""),
+    incomeComment: String(formData.get("income_comment") ?? ""),
   });
-  if (!parsed.success) dashboardError("Проверьте данные рейса.");
+  if (!parsed.success || (parsed.data.expectedPaymentAt && !z.string().date().safeParse(parsed.data.expectedPaymentAt).success)) {
+    dashboardError("Проверьте данные рейса и его доход.");
+  }
   if ((parsed.data.originLatitude === null) !== (parsed.data.originLongitude === null)
     || (parsed.data.destinationLatitude === null) !== (parsed.data.destinationLongitude === null)) {
     dashboardError("Для геометки нужны и широта, и долгота.");
@@ -182,7 +197,21 @@ export async function createTrip(formData: FormData): Promise<void> {
   if (driverId && !driverId.success) dashboardError("Выберите водителя из списка.");
 
   const supabase = await requirePermission(parsed.data.organizationId, "MANAGE_TRIPS");
-  const { data: tripId, error } = await supabase.rpc("create_trip_with_first_leg", {
+  let baseCurrency: string | null = null;
+  if (includesIncome) {
+    await requirePermission(parsed.data.organizationId, "MANAGE_FINANCE");
+    const { data: organization, error: organizationError } = await supabase
+      .from("organizations")
+      .select("base_currency")
+      .eq("id", parsed.data.organizationId)
+      .single();
+    if (organizationError || !organization) dashboardError("Не удалось определить базовую валюту компании.");
+    baseCurrency = organization.base_currency;
+    if (parsed.data.incomeCurrency !== baseCurrency && !parsed.data.fxRate) {
+      dashboardError(`Для ${parsed.data.incomeCurrency} укажите курс к ${baseCurrency}.`);
+    }
+  }
+  const tripPayload = {
     p_organization_id: parsed.data.organizationId,
     p_vehicle_id: parsed.data.vehicleId,
     p_driver_id: driverId?.data ?? null,
@@ -198,8 +227,20 @@ export async function createTrip(formData: FormData): Promise<void> {
     p_distance_km: parsed.data.distanceKm,
     p_load_state: parsed.data.loadState,
     p_started_at: `${parsed.data.startedAt}T00:00:00.000Z`,
-  });
-  if (error) dashboardError("Не удалось создать рейс. Проверьте машину, водителя и точки маршрута.");
+  };
+  const tripResult = includesIncome
+    ? await supabase.rpc("create_trip_with_first_leg_and_income", {
+      ...tripPayload,
+      p_customer_name: parsed.data.customerName,
+      p_income_amount: parsed.data.incomeAmount,
+      p_income_currency: parsed.data.incomeCurrency,
+      p_expected_payment_at: parsed.data.expectedPaymentAt || null,
+      p_income_comment: parsed.data.incomeComment || null,
+      p_fx_rate_to_reporting: parsed.data.incomeCurrency === baseCurrency ? 1 : parsed.data.fxRate,
+    })
+    : await supabase.rpc("create_trip_with_first_leg", tripPayload);
+  const { data: tripId, error } = tripResult;
+  if (error) dashboardError("Не удалось создать рейс с доходом. Проверьте маршрут, сумму, валюту и курс.");
   if (routeGeometry && tripId) {
     const { error: routeGeometryError } = await supabase.rpc("set_trip_route_geometry", {
       p_organization_id: parsed.data.organizationId,

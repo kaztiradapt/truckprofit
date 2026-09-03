@@ -79,7 +79,7 @@ function TripIncomePanel({ trip, incomes, baseCurrency, canViewFinance }: {
           {income.currency !== income.reportingCurrency ? <small>В учёте: {formatMinor(income.reportingAmountMinor, income.reportingCurrency)} · курс {income.fxRateToReporting.toLocaleString("ru-RU")}</small> : null}
         </span>
       </li>)}
-    </ul> : <p className="trip-expense-empty">Доход для этого рейса ещё не указан. Его можно добавить на шаге «Доход» в разделе «Создание рейса».</p>}
+    </ul> : <p className="trip-expense-empty">Доход для этого рейса не указан. В новых рейсах он сохраняется одновременно с созданием рейса.</p>}
   </section>;
 }
 

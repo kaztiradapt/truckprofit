@@ -4,6 +4,7 @@ import type { CircleMarker, Map as LeafletMap, Polyline } from "leaflet";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { createTrip } from "@/app/actions/owner";
+import { currencyLabels, isSupportedCurrency, supportedCurrencies, type SupportedCurrency } from "@/domain/currencies";
 
 type RoutePoint = { latitude: number; longitude: number };
 type PointKind = "origin" | "destination";
@@ -19,10 +20,12 @@ type TripCreateFormProps = {
   organizationId: string;
   vehicles: Array<{ id: string; displayName: string; plateNumber: string; status: string }>;
   drivers: Array<{ id: string; displayName: string; status: string; assignedVehicleId: string | null }>;
+  baseCurrency: string;
+  canManageFinance: boolean;
   today: string;
 };
 
-export function TripCreateForm({ organizationId, vehicles, drivers, today }: TripCreateFormProps) {
+export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency, canManageFinance, today }: TripCreateFormProps) {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<LeafletMap | null>(null);
   const leafletModule = useRef<typeof import("leaflet") | null>(null);
@@ -51,6 +54,9 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
   const [routingProvider, setRoutingProvider] = useState<"google" | "osrm" | "">("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
+  const baseCurrencyCode: SupportedCurrency = isSupportedCurrency(baseCurrency) ? baseCurrency : "KZT";
+  const [incomeCurrency, setIncomeCurrency] = useState<SupportedCurrency>(baseCurrencyCode);
+  const needsFxRate = incomeCurrency !== baseCurrencyCode;
   const activeVehicles = vehicles.filter((vehicle) => vehicle.status === "ACTIVE");
   const selectedDriver = drivers.find((driver) => driver.id === driverId) ?? null;
   const selectedRoute = routeAlternatives.find((route) => route.id === selectedRouteId) ?? null;
@@ -254,6 +260,17 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
         <label className="flow-field"><span>Тип пробега</span><select name="load_state" defaultValue="LOADED"><option value="LOADED">С грузом</option><option value="EMPTY">Порожний</option><option value="UNKNOWN">Неизвестно</option></select></label>
         <label className="flow-field"><span>Плановый километраж</span><input name="distance_km" type="number" inputMode="decimal" min="0.1" max="100000" step="0.1" value={distanceKm} onChange={(event) => setDistanceKm(event.target.value)} placeholder="Подставится по маршруту" required /></label>
         <label className="flow-field"><span>Дата старта</span><input name="started_at" type="date" defaultValue={today} required /></label>
+        {canManageFinance ? <fieldset className="trip-income-section">
+          <legend>Доход рейса <small>вносится вместе с рейсом · учёт в {baseCurrencyCode}</small></legend>
+          <div className="trip-income-grid">
+            <label className="flow-field"><span>Заказчик</span><input name="customer_name" placeholder="Например: ТОО Логистика" required /></label>
+            <label className="flow-field"><span>Сумма дохода</span><input name="income_amount" inputMode="decimal" placeholder="0" required /></label>
+            <label className="flow-field"><span>Валюта</span><select name="income_currency" value={incomeCurrency} onChange={(event) => setIncomeCurrency(event.target.value as SupportedCurrency)}>{supportedCurrencies.map((item) => <option key={item} value={item}>{currencyLabels[item]}</option>)}</select></label>
+            <label className="flow-field"><span>Ожидаемая оплата</span><input name="expected_payment_at" type="date" /></label>
+            {needsFxRate ? <label className="flow-field flow-field-wide fx-rate-field"><span>Курс к {baseCurrencyCode}</span><input name="fx_rate" inputMode="decimal" placeholder={`1 ${incomeCurrency} = сколько ${baseCurrencyCode}`} required /><small>Курс на дату договорённости с заказчиком.</small></label> : <input type="hidden" name="fx_rate" value="1" />}
+            <label className="flow-field flow-field-wide"><span>Комментарий к оплате</span><input name="income_comment" placeholder="Необязательно" /></label>
+          </div>
+        </fieldset> : <p className="trip-finance-access-note">Доход добавляет сотрудник с правом «Финансы». Рейс будет создан без финансовых данных.</p>}
         <div className="route-map-field flow-field-wide">
           <span>Точные точки на карте <small>необязательно</small></span>
           <div className="route-map-controls">
@@ -285,7 +302,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, today }: Tri
           <small>Выберите тип точки и нажмите нужное место на карте. После двух точек варианты маршрута построятся автоматически.</small>
         </div>
       </div>
-      <div className="flow-card-action"><button type="submit" disabled={!activeVehicles.length}>Создать рейс</button></div>
+      <div className="flow-card-action"><button type="submit" disabled={!activeVehicles.length}>Создать рейс{canManageFinance ? " с доходом" : ""}</button></div>
     </form>
   );
 }
