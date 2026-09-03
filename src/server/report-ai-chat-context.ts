@@ -2,6 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { aggregateManagementReport, type ExpenseBehavior, type ManagementReportExpense, type ManagementReportTrip, type ReportExpenseGroup } from "@/domain/reports/management-report";
+
 type AiChatFilters = {
   dateFrom?: string;
   dateTo?: string;
@@ -21,24 +23,19 @@ type TripRow = {
   vehicles: RelatedName | RelatedName[] | null;
   drivers: RelatedName | RelatedName[] | null;
 };
-type PnlRow = {
-  trip_id: string;
-  revenue_minor: number | string;
-  direct_expenses_minor: number | string;
-  driver_compensation_minor: number | string;
-  estimated_tax_minor: number | string;
-  total_expenses_minor: number | string;
-  management_profit_minor: number | string;
-  total_km: number | string;
-  loaded_km: number | string;
-  empty_km: number | string;
-};
+type PnlRow = { trip_id: string; driver_compensation_minor: number | string; total_km: number | string; loaded_km: number | string; empty_km: number | string };
+type LegRow = { trip_id: string; distance_km: number | string | null; load_state: string };
+type IncomeRow = { trip_id: string; reporting_amount_minor: number | string };
 type ExpenseRow = {
+  trip_id: string | null;
   reporting_amount_minor: number | string;
   quantity: number | string | null;
   unit: string | null;
-  expense_categories: { display_name: string; economic_group: string } | Array<{ display_name: string; economic_group: string }> | null;
+  cost_behavior: ExpenseBehavior;
+  include_in_normalized_cost: boolean;
+  expense_categories: { display_name: string; economic_group: ReportExpenseGroup } | Array<{ display_name: string; economic_group: ReportExpenseGroup }> | null;
 };
+type TripFact = ManagementReportTrip & { row: TripRow };
 
 function asOne<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
@@ -53,51 +50,27 @@ function rounded(value: number, digits = 1): number {
   return Math.round(value * scale) / scale;
 }
 
-function emptyTotals() {
-  return {
-    trips: 0,
-    revenueMinor: 0,
-    directExpensesMinor: 0,
-    driverCompensationMinor: 0,
-    estimatedTaxMinor: 0,
-    totalExpensesMinor: 0,
-    profitMinor: 0,
-    totalKm: 0,
-    loadedKm: 0,
-    emptyKm: 0,
-  };
-}
-
-function addPnl(target: ReturnType<typeof emptyTotals>, pnl: PnlRow | undefined) {
-  target.trips += 1;
-  if (!pnl) return;
-  target.revenueMinor += Number(pnl.revenue_minor);
-  target.directExpensesMinor += Number(pnl.direct_expenses_minor);
-  target.driverCompensationMinor += Number(pnl.driver_compensation_minor);
-  target.estimatedTaxMinor += Number(pnl.estimated_tax_minor);
-  target.totalExpensesMinor += Number(pnl.total_expenses_minor);
-  target.profitMinor += Number(pnl.management_profit_minor);
-  target.totalKm += Number(pnl.total_km);
-  target.loadedKm += Number(pnl.loaded_km);
-  target.emptyKm += Number(pnl.empty_km);
-}
-
-function publicTotals(totals: ReturnType<typeof emptyTotals>) {
+function publicTotals(trips: readonly ManagementReportTrip[], expenses: readonly ManagementReportExpense[]) {
+  const totals = aggregateManagementReport(trips, expenses);
   return {
     trips: totals.trips,
     revenue: amount(totals.revenueMinor),
     directExpenses: amount(totals.directExpensesMinor),
     driverCompensation: amount(totals.driverCompensationMinor),
-    estimatedTax: amount(totals.estimatedTaxMinor),
-    totalExpenses: amount(totals.totalExpensesMinor),
-    managementProfit: amount(totals.profitMinor),
-    marginPct: totals.revenueMinor ? rounded((totals.profitMinor / totals.revenueMinor) * 100) : null,
+    totalExpenses: amount(totals.actualExpensesMinor),
+    managementProfit: amount(totals.actualProfitMinor),
+    normalizedExpenses: amount(totals.normalizedExpensesMinor),
+    normalizedProfit: amount(totals.normalizedProfitMinor),
+    excludedOneOffAndCapitalExpenses: amount(totals.excludedExpensesMinor),
+    marginPct: totals.revenueMinor ? rounded((totals.actualProfitMinor / totals.revenueMinor) * 100) : null,
     totalKm: rounded(totals.totalKm),
     loadedKm: rounded(totals.loadedKm),
     emptyKm: rounded(totals.emptyKm),
     emptyMileagePct: totals.totalKm ? rounded((totals.emptyKm / totals.totalKm) * 100) : null,
-    costPerKm: totals.totalKm ? rounded(amount(totals.totalExpensesMinor) / totals.totalKm, 2) : null,
-    profitPerKm: totals.totalKm ? rounded(amount(totals.profitMinor) / totals.totalKm, 2) : null,
+    fuelLiters: rounded(totals.fuelLiters),
+    fuelPer100Km: totals.totalKm && totals.fuelLiters ? rounded((totals.fuelLiters / totals.totalKm) * 100) : null,
+    costPerKm: totals.totalKm ? rounded(amount(totals.actualExpensesMinor) / totals.totalKm, 2) : null,
+    profitPerKm: totals.totalKm ? rounded(amount(totals.actualProfitMinor) / totals.totalKm, 2) : null,
   };
 }
 
@@ -133,62 +106,108 @@ export async function buildReportAiChatContext(
   const tripIds = trips.map((trip) => trip.id);
 
   let pnlRows: PnlRow[] = [];
+  let legRows: LegRow[] = [];
+  let incomeRows: IncomeRow[] = [];
   let expenseRows: ExpenseRow[] = [];
   if (tripIds.length) {
-    const [pnlResult, expensesResult] = await Promise.all([
+    const [pnlResult, legsResult, incomesResult, expensesResult] = await Promise.all([
       supabase.from("pnl_snapshots")
-        .select("trip_id, revenue_minor, direct_expenses_minor, driver_compensation_minor, estimated_tax_minor, total_expenses_minor, management_profit_minor, total_km, loaded_km, empty_km")
+        .select("trip_id, driver_compensation_minor, total_km, loaded_km, empty_km")
         .in("trip_id", tripIds)
         .eq("is_current", true),
+      supabase.from("trip_legs")
+        .select("trip_id, distance_km, load_state")
+        .in("trip_id", tripIds)
+        .is("deleted_at", null),
+      supabase.from("incomes")
+        .select("trip_id, reporting_amount_minor")
+        .in("trip_id", tripIds)
+        .neq("payment_status", "VOIDED")
+        .is("deleted_at", null),
       supabase.from("expenses")
-        .select("reporting_amount_minor, quantity, unit, expense_categories(display_name, economic_group)")
+        .select("trip_id, reporting_amount_minor, quantity, unit, cost_behavior, include_in_normalized_cost, expense_categories(display_name, economic_group)")
         .in("trip_id", tripIds)
         .neq("review_status", "REJECTED")
         .eq("status", "RECORDED")
         .is("deleted_at", null),
     ]);
-    if (pnlResult.error || expensesResult.error) throw new Error("FINANCE_UNAVAILABLE");
+    if (pnlResult.error || legsResult.error || incomesResult.error || expensesResult.error) throw new Error("FINANCE_UNAVAILABLE");
     pnlRows = (pnlResult.data ?? []) as PnlRow[];
+    legRows = (legsResult.data ?? []) as LegRow[];
+    incomeRows = (incomesResult.data ?? []) as IncomeRow[];
     expenseRows = (expensesResult.data ?? []) as unknown as ExpenseRow[];
   }
 
   const pnlByTrip = new Map(pnlRows.map((row) => [row.trip_id, row]));
-  const totals = emptyTotals();
-  const byDriver = new Map<string, { name: string; totals: ReturnType<typeof emptyTotals> }>();
-  const byVehicle = new Map<string, { name: string; totals: ReturnType<typeof emptyTotals> }>();
-  const byMonth = new Map<string, ReturnType<typeof emptyTotals>>();
+  const legsByTrip = new Map<string, LegRow[]>();
+  for (const leg of legRows) legsByTrip.set(leg.trip_id, [...(legsByTrip.get(leg.trip_id) ?? []), leg]);
+  const revenueByTrip = new Map<string, number>();
+  for (const income of incomeRows) revenueByTrip.set(income.trip_id, (revenueByTrip.get(income.trip_id) ?? 0) + Number(income.reporting_amount_minor));
 
-  for (const trip of trips) {
-    const pnl = pnlByTrip.get(trip.id);
-    addPnl(totals, pnl);
+  const tripFacts: TripFact[] = trips.map((row) => {
+    const pnl = pnlByTrip.get(row.id);
+    const legs = legsByTrip.get(row.id) ?? [];
+    return {
+      id: row.id,
+      row,
+      revenueMinor: revenueByTrip.get(row.id) ?? 0,
+      driverCompensationMinor: Number(pnl?.driver_compensation_minor ?? 0),
+      totalKm: Number(pnl?.total_km ?? legs.reduce((sum, leg) => sum + Number(leg.distance_km ?? 0), 0)),
+      loadedKm: Number(pnl?.loaded_km ?? legs.filter((leg) => leg.load_state === "LOADED").reduce((sum, leg) => sum + Number(leg.distance_km ?? 0), 0)),
+      emptyKm: Number(pnl?.empty_km ?? legs.filter((leg) => leg.load_state === "EMPTY").reduce((sum, leg) => sum + Number(leg.distance_km ?? 0), 0)),
+    };
+  });
+  const expenseFacts: Array<ManagementReportExpense & { categoryName: string }> = expenseRows.flatMap((expense) => {
+    const category = asOne(expense.expense_categories);
+    return category && expense.trip_id ? [{
+      tripId: expense.trip_id,
+      reportingAmountMinor: Number(expense.reporting_amount_minor),
+      economicGroup: category.economic_group,
+      costBehavior: expense.cost_behavior,
+      includeInNormalizedCost: expense.include_in_normalized_cost,
+      quantity: expense.quantity === null ? null : Number(expense.quantity),
+      unit: expense.unit,
+      categoryName: category.display_name,
+    }] : [];
+  });
+
+  const expensesFor = (selectedTrips: readonly TripFact[]) => {
+    const ids = new Set(selectedTrips.map((trip) => trip.id));
+    return expenseFacts.filter((expense) => expense.tripId && ids.has(expense.tripId));
+  };
+  const summarize = (selectedTrips: readonly TripFact[]) => publicTotals(selectedTrips, expensesFor(selectedTrips));
+
+  const byDriver = new Map<string, { name: string; trips: TripFact[] }>();
+  const byVehicle = new Map<string, { name: string; trips: TripFact[] }>();
+  const byMonth = new Map<string, TripFact[]>();
+  for (const fact of tripFacts) {
+    const trip = fact.row;
     const driverName = asOne(trip.drivers)?.display_name ?? "Водитель не назначен";
     const vehicle = asOne(trip.vehicles);
     const vehicleName = vehicle ? `${vehicle.display_name}${vehicle.plate_number ? ` · ${vehicle.plate_number}` : ""}` : "Автомобиль не найден";
-    const driverBucket = byDriver.get(trip.driver_id ?? "unassigned") ?? { name: driverName, totals: emptyTotals() };
-    const vehicleBucket = byVehicle.get(trip.vehicle_id) ?? { name: vehicleName, totals: emptyTotals() };
-    addPnl(driverBucket.totals, pnl);
-    addPnl(vehicleBucket.totals, pnl);
+    const driverBucket = byDriver.get(trip.driver_id ?? "unassigned") ?? { name: driverName, trips: [] };
+    const vehicleBucket = byVehicle.get(trip.vehicle_id) ?? { name: vehicleName, trips: [] };
+    driverBucket.trips.push(fact);
+    vehicleBucket.trips.push(fact);
     byDriver.set(trip.driver_id ?? "unassigned", driverBucket);
     byVehicle.set(trip.vehicle_id, vehicleBucket);
     const month = trip.started_at?.slice(0, 7) ?? "Дата не указана";
-    const monthBucket = byMonth.get(month) ?? emptyTotals();
-    addPnl(monthBucket, pnl);
-    byMonth.set(month, monthBucket);
+    byMonth.set(month, [...(byMonth.get(month) ?? []), fact]);
   }
 
   const expenseGroups = new Map<string, { category: string; economicGroup: string; amountMinor: number; fuelLiters: number }>();
-  for (const expense of expenseRows) {
-    const category = asOne(expense.expense_categories);
-    if (!category) continue;
-    const key = `${category.economic_group}:${category.display_name}`;
-    const bucket = expenseGroups.get(key) ?? { category: category.display_name, economicGroup: category.economic_group, amountMinor: 0, fuelLiters: 0 };
-    bucket.amountMinor += Number(expense.reporting_amount_minor);
-    if (expense.unit === "L") bucket.fuelLiters += Number(expense.quantity ?? 0);
+  for (const expense of expenseFacts) {
+    const key = `${expense.economicGroup}:${expense.categoryName}`;
+    const bucket = expenseGroups.get(key) ?? { category: expense.categoryName, economicGroup: expense.economicGroup, amountMinor: 0, fuelLiters: 0 };
+    bucket.amountMinor += expense.reportingAmountMinor;
+    if (["l", "л", "литр", "литра", "литров"].includes(expense.unit?.trim().toLocaleLowerCase("ru-RU").replaceAll(".", "") ?? "")) {
+      bucket.fuelLiters += Number(expense.quantity ?? 0);
+    }
     expenseGroups.set(key, bucket);
   }
 
   const ranked = (source: typeof byDriver) => [...source.values()]
-    .map((item) => ({ name: item.name, ...publicTotals(item.totals) }))
+    .map((item) => ({ name: item.name, ...summarize(item.trips) }))
     .sort((left, right) => right.managementProfit - left.managementProfit || right.revenue - left.revenue);
 
   return {
@@ -211,17 +230,17 @@ export async function buildReportAiChatContext(
       maximumTripsLoaded: 500,
       truncated: trips.length === 500,
     },
-    totals: publicTotals(totals),
+    totals: summarize(tripFacts),
     monthly: [...byMonth.entries()].sort(([left], [right]) => left.localeCompare(right)).slice(-18)
-      .map(([month, monthTotals]) => ({ month, ...publicTotals(monthTotals) })),
+      .map(([month, monthTrips]) => ({ month, ...summarize(monthTrips) })),
     drivers: ranked(byDriver).slice(0, 30),
     vehicles: ranked(byVehicle).slice(0, 30),
     expenseGroups: [...expenseGroups.values()]
       .map((item) => ({ category: item.category, economicGroup: item.economicGroup, amount: amount(item.amountMinor), fuelLiters: rounded(item.fuelLiters) }))
       .sort((left, right) => right.amount - left.amount)
       .slice(0, 30),
-    recentTrips: trips.slice(0, 80).map((trip) => {
-      const pnl = pnlByTrip.get(trip.id);
+    recentTrips: tripFacts.slice(0, 80).map((fact) => {
+      const trip = fact.row;
       const vehicle = asOne(trip.vehicles);
       return {
         title: trip.title,
@@ -229,18 +248,14 @@ export async function buildReportAiChatContext(
         status: trip.status,
         driver: asOne(trip.drivers)?.display_name ?? null,
         vehicle: vehicle ? `${vehicle.display_name}${vehicle.plate_number ? ` · ${vehicle.plate_number}` : ""}` : null,
-        hasCalculatedPnl: Boolean(pnl),
-        ...(pnl ? publicTotals(Object.assign(emptyTotals(), { trips: 1,
-          revenueMinor: Number(pnl.revenue_minor), directExpensesMinor: Number(pnl.direct_expenses_minor),
-          driverCompensationMinor: Number(pnl.driver_compensation_minor), estimatedTaxMinor: Number(pnl.estimated_tax_minor),
-          totalExpensesMinor: Number(pnl.total_expenses_minor), profitMinor: Number(pnl.management_profit_minor),
-          totalKm: Number(pnl.total_km), loadedKm: Number(pnl.loaded_km), emptyKm: Number(pnl.empty_km),
-        })) : {}),
+        ...summarize([fact]),
       };
     }),
     dataQuality: {
-      tripsWithoutCalculatedPnl: trips.filter((trip) => !pnlByTrip.has(trip.id)).length,
-      note: "Суммы переданы в основной валюте компании. Адреса, геопозиции, чеки, комментарии, контакты и Telegram-данные исключены.",
+      tripsWithoutPublishedPnl: trips.filter((trip) => !pnlByTrip.has(trip.id)).length,
+      tripsWithoutRevenue: tripFacts.filter((trip) => trip.revenueMinor === 0).length,
+      tripsWithoutMileage: tripFacts.filter((trip) => trip.totalKm === 0).length,
+      note: "Факт рассчитан из рейсов, доходов и записанных расходов по тем же правилам, что управленческий дэшборд. Без опубликованного P&L оплата водителя может быть равна нулю. Адреса, геопозиции, чеки, комментарии, контакты и Telegram-данные исключены.",
     },
   };
 }
