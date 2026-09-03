@@ -460,7 +460,8 @@ td { font-size: 14px; }
 .help-section { margin-top: 42px; scroll-margin-top: 24px; }
 .training-video-card { margin-bottom: 14px; padding: 20px; border: 1px solid #27473a; border-radius: 16px; display: grid; grid-template-columns: minmax(250px, .62fr) minmax(0, 1.38fr); align-items: center; gap: 24px; overflow: hidden; background: var(--green-dark); color: #fff; }
 .training-video-copy h3 { margin: 5px 0 10px; font-size: 24px; line-height: 1.1; letter-spacing: -.035em; }
-.training-video-copy > p:last-child { margin: 0; color: #aebfb8; font-size: 12px; line-height: 1.55; }
+.training-video-copy > p:not(.eyebrow) { margin: 0; color: #aebfb8; font-size: 12px; line-height: 1.55; }
+.training-video-copy > small { margin-top: 12px; color: #758d83; display: block; font-size: 10px; }
 .training-video-copy .eyebrow { color: #cbe94a; }
 .training-video-frame { min-width: 0; aspect-ratio: 16 / 9; border: 1px solid #ffffff1c; border-radius: 11px; overflow: hidden; background: #07120e; box-shadow: 0 14px 34px #06100c66; }
 .training-video-frame video { width: 100%; height: 100%; display: block; object-fit: cover; }

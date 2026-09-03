@@ -115,12 +115,92 @@ export const Field: React.FC<{ label: string; value: string; width?: number; act
   </label>
 );
 
-export const Cursor: React.FC<{ x: number; y: number; click?: boolean }> = ({ x, y, click = false }) => {
+export type CursorStop = {
+  frame: number;
+  x: number;
+  y: number;
+  click?: boolean;
+  label?: string;
+};
+
+export const GuidedCursor: React.FC<{ stops: CursorStop[] }> = ({ stops }) => {
   const frame = useCurrentFrame();
+  const first = stops[0];
+
+  if (!first) {
+    return null;
+  }
+
+  let x = first.x;
+  let y = first.y;
+  let settledStop = first;
+
+  for (let index = 1; index < stops.length; index += 1) {
+    const previous = stops[index - 1];
+    const next = stops[index];
+    const travelStart = next.frame - 18;
+
+    if (frame < travelStart) {
+      settledStop = previous;
+      break;
+    }
+
+    if (frame <= next.frame) {
+      x = interpolate(frame, [travelStart, next.frame], [previous.x, next.x], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+      });
+      y = interpolate(frame, [travelStart, next.frame], [previous.y, next.y], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+      });
+      settledStop = next;
+      break;
+    }
+
+    x = next.x;
+    y = next.y;
+    settledStop = next;
+  }
+
+  const clickStop = stops.find((stop) => stop.click && frame >= stop.frame - 2 && frame <= stop.frame + 13);
+  const clickProgress = clickStop ? frame - clickStop.frame : -1;
+  const clickScale = clickStop
+    ? interpolate(clickProgress, [-2, 2, 13], [0.5, 0.82, 1.5], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.quad),
+    })
+    : 1;
+  const clickOpacity = clickStop
+    ? interpolate(clickProgress, [-2, 1, 13], [0, 0.9, 0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    })
+    : 0;
+  const labelVisible = Boolean(settledStop.label) && frame >= settledStop.frame && frame <= settledStop.frame + 34;
+
   return (
-    <div style={{ position: "absolute", zIndex: 20, left: x, top: y, width: 30, height: 38, filter: "drop-shadow(0 5px 5px rgba(0,0,0,.25))" }}>
-      {click ? <span style={{ position: "absolute", width: 54, height: 54, left: -17, top: -16, border: "3px solid #dafa58", borderRadius: "50%", opacity: interpolate(frame % 36, [0, 12, 30], [0, 0.8, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }), scale: interpolate(frame % 36, [0, 30], [0.4, 1.3], { extrapolateLeft: "clamp", extrapolateRight: "clamp", output: "perceptual-scale" }) }} /> : null}
+    <div
+      style={{
+        position: "absolute",
+        zIndex: 20,
+        left: x,
+        top: y,
+        width: 30,
+        height: 38,
+        opacity: interpolate(frame, [Math.max(0, first.frame - 12), first.frame], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        }),
+        filter: "drop-shadow(0 5px 5px rgba(0,0,0,.25))",
+      }}
+    >
+      <span style={{ position: "absolute", width: 54, height: 54, left: -17, top: -16, border: "3px solid #dafa58", borderRadius: "50%", opacity: clickOpacity, scale: clickScale }} />
       <div style={{ width: 0, height: 0, borderTop: "22px solid #15241d", borderRight: "14px solid transparent", rotate: "-18deg" }} />
+      {labelVisible ? <span style={{ position: "absolute", left: 18, top: 24, width: "max-content", maxWidth: 190, padding: "7px 10px", borderRadius: 8, backgroundColor: "#13261f", color: "#ffffff", boxShadow: "0 8px 24px rgba(14,39,29,.24)", fontSize: 10, fontWeight: 800 }}>{settledStop.label}</span> : null}
     </div>
   );
 };

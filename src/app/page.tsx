@@ -248,7 +248,7 @@ export default function Home() {
 
       <section className={`${styles.section} ${styles.videoSection}`} id="demo">
         <div className={styles.videoCopy}>
-          <p className={styles.kicker}><span /> Обучение · 2 минуты</p>
+          <p className={styles.kicker}><span /> Обучение · 2,5 минуты</p>
           <h2>Первый рейс:<br />от создания до отчёта.</h2>
           <p>
             Посмотрите полный рабочий сценарий: подготовка автопарка, назначение рейса,
@@ -260,6 +260,7 @@ export default function Home() {
             <span><b>03</b> Статусы и расходы</span>
             <span><b>04</b> Отчёт и ИИ-анализ</span>
           </div>
+          <small className={styles.videoDisclosure}>Озвучка создана с помощью ИИ.</small>
         </div>
         <div className={styles.videoFrame}>
           <video controls preload="metadata" poster="/training/first-trip-poster.png">

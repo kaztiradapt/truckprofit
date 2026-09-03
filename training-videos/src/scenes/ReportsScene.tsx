@@ -1,6 +1,6 @@
 import { Easing, interpolate, useCurrentFrame } from "remotion";
 
-import { AppWindow, Field, SceneBase } from "../components";
+import { AppWindow, Field, GuidedCursor, SceneBase } from "../components";
 
 const bars = [38, 52, 47, 66, 59, 83];
 
@@ -10,7 +10,7 @@ export const ReportsScene: React.FC = () => {
   return (
     <SceneBase scene="reports" audio="voiceover/07-reports.wav" number="06" eyebrow="Управленческие отчёты" title={<>Сравнивайте<br />и находите потери.</>}>
       <AppWindow active="Отчёты" title="Управленческие отчёты" badge="Данные обновлены">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}><Field label="ПЕРИОД" value="Последние 30 дней" active={frame < 100} /><Field label="АВТОМОБИЛЬ" value="Все автомобили" active={frame >= 100 && frame < 160} /><Field label="ВОДИТЕЛЬ" value="Все водители" active={frame >= 160 && frame < 220} /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}><Field label="ПЕРИОД" value="Последние 30 дней" active={frame >= 82 && frame < 142} /><Field label="АВТОМОБИЛЬ" value="Все автомобили" active={frame >= 142 && frame < 202} /><Field label="ВОДИТЕЛЬ" value="Все водители" active={frame >= 202 && frame < 262} /></div>
         <div style={{ marginTop: 13, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 9 }}>
           {[{ l: "Выручка", v: "18,4 млн ₸" }, { l: "Расходы", v: "12,1 млн ₸" }, { l: "Прибыль", v: "6,3 млн ₸", dark: true }, { l: "Маржа", v: "34,2%" }].map((item) => <div key={item.l} style={{ minHeight: 80, padding: 13, border: `1px solid ${item.dark ? "#174f3d" : "#dbe3df"}`, borderRadius: 11, backgroundColor: item.dark ? "#174f3d" : "#fff", color: item.dark ? "#fff" : "#17211d", display: "grid", alignContent: "space-between" }}><small style={{ color: item.dark ? "#aac8bc" : "#74817b", fontSize: 9 }}>{item.l}</small><b style={{ fontSize: 17 }}>{item.v}</b></div>)}
         </div>
@@ -26,6 +26,12 @@ export const ReportsScene: React.FC = () => {
             <div style={{ padding: 15, borderRadius: 13, backgroundColor: "#102a21", color: "#fff", opacity: interpolate(frame, [270, 305], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }), translate: interpolate(frame, [270, 305], ["0px 14px", "0px 0px"], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.16, 1, 0.3, 1) }) }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ width: 33, height: 33, borderRadius: 9, backgroundColor: "#dafa58", color: "#173024", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 900 }}>AI</span><div><small style={{ color: "#8ea79c", fontSize: 8 }}>ИИ-АНАЛИТИК</small><b style={{ display: "block", fontSize: 12 }}>Что изменилось в расходах?</b></div></div><p style={{ margin: "10px 0 0", color: "#b9cac2", fontSize: 10, lineHeight: 1.5 }}>Расход топлива на километр вырос у двух автомобилей. Проверьте Volvo FH.</p></div>
           </section>
         </div>
+        <GuidedCursor stops={[
+          { frame: 88, x: 385, y: 205, click: true, label: "Выбрать период" },
+          { frame: 148, x: 695, y: 205, click: true, label: "Фильтр по машине" },
+          { frame: 208, x: 1000, y: 205, click: true, label: "Фильтр по водителю" },
+          { frame: 510, x: 1010, y: 618, click: true, label: "Открыть вывод ИИ" },
+        ]} />
       </AppWindow>
     </SceneBase>
   );

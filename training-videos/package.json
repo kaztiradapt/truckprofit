@@ -27,6 +27,7 @@
   "scripts": {
     "dev": "remotion studio",
     "build": "remotion bundle",
+    "voiceover": "node scripts/generate-voiceover.mjs",
     "render:first-trip": "remotion render TruckProfit-FirstTrip output/truckprofit-first-trip-training.mp4",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"

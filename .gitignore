@@ -4,6 +4,8 @@ coverage/
 *.tsbuildinfo
 .env
 .env.local
-!.env.example
 supabase/.temp/
 supabase/.branches/
+.vercel
+.env*
+!.env.example

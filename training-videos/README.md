@@ -22,10 +22,16 @@ npm run dev
 npm run lint
 ```
 
+Пересоздать живую ИИ-озвучку (требуется `OPENAI_API_KEY`):
+
+```console
+npm run voiceover
+```
+
 Отрендерить основной ролик:
 
 ```console
 npm run render:first-trip
 ```
 
-Готовое видео и постер сохраняются в `output/`. Копии для сайта находятся в `../public/training/`.
+Озвучка создаётся моделью `gpt-4o-mini-tts`, голосом `marin`. Готовое видео и постер сохраняются в `output/`. Копии для сайта находятся в `../public/training/`.
