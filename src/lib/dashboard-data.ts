@@ -119,11 +119,19 @@ export type DashboardData = {
   recentExpenses: Array<{
     id: string;
     tripId: string | null;
+    vehicleId: string;
+    driverId: string | null;
     categoryName: string;
+    economicGroup: "FUEL" | "TOLLS" | "REPAIR" | "MAINTENANCE" | "OTHER";
+    costBehavior: "VARIABLE" | "FIXED" | "RESERVE" | "ONE_OFF" | "CAPITAL";
+    includeInNormalizedCost: boolean;
     tripTitle: string | null;
     driverName: string | null;
     amount: number;
     currency: string;
+    reportingAmountMinor: number;
+    quantity: number | null;
+    unit: string | null;
     occurredAt: string;
     source: string;
     locationText: string | null;
@@ -306,7 +314,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id, assigned_vehicle_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km, route_geometry)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(500),
     supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id),
-    supabase.from("expenses").select("id, trip_id, amount, currency, occurred_at, source, location_text, comment, expense_categories(display_name), trips(title), drivers(display_name), attachments(id, original_filename, content_type)").eq("organization_id", membership.organization_id).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(500),
+    supabase.from("expenses").select("id, trip_id, vehicle_id, driver_id, amount, currency, reporting_amount_minor, quantity, unit, occurred_at, source, location_text, comment, cost_behavior, include_in_normalized_cost, expense_categories(display_name, economic_group), trips(title), drivers(display_name), attachments(id, original_filename, content_type)").eq("organization_id", membership.organization_id).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(2000),
     supabase.from("incomes").select("id, trip_id, customer_name, amount, currency, reporting_currency, reporting_amount_minor, fx_rate_to_reporting, expected_payment_at, payment_status, comment").eq("organization_id", membership.organization_id).neq("payment_status", "VOIDED").is("deleted_at", null).order("created_at", { ascending: false }).limit(500),
     supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
     supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()),
@@ -505,11 +513,19 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
       return {
         id: expense.id,
         tripId: expense.trip_id,
+        vehicleId: expense.vehicle_id,
+        driverId: expense.driver_id,
         categoryName: asOne(expense.expense_categories)?.display_name ?? "Расход",
+        economicGroup: (asOne(expense.expense_categories)?.economic_group ?? "OTHER") as DashboardData["recentExpenses"][number]["economicGroup"],
+        costBehavior: (expense.cost_behavior ?? "VARIABLE") as DashboardData["recentExpenses"][number]["costBehavior"],
+        includeInNormalizedCost: expense.include_in_normalized_cost ?? true,
         tripTitle: asOne(expense.trips)?.title ?? null,
         driverName: asOne(expense.drivers)?.display_name ?? null,
         amount: Number(expense.amount),
         currency: expense.currency,
+        reportingAmountMinor: Number(expense.reporting_amount_minor),
+        quantity: expense.quantity === null ? null : Number(expense.quantity),
+        unit: expense.unit,
         occurredAt: expense.occurred_at,
         source: expense.source,
         locationText: expense.location_text,

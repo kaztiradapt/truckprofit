@@ -10,6 +10,7 @@ import { DashboardRefreshButton } from "./dashboard-refresh-button";
 import { DeviceDateTime } from "./device-date-time";
 import { DriverList } from "./driver-list";
 import { DriverReports } from "./driver-reports";
+import { ExpenseTreatmentControl } from "./expense-treatment-control";
 import { OwnerTelegramConnectButton } from "./owner-telegram-connect-button";
 import { ReceiptViewerButton } from "./receipt-viewer-button";
 import { TelegramMenuButton } from "./telegram-menu-button";
@@ -43,7 +44,7 @@ const sectionTitles: Record<DashboardSection, string> = {
   trips: "Рейсы и маршруты",
   vehicles: "Автомобили",
   drivers: "Водители",
-  reports: "Отчёты по водителям",
+  reports: "Управленческие отчёты",
   expenses: "Расходы",
   team: "Сотрудники и роли",
   operations: "Создание и закрытие рейса",
@@ -76,7 +77,11 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
   const emptyShare = latestPnl && latestPnl.totalKm > 0
     ? `${((latestPnl.emptyKm / latestPnl.totalKm) * 100).toFixed(1)}%`
     : data.totals.emptyMileagePct === null ? "—" : `${data.totals.emptyMileagePct}%`;
+  const incomesByTrip = new Map<string, number>();
+  for (const income of data.incomes) incomesByTrip.set(income.tripId, (incomesByTrip.get(income.tripId) ?? 0) + income.reportingAmountMinor);
   const reportTrips = data.trips.map((trip) => ({
+    id: trip.id,
+    title: trip.title,
     driverId: trip.driverId,
     vehicleId: trip.vehicleId,
     vehicleName: trip.vehicleName,
@@ -85,10 +90,8 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
     totalKm: trip.pnl?.totalKm ?? trip.legs.reduce((sum, leg) => sum + (leg.distanceKm ?? 0), 0),
     loadedKm: trip.pnl?.loadedKm ?? trip.legs.filter((leg) => leg.loadState === "LOADED").reduce((sum, leg) => sum + (leg.distanceKm ?? 0), 0),
     emptyKm: trip.pnl?.emptyKm ?? trip.legs.filter((leg) => leg.loadState === "EMPTY").reduce((sum, leg) => sum + (leg.distanceKm ?? 0), 0),
-    revenueMinor: trip.pnl?.revenueMinor ?? 0,
-    totalExpensesMinor: trip.pnl?.totalExpensesMinor ?? 0,
+    revenueMinor: incomesByTrip.get(trip.id) ?? trip.pnl?.revenueMinor ?? 0,
     driverCompensationMinor: trip.pnl?.driverCompensationMinor ?? 0,
-    managementProfitMinor: trip.pnl?.managementProfitMinor ?? 0,
   }));
   const navigationItems = [
     { href: "/dashboard", label: "Обзор", visible: true, key: "overview" },
@@ -255,13 +258,13 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
 
           {section === "expenses" && canViewFinance ? <article className="panel panel-wide"><div className="panel-title"><div><p className="eyebrow">Финансовый учёт</p><h2>Расходы</h2></div><span>{data.recentExpenses.length}</span></div>
             <p className="panel-note">Расход попадает в карточку назначенного рейса и его экономику сразу после записи водителем. Отдельного подтверждения владельца не требуется.</p>
-            <ul className="entity-list expense-list">{data.recentExpenses.length ? data.recentExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {expense.driverName ?? "Водитель не указан"} · <DeviceDateTime value={expense.occurredAt} /> · {expense.source === "TELEGRAM" ? "Telegram" : "Кабинет"}{expense.locationText ? ` · ${expense.locationText}` : ""}{expense.comment ? ` · ${expense.comment}` : ""}</small></span><span className="expense-amount-actions"><strong>{formatMoney(expense.amount, expense.currency)}</strong>{expense.receipt ? <ReceiptViewerButton expenseId={expense.id} filename={expense.receipt.originalFilename} contentType={expense.receipt.contentType} /> : null}</span></li>) : <li className="empty-state">Расходов пока нет.</li>}</ul>
+            <ul className="entity-list expense-list">{data.recentExpenses.length ? data.recentExpenses.map((expense) => <li key={expense.id}><span>{expense.categoryName}<small>{expense.tripTitle ?? "Без рейса"} · {expense.driverName ?? "Водитель не указан"} · <DeviceDateTime value={expense.occurredAt} /> · {expense.source === "TELEGRAM" ? "Telegram" : "Кабинет"}{expense.locationText ? ` · ${expense.locationText}` : ""}{expense.comment ? ` · ${expense.comment}` : ""}</small>{expense.quantity ? <small>{expense.quantity.toLocaleString("ru-RU")} {expense.unit ?? "ед."}</small> : null}</span><div className="expense-amount-actions"><strong>{formatMoney(expense.amount, expense.currency)}</strong>{expense.receipt ? <ReceiptViewerButton expenseId={expense.id} filename={expense.receipt.originalFilename} contentType={expense.receipt.contentType} /> : null}{canManageFinance ? <ExpenseTreatmentControl expenseId={expense.id} organizationId={data.organization.id} initialBehavior={expense.costBehavior} initialIncluded={expense.includeInNormalizedCost} /> : null}</div></li>) : <li className="empty-state">Расходов пока нет.</li>}</ul>
           </article> : section === "expenses" ? <article className="panel panel-wide"><h2>Доступ ограничен</h2><p className="muted">Владелец не выдал этой роли доступ к финансовым данным.</p></article> : null}
         </section> : null}
 
         {section === "team" && data.role === "OWNER" ? <TeamManagement organizationId={data.organization.id} roles={data.accessRoles} staff={data.staff} /> : section === "team" ? <section className="panel"><h2>Доступ ограничен</h2><p className="muted">Управление сотрудниками доступно только владельцу.</p></section> : null}
 
-        {section === "reports" ? <DriverReports reports={data.driverReports} trips={reportTrips} vehicles={data.vehicles} baseCurrency={data.organization.baseCurrency} canViewFinance={canViewFinance} /> : null}
+        {section === "reports" ? <DriverReports reports={data.driverReports} trips={reportTrips} expenses={data.recentExpenses} vehicles={data.vehicles} baseCurrency={data.organization.baseCurrency} canViewFinance={canViewFinance} /> : null}
 
         {section === "operations" && canOperate ? <section className="operations">
           <div className="start-intro"><p className="eyebrow">End-to-end контур</p><h2>Провести настоящий рейс</h2><p>Организация уже подключена. Пройдите шаги по порядку — данные сохраняются в защищённом контуре компании.</p></div>
@@ -294,7 +297,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             <details><summary>Откуда берётся километраж рейса?</summary><p>После выбора погрузки и выгрузки кабинет строит автомобильный маршрут и подставляет его расстояние. Перед созданием рейса проверьте значение: при необходимости его можно заменить плановым километражем вручную.</p></details>
             <details><summary>Как закрепить автомобиль за водителем?</summary><p>Откройте раздел «Водители», нажмите «Изменить» напротив нужного человека и выберите активный автомобиль. При создании следующего рейса выбор этого водителя автоматически подставит закреплённую машину; при необходимости её можно заменить вручную.</p></details>
             <details><summary>Когда водитель получает уведомление о рейсе?</summary><p>Сразу после создания рейса с назначенным водителем или после смены водителя в существующем рейсе. Уведомление придёт только после подключения Telegram-профиля водителя к боту; результат отправки кабинет покажет после сохранения.</p></details>
-            <details><summary>Что показывает раздел «Отчёты»?</summary><p>Дэшборд показывает рейсы, пробег, долю километров с грузом, сравнение водителей и использование автомобилей. Ролям с финансовым доступом дополнительно видны доход, расходы, результат и маржа. Фильтры по водителю, автомобилю и статусу рейса пересчитывают все карточки, диаграммы и таблицу.</p></details>
+            <details><summary>Что показывает раздел «Отчёты»?</summary><p>Управленческий дэшборд показывает валовую выручку, фактические затраты и результат, себестоимость и прибыль на километр, порожний пробег, расход топлива, структуру затрат, сравнение водителей и автомобилей. Можно выбрать период, водителя, машину и статус рейса. Разовый или капитальный расход остаётся в факте, но его можно исключить из нормальной себестоимости через раздел «Расходы».</p></details>
             <details><summary>Сохраняются ли старые геопозиции водителя?</summary><p>Да. Каждая отправленная водителем точка остаётся в истории рейса с выбранным в Telegram типом и комментарием. Последняя отмечена как текущая, прошлые можно открыть по номеру, а владельцу доступно исправление подписи.</p></details>
             <details><summary>Где смотреть полную экономику?</summary><p>В Mini App: выручка, расходы, прибыль, пробег и P&amp;L закрытых рейсов. Бот показывает быструю оперативную сводку.</p></details>
             <details><summary>Как сообщить об ошибке?</summary><p>Откройте раздел «Поддержка», опишите проблему и при необходимости приложите скриншот. Страница, устройство, часовой пояс и версия приложения добавятся автоматически. После отправки вы получите номер обращения и сможете следить за его статусом.</p></details>
