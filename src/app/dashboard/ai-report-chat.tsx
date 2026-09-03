@@ -42,6 +42,7 @@ export function AiReportChat({ organizationId, driverId, vehicleId, tripStatus, 
   const [question, setQuestion] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -101,11 +102,16 @@ export function AiReportChat({ organizationId, driverId, vehicleId, tripStatus, 
   }
 
   async function clearHistory() {
-    if (!messages.length || !window.confirm("Удалить историю этого ИИ‑чата?")) return;
+    if (!messages.length) return;
+    if (!confirmingClear) {
+      setConfirmingClear(true);
+      return;
+    }
     setError("");
     const response = await fetch(`/api/reports/ai-chat?organizationId=${encodeURIComponent(organizationId)}`, { method: "DELETE" });
     if (response.ok) setMessages([]);
     else setError("Не удалось очистить историю.");
+    setConfirmingClear(false);
   }
 
   return <section className="ai-report-chat" aria-label="ИИ-помощник TruckProfit">
@@ -115,7 +121,7 @@ export function AiReportChat({ organizationId, driverId, vehicleId, tripStatus, 
         <h3>Спросить ИИ о компании</h3>
         <p>Отвечает только по данным и функциям TruckProfit. Внешние и посторонние темы, например погода и новости, недоступны.</p>
       </div>
-      {messages.length ? <button type="button" className="tiny-button" onClick={clearHistory} disabled={busy}>Очистить чат</button> : null}
+      {messages.length ? <button type="button" className={`tiny-button clear-chat-button${confirmingClear ? " confirming" : ""}`} onClick={clearHistory} disabled={busy}>{confirmingClear ? "Подтвердить удаление" : "Очистить чат"}</button> : null}
     </div>
 
     <div className="ai-chat-scope"><span aria-hidden="true">🔒</span><p><b>Текущая область:</b> выбранные выше период, водитель, автомобиль и статус рейса. Чеки, контакты, Telegram‑ID и геопозиции автоматически из базы в ИИ не передаются.</p></div>

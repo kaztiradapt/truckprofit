@@ -311,6 +311,7 @@ td { font-size: 14px; }
 .ai-chat-heading h3 { margin: 3px 0 5px; font-size: clamp(20px, 2.2vw, 28px); letter-spacing: -.035em; }
 .ai-chat-heading p:not(.eyebrow) { max-width: 760px; margin: 0; color: var(--muted); font-size: 12px; }
 .ai-chat-heading > button { flex: 0 0 auto; }
+.clear-chat-button.confirming { border-color: #c45a48; background: #fff2ef; color: #9e3022; }
 .ai-chat-scope { padding: 11px 13px; border: 1px solid #d2e3da; border-radius: 11px; background: #f2f8f5; display: flex; align-items: flex-start; gap: 9px; color: var(--muted); }
 .ai-chat-scope p { margin: 0; font-size: 10px; line-height: 1.5; }
 .ai-chat-scope b { color: #315d4b; }
