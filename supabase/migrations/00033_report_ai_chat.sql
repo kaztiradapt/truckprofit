@@ -31,4 +31,10 @@ create policy report_ai_chat_messages_delete_own on public.report_ai_chat_messag
     and public.has_org_permission(organization_id, 'VIEW_FINANCE')
   );
 
-grant select, delete on public.report_ai_chat_messages to authenticated;
+create policy report_ai_chat_messages_insert_own on public.report_ai_chat_messages
+  for insert with check (
+    requested_by = auth.uid()
+    and public.has_org_permission(organization_id, 'VIEW_FINANCE')
+  );
+
+grant select, insert, delete on public.report_ai_chat_messages to authenticated;

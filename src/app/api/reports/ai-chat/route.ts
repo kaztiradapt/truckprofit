@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { aiChatOutOfScopeAnswer, classifyAiChatScope } from "@/domain/reports/ai-chat-scope";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { authenticatedTeamRequest } from "@/server/team-access";
 import { buildReportAiChatContext } from "@/server/report-ai-chat-context";
 
@@ -58,9 +58,8 @@ function publicHistory(rows: HistoryRow[]) {
   }));
 }
 
-async function recentHistory(organizationId: string, userId: string, limit = 12): Promise<HistoryRow[]> {
-  const admin = createAdminClient();
-  const { data, error } = await admin.from("report_ai_chat_messages")
+async function recentHistory(client: SupabaseClient, organizationId: string, userId: string, limit = 12): Promise<HistoryRow[]> {
+  const { data, error } = await client.from("report_ai_chat_messages")
     .select("id, role, content, scope_status, created_at")
     .eq("organization_id", organizationId)
     .eq("requested_by", userId)
@@ -74,6 +73,7 @@ async function recentHistory(organizationId: string, userId: string, limit = 12)
 }
 
 async function saveExchange(input: {
+  client: SupabaseClient;
   organizationId: string;
   userId: string;
   question: string;
@@ -82,13 +82,12 @@ async function saveExchange(input: {
   filters: Record<string, unknown>;
   model: string | null;
 }) {
-  const admin = createAdminClient();
   const common = {
     organization_id: input.organizationId,
     requested_by: input.userId,
     filters: input.filters,
   };
-  const { data, error } = await admin.from("report_ai_chat_messages").insert([
+  const { data, error } = await input.client.from("report_ai_chat_messages").insert([
     { ...common, role: "USER", content: input.question, scope_status: input.status, model: null },
     { ...common, role: "ASSISTANT", content: input.answer, scope_status: input.status, model: input.model },
   ]).select("id, role, content, scope_status, created_at");
@@ -192,7 +191,7 @@ export async function GET(request: Request): Promise<Response> {
   const authorization = await authorize(parsed.data.organizationId);
   if (!authorization.ok) return authorization.response;
   try {
-    const history = await recentHistory(parsed.data.organizationId, authorization.auth.userId, 40);
+    const history = await recentHistory(authorization.auth.supabase, parsed.data.organizationId, authorization.auth.userId, 40);
     return Response.json({ messages: publicHistory(history) });
   } catch {
     return Response.json({ error: "Не удалось загрузить историю помощника." }, { status: 500 });
@@ -204,8 +203,7 @@ export async function DELETE(request: Request): Promise<Response> {
   if (!parsed.success) return Response.json({ error: "Компания не указана." }, { status: 400 });
   const authorization = await authorize(parsed.data.organizationId);
   if (!authorization.ok) return authorization.response;
-  const admin = createAdminClient();
-  const { error } = await admin.from("report_ai_chat_messages").delete()
+  const { error } = await authorization.auth.supabase.from("report_ai_chat_messages").delete()
     .eq("organization_id", parsed.data.organizationId)
     .eq("requested_by", authorization.auth.userId);
   if (error && error.code !== "42P01") return Response.json({ error: "Не удалось очистить историю." }, { status: 500 });
@@ -218,10 +216,9 @@ export async function POST(request: Request): Promise<Response> {
   const authorization = await authorize(parsed.data.organizationId);
   if (!authorization.ok) return authorization.response;
   const { auth } = authorization;
-  const admin = createAdminClient();
 
   const minuteAgo = new Date(Date.now() - 60_000).toISOString();
-  const { count } = await admin.from("report_ai_chat_messages").select("id", { count: "exact", head: true })
+  const { count } = await auth.supabase.from("report_ai_chat_messages").select("id", { count: "exact", head: true })
     .eq("organization_id", parsed.data.organizationId)
     .eq("requested_by", auth.userId)
     .eq("role", "USER")
@@ -230,7 +227,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let history: HistoryRow[] = [];
   try {
-    history = await recentHistory(parsed.data.organizationId, auth.userId);
+    history = await recentHistory(auth.supabase, parsed.data.organizationId, auth.userId);
   } catch {
     return Response.json({ error: "Не удалось подготовить историю диалога." }, { status: 500 });
   }
@@ -238,6 +235,7 @@ export async function POST(request: Request): Promise<Response> {
   const hasInScopeHistory = history.some((item) => item.scope_status === "ANSWER" || item.scope_status === "INSUFFICIENT_DATA");
   if (classifyAiChatScope(parsed.data.message, hasInScopeHistory) === "OUT_OF_SCOPE") {
     const saved = await saveExchange({
+      client: auth.supabase,
       organizationId: parsed.data.organizationId,
       userId: auth.userId,
       question: parsed.data.message,
@@ -269,6 +267,7 @@ export async function POST(request: Request): Promise<Response> {
   const answer = ai.result.status === "OUT_OF_SCOPE" ? aiChatOutOfScopeAnswer : ai.result.answer;
   const status = ai.result.status;
   const saved = await saveExchange({
+    client: auth.supabase,
     organizationId: parsed.data.organizationId,
     userId: auth.userId,
     question: parsed.data.message,
