@@ -11,6 +11,7 @@ import {
   type ReportExpenseGroup,
 } from "@/domain/reports/management-report";
 import { AiReportAnalyst } from "./ai-report-analyst";
+import { AiReportChat } from "./ai-report-chat";
 import { DeviceDateTime } from "./device-date-time";
 
 type DriverReport = {
@@ -260,6 +261,15 @@ export function DriverReports({ organizationId, reports, trips, expenses, vehicl
 
     {canViewFinance ? <AiReportAnalyst
       key={`${driverId}:${vehicleId}:${tripStatus}:${dateFrom}:${dateTo}`}
+      organizationId={organizationId}
+      driverId={driverId}
+      vehicleId={vehicleId}
+      tripStatus={tripStatus}
+      dateFrom={dateFrom}
+      dateTo={dateTo}
+    /> : null}
+
+    {canViewFinance ? <AiReportChat
       organizationId={organizationId}
       driverId={driverId}
       vehicleId={vehicleId}
