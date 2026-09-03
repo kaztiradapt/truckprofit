@@ -34,7 +34,7 @@ const modelResultSchema = z.object({
 });
 
 type ChatStatus = "ANSWER" | "OUT_OF_SCOPE" | "INSUFFICIENT_DATA" | "ERROR";
-type HistoryRow = { id: string; role: "USER" | "ASSISTANT"; content: string; scope_status: ChatStatus; created_at: string };
+type HistoryRow = { id: string; message_order: number; role: "USER" | "ASSISTANT"; content: string; scope_status: ChatStatus; created_at: string };
 type FailureCode = "NOT_CONFIGURED" | "TIMEOUT" | "AUTH" | "QUOTA" | "MODEL" | "UPSTREAM" | "INVALID_RESPONSE";
 
 async function authorize(organizationId: string) {
@@ -60,10 +60,10 @@ function publicHistory(rows: HistoryRow[]) {
 
 async function recentHistory(client: SupabaseClient, organizationId: string, userId: string, limit = 12): Promise<HistoryRow[]> {
   const { data, error } = await client.from("report_ai_chat_messages")
-    .select("id, role, content, scope_status, created_at")
+    .select("id, message_order, role, content, scope_status, created_at")
     .eq("organization_id", organizationId)
     .eq("requested_by", userId)
-    .order("created_at", { ascending: false })
+    .order("message_order", { ascending: false })
     .limit(limit);
   if (error) {
     if (error.code === "42P01") return [];
@@ -90,7 +90,7 @@ async function saveExchange(input: {
   const { data, error } = await input.client.from("report_ai_chat_messages").insert([
     { ...common, role: "USER", content: input.question, scope_status: input.status, model: null },
     { ...common, role: "ASSISTANT", content: input.answer, scope_status: input.status, model: input.model },
-  ]).select("id, role, content, scope_status, created_at");
+  ]).select("id, message_order, role, content, scope_status, created_at");
   if (error) {
     if (error.code === "42P01") return [];
     throw error;
@@ -138,6 +138,7 @@ async function askModel(input: {
           "Используй только переданные факты. Не придумывай отсутствующие значения. При нехватке данных верни INSUFFICIENT_DATA и назови, чего именно нет.",
           "Если вопрос вне разрешённой области, верни OUT_OF_SCOPE и стандартно объясни область работы.",
           "Для ANSWER укажи 1-4 коротких подтверждения из контекста в evidence. Денежные суммы всегда подписывай валютой компании.",
+          "Подтверждения пиши понятным русским языком без путей JSON, имён полей, технических ключей и английских названий. Форматируй большие суммы с пробелами между тысячами.",
         ].join(" "),
         input: JSON.stringify({
           conversation: input.history.map((item) => ({ role: item.role, content: item.content })).slice(-10),

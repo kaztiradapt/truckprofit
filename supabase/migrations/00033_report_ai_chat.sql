@@ -4,6 +4,7 @@
 
 create table public.report_ai_chat_messages (
   id uuid primary key default gen_random_uuid(),
+  message_order bigint generated always as identity unique,
   organization_id uuid not null references public.organizations(id) on delete cascade,
   requested_by uuid not null references public.profiles(id) on delete cascade,
   role text not null check (role in ('USER', 'ASSISTANT')),
@@ -15,7 +16,7 @@ create table public.report_ai_chat_messages (
 );
 
 create index report_ai_chat_messages_user_created_idx
-  on public.report_ai_chat_messages (organization_id, requested_by, created_at desc);
+  on public.report_ai_chat_messages (organization_id, requested_by, message_order desc);
 
 alter table public.report_ai_chat_messages enable row level security;
 

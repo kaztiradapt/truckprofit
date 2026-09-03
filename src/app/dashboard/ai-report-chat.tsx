@@ -113,7 +113,7 @@ export function AiReportChat({ organizationId, driverId, vehicleId, tripStatus, 
       <div>
         <p className="eyebrow">Закрытый помощник</p>
         <h3>Спросить ИИ о компании</h3>
-        <p>Отвечает только по данным и функциям TruckProfit. Интернет, погода и новости недоступны.</p>
+        <p>Отвечает только по данным и функциям TruckProfit. Внешние и посторонние темы, например погода и новости, недоступны.</p>
       </div>
       {messages.length ? <button type="button" className="tiny-button" onClick={clearHistory} disabled={busy}>Очистить чат</button> : null}
     </div>
