@@ -14,6 +14,7 @@ const realtimeTables = [
   "trips",
   "trip_legs",
   "pnl_snapshots",
+  "support_tickets",
 ] as const;
 
 type ConnectionState = "connecting" | "online" | "offline";
@@ -69,7 +70,7 @@ export function DashboardRealtimeSync({ organizationId }: { organizationId: stri
     : connectionState === "connecting"
       ? "Подключение…"
       : "Обновление вручную";
-  return <span className={`realtime-indicator ${connectionState}`} role="status" aria-live="polite" title="Статусы, геопозиции, расходы, чеки, рейсы и доходы обновляются автоматически">
+  return <span className={`realtime-indicator ${connectionState}`} role="status" aria-live="polite" title="Статусы, геопозиции, расходы, чеки, рейсы, доходы и обращения обновляются автоматически">
     <i aria-hidden="true" />{label}
   </span>;
 }

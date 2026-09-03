@@ -19,6 +19,7 @@ import { TripCreateForm } from "./trip-create-form";
 import { TripList } from "./trip-list";
 import { TripTrackingMap } from "./trip-tracking-map";
 import { VehicleList } from "./vehicle-list";
+import { SupportForm } from "./support-form";
 
 export const dynamic = "force-dynamic";
 
@@ -48,9 +49,10 @@ const sectionTitles: Record<DashboardSection, string> = {
   team: "Сотрудники и роли",
   operations: "Создание и закрытие рейса",
   help: "Инструкции и ЧАВО",
+  support: "Поддержка",
 };
 
-export const dashboardSections = ["overview", "trips", "vehicles", "drivers", "reports", "expenses", "team", "operations", "help"] as const;
+export const dashboardSections = ["overview", "trips", "vehicles", "drivers", "reports", "expenses", "team", "operations", "help", "support"] as const;
 export type DashboardSection = (typeof dashboardSections)[number];
 
 export async function DashboardScreen({ section, searchParams }: { section: DashboardSection; searchParams: Promise<{ error?: string; message?: string }> }) {
@@ -99,6 +101,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
     { href: "/dashboard/team", label: "Сотрудники", visible: data.role === "OWNER", key: "team" },
     { href: "/dashboard/operations", label: "Создание рейса", visible: canOperate, key: "operations" },
     { href: "/dashboard/help", label: "Инструкция", visible: true, key: "help" },
+    { href: "/dashboard/support", label: "Поддержка", visible: true, key: "support" },
   ].filter((item) => item.visible);
 
   return (
@@ -296,6 +299,34 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
             <details><summary>Что показывает раздел «Отчёты»?</summary><p>Дэшборд показывает рейсы, пробег, долю километров с грузом, сравнение водителей и использование автомобилей. Ролям с финансовым доступом дополнительно видны доход, расходы, результат и маржа. Фильтры по водителю, автомобилю и статусу рейса пересчитывают все карточки, диаграммы и таблицу.</p></details>
             <details><summary>Сохраняются ли старые геопозиции водителя?</summary><p>Да. Каждая отправленная водителем точка остаётся в истории рейса с выбранным в Telegram типом и комментарием. Последняя отмечена как текущая, прошлые можно открыть по номеру, а владельцу доступно исправление подписи.</p></details>
             <details><summary>Где смотреть полную экономику?</summary><p>В Mini App: выручка, расходы, прибыль, пробег и P&amp;L закрытых рейсов. Бот показывает быструю оперативную сводку.</p></details>
+            <details><summary>Как сообщить об ошибке?</summary><p>Откройте раздел «Поддержка», опишите проблему и при необходимости приложите скриншот. Страница, устройство, часовой пояс и версия приложения добавятся автоматически. После отправки вы получите номер обращения и сможете следить за его статусом.</p></details>
+          </div>
+        </section> : null}
+
+        {section === "support" ? <section className="support-section">
+          <div className="start-intro"><p className="eyebrow">Связь с командой TruckProfit</p><h2>Сообщить об ошибке</h2><p>Опишите проблему своими словами. Мы автоматически приложим технические сведения, которые помогают быстрее найти причину.</p></div>
+          <div className="support-layout">
+            <article className="panel support-create-panel">
+              <div className="panel-title"><div><p className="eyebrow">Новое обращение</p><h2>Что не работает?</h2></div><span>Ответ по указанному контакту</span></div>
+              <SupportForm organizationId={data.organization.id} />
+            </article>
+            <article className="panel support-history-panel">
+              <div className="panel-title"><div><p className="eyebrow">История</p><h2>Мои обращения</h2></div><span>{data.supportTickets.length}</span></div>
+              {data.supportTickets.length ? <div className="support-ticket-list">{data.supportTickets.map((ticket) => {
+                const reference = `TP-${String(ticket.ticketNumber).padStart(6, "0")}`;
+                const status = ({ OPEN: "Получено", IN_PROGRESS: "В работе", WAITING_CUSTOMER: "Нужна информация", RESOLVED: "Решено", CLOSED: "Закрыто" } as Record<string, string>)[ticket.status] ?? ticket.status;
+                const category = ({ INTERFACE: "Mini App", TELEGRAM: "Telegram-бот", DATA: "Данные и расчёты", QUESTION: "Вопрос", IDEA: "Предложение", OTHER: "Другое" } as Record<string, string>)[ticket.category] ?? ticket.category;
+                return <details className={`support-ticket status-${ticket.status.toLowerCase()}`} key={ticket.id}>
+                  <summary><span><b>{reference} · {ticket.subject}</b><small>{category} · <DeviceDateTime value={ticket.createdAt} /></small></span><em>{status}</em></summary>
+                  <div className="support-ticket-body">
+                    <p>{ticket.description}</p>
+                    {ticket.stepsToReproduce ? <div><b>Как повторить</b><p>{ticket.stepsToReproduce}</p></div> : null}
+                    {ticket.attachmentFilename ? <a className="tiny-button" href={`/api/support/${ticket.id}/attachment`} target="_blank" rel="noreferrer">Открыть скриншот</a> : null}
+                    {ticket.responseText ? <div className="support-response"><b>Ответ поддержки</b><p>{ticket.responseText}</p>{ticket.respondedAt ? <small><DeviceDateTime value={ticket.respondedAt} /></small> : null}</div> : <small>Ответ появится здесь; если вы оставили контакт, поддержка также сможет связаться напрямую.</small>}
+                  </div>
+                </details>;
+              })}</div> : <p className="empty-state">Обращений пока нет. Если заметите ошибку, форма слева автоматически соберёт нужную техническую информацию.</p>}
+            </article>
           </div>
         </section> : null}
 

@@ -147,6 +147,22 @@ export type DashboardData = {
     paymentStatus: string;
     comment: string | null;
   }>;
+  supportTickets: Array<{
+    id: string;
+    ticketNumber: number;
+    category: string;
+    priority: string;
+    status: string;
+    subject: string;
+    description: string;
+    stepsToReproduce: string | null;
+    contact: string | null;
+    responseText: string | null;
+    respondedAt: string | null;
+    attachmentFilename: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
   totals: { revenue: number; expenses: number; profit: number; totalKm: number; emptyMileagePct: number | null };
 };
 
@@ -240,6 +256,23 @@ type VehicleStatusRow = {
   recorded_at: string;
 };
 
+type SupportTicketRow = {
+  id: string;
+  ticket_number: number | string;
+  category: string;
+  priority: string;
+  status: string;
+  subject: string;
+  description: string;
+  steps_to_reproduce: string | null;
+  contact: string | null;
+  response_text: string | null;
+  responded_at: string | null;
+  attachment_filename: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 function asOne<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
@@ -267,7 +300,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
   const accessRole = asOne(membership.organization_access_roles);
   const permissions = membership.role === "OWNER" ? [...permissionCodes] : accessRole?.permissions ?? [];
 
-  const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, incomesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult, vehicleStatusesResult] = await Promise.all([
+  const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, incomesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult, vehicleStatusesResult, supportTicketsResult] = await Promise.all([
     supabase.from("profiles").select("telegram_user_id, telegram_username").eq("id", userId).maybeSingle(),
     supabase.from("vehicles").select("id, display_name, plate_number, make_model, fuel_norm_l_per_100km, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id, assigned_vehicle_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
@@ -281,6 +314,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
     supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("created_at"),
     supabase.from("trip_location_points").select("id, trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at, event_type, note").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(500),
     supabase.from("vehicle_status_records").select("id, trip_id, status_code, load_state, location_text, recorded_at").eq("organization_id", membership.organization_id).not("trip_id", "is", null).order("recorded_at", { ascending: false }).limit(1000),
+    supabase.from("support_tickets").select("id, ticket_number, category, priority, status, subject, description, steps_to_reproduce, contact, response_text, responded_at, attachment_filename, created_at, updated_at").eq("organization_id", membership.organization_id).order("created_at", { ascending: false }).limit(50),
   ]);
   for (const result of [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, incomesResult, accessRolesResult, staffResult]) {
     if (result.error) throw new Error(result.error.message);
@@ -289,7 +323,7 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
   // The web release may reach Vercel a few moments before the additive SQL migration.
   // Keep the current owner dashboard readable during that short window; any other
   // error still surfaces instead of being hidden.
-  for (const result of [recentExpensesResult, pnlResult, invitesResult, locationsResult, vehicleStatusesResult]) {
+  for (const result of [recentExpensesResult, pnlResult, invitesResult, locationsResult, vehicleStatusesResult, supportTicketsResult]) {
     if (result.error && !["42P01", "42703"].includes(result.error.code ?? "")) throw new Error(result.error.message);
   }
 
@@ -499,6 +533,22 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
       expectedPaymentAt: income.expected_payment_at,
       paymentStatus: income.payment_status,
       comment: income.comment,
+    })),
+    supportTickets: ((supportTicketsResult.data ?? []) as SupportTicketRow[]).map((ticket) => ({
+      id: ticket.id,
+      ticketNumber: Number(ticket.ticket_number),
+      category: ticket.category,
+      priority: ticket.priority,
+      status: ticket.status,
+      subject: ticket.subject,
+      description: ticket.description,
+      stepsToReproduce: ticket.steps_to_reproduce,
+      contact: ticket.contact,
+      responseText: ticket.response_text,
+      respondedAt: ticket.responded_at,
+      attachmentFilename: ticket.attachment_filename,
+      createdAt: ticket.created_at,
+      updatedAt: ticket.updated_at,
     })),
     totals: {
       revenue: summaries.reduce((sum, item) => sum + Number(item.revenue ?? 0), 0),

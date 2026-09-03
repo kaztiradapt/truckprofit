@@ -376,6 +376,40 @@ td { font-size: 14px; }
 .faq-list details { padding: 14px 16px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
 .faq-list summary { cursor: pointer; font-size: 14px; font-weight: 750; }
 .faq-list p { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+
+.support-section { margin-top: 42px; }
+.support-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr); gap: 14px; align-items: start; }
+.support-create-panel, .support-history-panel { min-width: 0; }
+.support-form { margin-top: 18px; }
+.support-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.support-form textarea, .support-form input, .support-form select { width: 100%; min-width: 0; border: 1px solid #cdd6d1; border-radius: 9px; padding: 10px 12px; background: #fbfcfa; color: var(--ink); resize: vertical; }
+.support-form textarea:focus, .support-form input:focus, .support-form select:focus { border-color: #3a7454; box-shadow: 0 0 0 3px #dceddf; outline: 0; }
+.support-form label > span small { margin-left: 4px; color: var(--muted); font-size: 10px; font-weight: 500; }
+.support-file-field input { min-height: 44px; padding: 7px 9px; font-size: 11px; }
+.support-file-field input::file-selector-button { margin-right: 8px; padding: 7px 9px; border: 1px solid #c3d2cb; border-radius: 7px; background: #fff; color: var(--green); font-weight: 750; cursor: pointer; }
+.support-submit-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.support-submit-row > span { max-width: 440px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.support-submit-row button { flex: 0 0 auto; min-width: 200px; }
+.support-form .form-error, .support-form .form-success { margin: 0; }
+.support-ticket-list { margin-top: 16px; display: grid; gap: 8px; }
+.support-ticket { border: 1px solid var(--line); border-radius: 11px; background: #fbfcfa; overflow: hidden; }
+.support-ticket[open] { border-color: #bfd5ca; background: #fff; }
+.support-ticket summary { padding: 13px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
+.support-ticket summary::-webkit-details-marker { display: none; }
+.support-ticket summary > span { min-width: 0; display: grid; gap: 4px; }
+.support-ticket summary b { overflow-wrap: anywhere; font-size: 13px; }
+.support-ticket summary small { color: var(--muted); font-size: 10px; }
+.support-ticket summary em { flex: 0 0 auto; padding: 5px 8px; border-radius: 999px; background: #eef1ef; color: #53615b; font-size: 9px; font-style: normal; font-weight: 850; text-transform: uppercase; }
+.support-ticket.status-in_progress summary em, .support-ticket.status-waiting_customer summary em { background: #fff0e4; color: #925829; }
+.support-ticket.status-resolved summary em, .support-ticket.status-closed summary em { background: var(--green-soft); color: var(--green); }
+.support-ticket-body { padding: 0 14px 14px; border-top: 1px solid #e6ebe8; display: grid; gap: 10px; }
+.support-ticket-body > p, .support-ticket-body > div p { margin: 11px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #3f4e47; font-size: 12px; line-height: 1.5; }
+.support-ticket-body > div b { font-size: 11px; }
+.support-ticket-body > small { color: var(--muted); font-size: 10px; line-height: 1.45; }
+.support-ticket-body .tiny-button { width: fit-content; text-decoration: none; }
+.support-response { margin-top: 3px; padding: 11px; border-radius: 9px; background: var(--green-soft); }
+.support-response p { margin-top: 5px !important; }
+.support-response small { color: var(--muted); font-size: 9px; }
 .start-intro { padding: 18px 0 24px; }
 .start-intro h2 { margin: 6px 0 10px; font-size: clamp(28px, 5vw, 44px); letter-spacing: -.05em; }
 .start-intro > p:last-child { max-width: 720px; margin: 0; color: var(--muted); line-height: 1.6; }
@@ -487,6 +521,7 @@ td { font-size: 14px; }
   .active-trip-facts { grid-column: 1 / -1; grid-row: 2; }
   .active-trip-toggle { grid-column: 2; grid-row: 1; }
   .help-grid { grid-template-columns: 1fr; }
+  .support-layout { grid-template-columns: 1fr; }
   .team-management-grid { grid-template-columns: 1fr; }
   .record-management-grid { grid-template-columns: 1fr; }
   .record-card-wide { grid-column: auto; }
@@ -518,7 +553,7 @@ td { font-size: 14px; }
   .topbar { align-items: start; gap: 12px; }
   .topbar h1 { font-size: clamp(25px, 7.3vw, 31px); line-height: 1.04; overflow-wrap: anywhere; }
   .eyebrow { font-size: 10px; }
-  .section-board, .operations, .record-management, .help-section, .team-management, .driver-reports { margin-top: 18px; }
+  .section-board, .operations, .record-management, .help-section, .team-management, .driver-reports, .support-section { margin-top: 18px; }
   .report-filters { grid-template-columns: 1fr; padding: 12px; }
   .report-filters .tiny-button { width: 100%; }
   .start-intro { padding: 8px 0 18px; }
@@ -601,6 +636,9 @@ td { font-size: 14px; }
   .route-search-input { grid-template-columns: 1fr; }
   .flow-card .route-search-input button { width: 100%; }
   .route-alternative-list { grid-template-columns: 1fr; }
+  .support-form-grid { grid-template-columns: 1fr; }
+  .support-submit-row { align-items: stretch; flex-direction: column; }
+  .support-submit-row button { width: 100%; min-width: 0; }
 }
 
 @media (max-width: 560px) {
@@ -662,6 +700,8 @@ td { font-size: 14px; }
   .economics strong { overflow-wrap: anywhere; }
   .auth-card { padding: 25px; }
   .route-map { height: 210px; }
+  .support-ticket summary { align-items: flex-start; flex-direction: column; }
+  .support-ticket summary em { align-self: flex-start; }
 }
 
 .telegram-mini-app, .telegram-mini-app body { min-height: 100%; overscroll-behavior: none; }
