@@ -7,6 +7,8 @@ import { aggregateManagementReport, type ExpenseBehavior, type ReportExpenseGrou
 import { createAdminClient } from "@/lib/supabase/admin";
 import { authenticatedTeamRequest } from "@/server/team-access";
 
+export const maxDuration = 60;
+
 const inputSchema = z.object({
   organizationId: z.uuid(),
   dateFrom: z.union([z.iso.date(), z.literal("")]).optional(),
@@ -30,6 +32,7 @@ const aiResultSchema = z.object({
 });
 
 type Period = { start: string; end: string };
+type AiFailureCode = "NOT_CONFIGURED" | "TIMEOUT" | "AUTH" | "QUOTA" | "MODEL" | "UPSTREAM" | "INVALID_RESPONSE";
 
 type TripRow = {
   id: string;
@@ -110,9 +113,9 @@ async function createAiExplanation(input: {
   safetyIdentifier: string;
 }) {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) return null;
+  if (!apiKey) return { result: null, failureCode: "NOT_CONFIGURED" as AiFailureCode };
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
+  const timeout = setTimeout(() => controller.abort(), 45_000);
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -121,8 +124,9 @@ async function createAiExplanation(input: {
       body: JSON.stringify({
         model: process.env.OPENAI_ANALYTICS_MODEL?.trim() || "gpt-5-mini",
         store: false,
-        max_output_tokens: 1_400,
+        max_output_tokens: 1_000,
         safety_identifier: input.safetyIdentifier,
+        reasoning: { effort: "minimal" },
         instructions: [
           "Ты аналитик экономики грузового автопарка. Отвечай по-русски.",
           "Все числа уже рассчитаны приложением. Не пересчитывай их, не изменяй и не добавляй новые факты.",
@@ -171,16 +175,26 @@ async function createAiExplanation(input: {
         },
       }),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const failureCode: AiFailureCode = response.status === 401 || response.status === 403
+        ? "AUTH"
+        : response.status === 429
+          ? "QUOTA"
+          : response.status === 404
+            ? "MODEL"
+            : "UPSTREAM";
+      console.warn("OpenAI report analysis unavailable", { status: response.status, failureCode });
+      return { result: null, failureCode };
+    }
     const payload = await response.json() as {
       output_text?: string;
       output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
     };
     const outputText = payload.output_text ?? payload.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text;
-    if (!outputText) return null;
+    if (!outputText) return { result: null, failureCode: "INVALID_RESPONSE" as AiFailureCode };
     const parsed = aiResultSchema.parse(JSON.parse(outputText));
     const explanationsBySignal = new Map(parsed.insights.map((insight) => [insight.signalId, insight]));
-    return {
+    return { result: {
       summary: parsed.summary,
       insights: input.signals.slice(0, 8).map((signal) => {
         const explanation = explanationsBySignal.get(signal.id);
@@ -192,9 +206,11 @@ async function createAiExplanation(input: {
         };
       }),
       dataQuality: parsed.dataQuality,
-    };
-  } catch {
-    return null;
+    }, failureCode: null };
+  } catch (error) {
+    const failureCode: AiFailureCode = error instanceof Error && error.name === "AbortError" ? "TIMEOUT" : "INVALID_RESPONSE";
+    console.warn("OpenAI report analysis failed", { failureCode });
+    return { result: null, failureCode };
   } finally {
     clearTimeout(timeout);
   }
@@ -322,7 +338,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
-  const aiResult = await createAiExplanation({
+  const aiExplanation = await createAiExplanation({
     current: currentMetrics,
     previous: previousMetrics,
     signals,
@@ -331,6 +347,7 @@ export async function POST(request: Request): Promise<Response> {
     comparison: periods.previous,
     safetyIdentifier: createHash("sha256").update(auth.userId).digest("hex").slice(0, 32),
   });
+  const aiResult = aiExplanation.result;
   const result = aiResult ?? rulesResult(signals);
   const mode = aiResult ? "AI" : "RULES";
   const now = new Date();
@@ -363,5 +380,6 @@ export async function POST(request: Request): Promise<Response> {
     currentMetrics,
     previousMetrics,
     signals,
+    fallbackReason: aiExplanation.failureCode,
   });
 }

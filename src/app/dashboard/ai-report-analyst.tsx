@@ -13,6 +13,7 @@ type AnalysisResponse = {
   model: string | null;
   generatedAt: string;
   cached: boolean;
+  fallbackReason?: "NOT_CONFIGURED" | "TIMEOUT" | "AUTH" | "QUOTA" | "MODEL" | "UPSTREAM" | "INVALID_RESPONSE" | null;
   period: { start: string; end: string };
   comparisonPeriod: { start: string; end: string };
   currentMetrics: {
@@ -22,6 +23,16 @@ type AnalysisResponse = {
     fuelPer100Km: number | null;
     emptyMileagePct: number | null;
   };
+};
+
+const fallbackLabels: Record<NonNullable<AnalysisResponse["fallbackReason"]>, string> = {
+  NOT_CONFIGURED: "API‑ключ модели не подключён.",
+  TIMEOUT: "Модель не успела ответить; показаны точные расчётные сигналы.",
+  AUTH: "Ключ OpenAI не принят. Проверьте ключ проекта.",
+  QUOTA: "OpenAI отклонил запрос по балансу или лимиту проекта.",
+  MODEL: "Выбранная модель недоступна этому API‑проекту.",
+  UPSTREAM: "Сервис модели временно недоступен.",
+  INVALID_RESPONSE: "Ответ модели не прошёл безопасную проверку формата.",
 };
 
 const severityLabels: Record<SignalSeverity, string> = {
@@ -97,7 +108,7 @@ export function AiReportAnalyst({ organizationId, driverId, vehicleId, tripStatu
         </article>;
       })}</div>
       <p className="ai-data-quality"><b>Качество данных:</b> {analysis.dataQuality}</p>
-      <small className="ai-report-footnote">Справка не изменяет учётные записи. {analysis.cached ? "Показан сохранённый анализ." : "Анализ сформирован сейчас."}{analysis.mode === "RULES" ? " Подключение модели временно недоступно, точные расчётные сигналы сохранены." : ""}</small>
+      <small className="ai-report-footnote">Справка не изменяет учётные записи. {analysis.cached ? "Показан сохранённый анализ." : "Анализ сформирован сейчас."}{analysis.mode === "RULES" ? ` ${analysis.fallbackReason ? fallbackLabels[analysis.fallbackReason] : "Подключение модели временно недоступно, точные расчётные сигналы сохранены."}` : ""}</small>
     </> : null}
   </section>;
 }
