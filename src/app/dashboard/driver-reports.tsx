@@ -10,6 +10,7 @@ import {
   type ManagementReportExpense,
   type ReportExpenseGroup,
 } from "@/domain/reports/management-report";
+import { AiReportAnalyst } from "./ai-report-analyst";
 import { DeviceDateTime } from "./device-date-time";
 
 type DriverReport = {
@@ -110,7 +111,8 @@ function datePart(value: string | null): string {
   return value?.slice(0, 10) ?? "";
 }
 
-export function DriverReports({ reports, trips, expenses, vehicles, baseCurrency, canViewFinance }: {
+export function DriverReports({ organizationId, reports, trips, expenses, vehicles, baseCurrency, canViewFinance }: {
+  organizationId: string;
   reports: DriverReport[];
   trips: ReportTrip[];
   expenses: ReportExpense[];
@@ -255,6 +257,16 @@ export function DriverReports({ reports, trips, expenses, vehicles, baseCurrency
       <label><span>Статус рейса</span><select value={tripStatus} onChange={(event) => setTripStatus(event.target.value)}><option value="">Все статусы</option><option value="ACTIVE">В рейсе</option><option value="COMPLETED">Закрыт</option><option value="DRAFT">Черновик</option><option value="CANCELLED">Отменён</option></select></label>
       {filtersApplied ? <button type="button" className="tiny-button" onClick={() => { setDriverId(""); setVehicleId(""); setTripStatus(""); setDateFrom(""); setDateTo(""); }}>Сбросить</button> : null}
     </div>
+
+    {canViewFinance ? <AiReportAnalyst
+      key={`${driverId}:${vehicleId}:${tripStatus}:${dateFrom}:${dateTo}`}
+      organizationId={organizationId}
+      driverId={driverId}
+      vehicleId={vehicleId}
+      tripStatus={tripStatus}
+      dateFrom={dateFrom}
+      dateTo={dateTo}
+    /> : null}
 
     <div className={`report-summary${canViewFinance ? " report-summary-finance" : ""}`} aria-label="Ключевые показатели отчёта">
       <article><span>Рейсы</span><strong>{totals.trips}</strong><small>{matchingTrips.filter((trip) => trip.status === "ACTIVE").length} в пути · {matchingTrips.filter((trip) => trip.status === "COMPLETED").length} закрыто</small></article>
