@@ -286,7 +286,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
         {section === "help" ? <section className="help-section">
           <div className="start-intro"><p className="eyebrow">ЧАВО и инструкции</p><h2>Как пользоваться TruckProfit</h2><p>Короткие сценарии для ежедневной работы. В Telegram та же справка открывается кнопкой «❓ Помощь» или командой /help.</p></div>
           <article className="training-video-card">
-            <div className="training-video-copy"><p className="eyebrow">Видеоинструкция · 2:31</p><h3>Первый рейс: от создания до отчёта</h3><p>Автомобиль и водитель, маршрут, уведомление в Telegram, статусы, расход с чеком и итоговый отчёт — в одном коротком сценарии.</p><small>Озвучка создана с помощью ИИ.</small></div>
+            <div className="training-video-copy"><p className="eyebrow">Видеоинструкция · 1:50</p><h3>Первый рейс: от создания до отчёта</h3><p>Автомобиль и водитель, маршрут, уведомление в Telegram, статусы, расход с чеком и итоговый отчёт — в одном коротком сценарии.</p><small>Озвучка создана с помощью ИИ.</small></div>
             <div className="training-video-frame"><video controls preload="metadata" poster="/training/first-trip-poster.png"><source src="/training/first-trip.mp4" type="video/mp4" />Ваш браузер не поддерживает видео.</video></div>
           </article>
           <div className="help-grid">

@@ -1,43 +1,40 @@
 {
   "intro": [
-    {"text":"Представьте: вы открываете кабинет — и сразу видите, сколько на самом деле приносит каждый рейс.","startMs":500,"endMs":7100,"timestampMs":null,"confidence":null},
-    {"text":"Это Трак Профит. За пару минут покажем весь путь: от добавления машины до итогового отчёта.","startMs":7100,"endMs":13750,"timestampMs":null,"confidence":null}
+    {"text":"Это Трак Профит. Здесь владелец сразу видит, сколько приносит каждый рейс.","startMs":500,"endMs":6100,"timestampMs":null,"confidence":null},
+    {"text":"Быстро покажем весь рабочий путь — от машины до прибыли.","startMs":6100,"endMs":11600,"timestampMs":null,"confidence":null}
   ],
   "fleet": [
-    {"text":"Начнём с основы. В разделе «Автомобили» добавьте тягач, государственный номер и основные данные.","startMs":500,"endMs":7200,"timestampMs":null,"confidence":null},
-    {"text":"Затем откройте «Водители», создайте карточку сотрудника и закрепите за ним машину.","startMs":7200,"endMs":14200,"timestampMs":null,"confidence":null},
-    {"text":"Готово! Теперь при назначении рейса нужный автомобиль подставится автоматически.","startMs":14200,"endMs":20700,"timestampMs":null,"confidence":null}
+    {"text":"Сначала добавьте автомобиль: модель, номер и тип.","startMs":500,"endMs":4700,"timestampMs":null,"confidence":null},
+    {"text":"Затем создайте водителя и закрепите за ним машину.","startMs":4700,"endMs":9000,"timestampMs":null,"confidence":null},
+    {"text":"При назначении рейса автомобиль подставится сам.","startMs":9000,"endMs":12750,"timestampMs":null,"confidence":null}
   ],
   "trip": [
-    {"text":"Теперь создаём рейс. Укажите точные адреса погрузки и выгрузки.","startMs":500,"endMs":6000,"timestampMs":null,"confidence":null},
-    {"text":"Система предложит варианты маршрута прямо на карте. Выберите подходящий и проверьте километраж.","startMs":6000,"endMs":12200,"timestampMs":null,"confidence":null},
-    {"text":"Назначьте водителя — автомобиль уже подставился.","startMs":12200,"endMs":15700,"timestampMs":null,"confidence":null},
-    {"text":"Остаётся указать заказчика, доход, валюту и согласованный курс.","startMs":15700,"endMs":21400,"timestampMs":null,"confidence":null}
+    {"text":"Теперь рейс. Укажите точки погрузки и выгрузки.","startMs":500,"endMs":4600,"timestampMs":null,"confidence":null},
+    {"text":"Выберите маршрут и проверьте километраж. Назначьте водителя.","startMs":4600,"endMs":9700,"timestampMs":null,"confidence":null},
+    {"text":"Добавьте заказчика, доход и валюту.","startMs":9700,"endMs":13700,"timestampMs":null,"confidence":null},
+    {"text":"Один клик — рейс создан.","startMs":13700,"endMs":17050,"timestampMs":null,"confidence":null}
   ],
   "telegram": [
-    {"text":"Как только рейс назначен, водитель получает уведомление в Телеграм.","startMs":500,"endMs":5200,"timestampMs":null,"confidence":null},
-    {"text":"В разделе «Мой рейс» уже есть маршрут, машина и все нужные действия.","startMs":5200,"endMs":10100,"timestampMs":null,"confidence":null},
-    {"text":"Водитель одним нажатием меняет статус: ожидает погрузку, на погрузке, в пути, ожидает выгрузку или выгружен.","startMs":10100,"endMs":18400,"timestampMs":null,"confidence":null},
-    {"text":"Для нестандартной ситуации он выбирает «Прочее» и пишет свой комментарий.","startMs":18400,"endMs":23450,"timestampMs":null,"confidence":null}
+    {"text":"Водитель сразу получает рейс в Телеграм.","startMs":500,"endMs":4000,"timestampMs":null,"confidence":null},
+    {"text":"В «Мой рейс» он видит маршрут и меняет статус одним нажатием.","startMs":4000,"endMs":9300,"timestampMs":null,"confidence":null},
+    {"text":"Нестандартная ситуация? Выберите «Прочее» и добавьте комментарий.","startMs":9300,"endMs":14500,"timestampMs":null,"confidence":null}
   ],
   "expense": [
-    {"text":"Появился расход? Водитель сразу добавляет его через Телеграм.","startMs":500,"endMs":4500,"timestampMs":null,"confidence":null},
-    {"text":"Выбирает категорию, указывает сумму и валюту, пишет комментарий и фотографирует чек.","startMs":4500,"endMs":11100,"timestampMs":null,"confidence":null},
-    {"text":"Запись мгновенно появляется в нужном рейсе, а сам чек можно открыть прямо внутри кабинета.","startMs":11100,"endMs":16550,"timestampMs":null,"confidence":null}
+    {"text":"Расход добавляется в Телеграм: категория, сумма, комментарий и фото чека.","startMs":500,"endMs":6500,"timestampMs":null,"confidence":null},
+    {"text":"Запись появляется в рейсе сразу, а чек открывается внутри кабинета.","startMs":6500,"endMs":11450,"timestampMs":null,"confidence":null}
   ],
   "live": [
-    {"text":"Дальше всё видно в реальном времени: статус, расходы и геопозиции обновляются в кабинете владельца.","startMs":500,"endMs":7000,"timestampMs":null,"confidence":null},
-    {"text":"На карте сохраняется история отметок — со временем и комментариями водителя.","startMs":7000,"endMs":12200,"timestampMs":null,"confidence":null},
-    {"text":"Значит, ход рейса можно проверить без постоянных звонков.","startMs":12200,"endMs":16550,"timestampMs":null,"confidence":null}
+    {"text":"Статус, расходы и геопозиция обновляются в реальном времени.","startMs":500,"endMs":5000,"timestampMs":null,"confidence":null},
+    {"text":"На карте остаются маршрут, время и комментарии водителя.","startMs":5000,"endMs":9600,"timestampMs":null,"confidence":null},
+    {"text":"Ход рейса виден без лишних звонков.","startMs":9600,"endMs":13200,"timestampMs":null,"confidence":null}
   ],
   "reports": [
-    {"text":"И самое важное — результат. В «Отчётах» выберите период, машину или водителя.","startMs":500,"endMs":6600,"timestampMs":null,"confidence":null},
-    {"text":"Трак Профит покажет выручку, расходы, управленческую прибыль и маржу.","startMs":6600,"endMs":12400,"timestampMs":null,"confidence":null},
-    {"text":"Здесь же видны стоимость километра и порожний пробег.","startMs":12400,"endMs":16000,"timestampMs":null,"confidence":null},
-    {"text":"А ИИ-аналитик поможет быстро сравнить показатели и найти отклонения — только по данным вашей компании.","startMs":16000,"endMs":21800,"timestampMs":null,"confidence":null}
+    {"text":"В отчётах выберите период, машину или водителя.","startMs":500,"endMs":4300,"timestampMs":null,"confidence":null},
+    {"text":"Система покажет выручку, расходы, прибыль, маржу и пробег.","startMs":4300,"endMs":9500,"timestampMs":null,"confidence":null},
+    {"text":"ИИ-аналитик заметит отклонения и подскажет, что проверить.","startMs":9500,"endMs":14300,"timestampMs":null,"confidence":null}
   ],
   "outro": [
-    {"text":"Вот и всё. Один рейс превращается в понятную цепочку фактов — от водителя до владельца.","startMs":500,"endMs":8200,"timestampMs":null,"confidence":null},
-    {"text":"Трак Профит. Прибыль каждого рейса под контролем.","startMs":8200,"endMs":12100,"timestampMs":null,"confidence":null}
+    {"text":"Готово. От первого километра до прибыли — весь рейс под контролем.","startMs":500,"endMs":7600,"timestampMs":null,"confidence":null},
+    {"text":"Трак Профит.","startMs":7600,"endMs":12100,"timestampMs":null,"confidence":null}
   ]
 }

@@ -16,19 +16,19 @@ export const CaptionTrack: React.FC<{ scene: string }> = ({ scene }) => {
   if (!active) return null;
 
   return (
-    <AbsoluteFill style={{ zIndex: 50, pointerEvents: "none", justifyContent: "flex-end", alignItems: "center", paddingBottom: 80 }}>
+    <AbsoluteFill style={{ zIndex: 50, pointerEvents: "none", justifyContent: "flex-end", alignItems: "center", paddingBottom: 30 }}>
       <div
         style={{
-          maxWidth: 1460,
-          minHeight: 76,
-          padding: "17px 32px",
+          maxWidth: 1320,
+          minHeight: 56,
+          padding: "13px 26px",
           border: "1px solid rgba(255,255,255,.18)",
-          borderRadius: 18,
-          backgroundColor: "rgba(8,24,18,.92)",
+          borderRadius: 14,
+          backgroundColor: "rgba(8,24,18,.88)",
           color: "#ffffff",
           boxShadow: "0 16px 44px rgba(0,0,0,.22)",
           fontFamily: "Inter, Arial, sans-serif",
-          fontSize: 34,
+          fontSize: 28,
           fontWeight: 720,
           lineHeight: 1.25,
           textAlign: "center",

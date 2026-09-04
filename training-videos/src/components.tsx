@@ -13,7 +13,7 @@ export const SceneBase: React.FC<{
   children: ReactNode;
   dark?: boolean;
 }> = ({ scene, audio, number, eyebrow, title, children, dark = false }) => {
-  const frame = useCurrentFrame();
+  const currentStep = Number(number);
 
   return (
     <AbsoluteFill style={{ overflow: "hidden", backgroundColor: dark ? "#0b261e" : "#f4f6f2", color: dark ? "#ffffff" : "#14211c", fontFamily: "Inter, Arial, sans-serif" }}>
@@ -26,82 +26,70 @@ export const SceneBase: React.FC<{
         style={{
           position: "absolute",
           zIndex: 2,
-          top: 92,
+          top: 52,
           left: 96,
-          width: 490,
-          opacity: interpolate(frame, [0, 18], [0, 1], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: Easing.bezier(0.16, 1, 0.3, 1),
-          }),
-          translate: interpolate(frame, [0, 22], ["-24px 0px", "0px 0px"], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: Easing.bezier(0.16, 1, 0.3, 1),
-          }),
+          width: 1080,
+          opacity: 1,
         }}
       >
-        <div style={{ color: dark ? "#a8bbb2" : "#60736a", display: "flex", alignItems: "center", gap: 12, fontSize: 17, fontWeight: 800, letterSpacing: 2.2, textTransform: "uppercase" }}>
-          <span style={{ color: "#11271f", width: 44, height: 44, borderRadius: 14, backgroundColor: "#dafa58", display: "grid", placeItems: "center", fontSize: 15 }}>{number}</span>
+        <div style={{ color: dark ? "#a8bbb2" : "#60736a", display: "flex", alignItems: "center", gap: 12, fontSize: 16, fontWeight: 800, letterSpacing: 2.2, textTransform: "uppercase" }}>
+          <span style={{ color: "#11271f", width: 40, height: 40, borderRadius: 12, backgroundColor: "#dafa58", display: "grid", placeItems: "center", fontSize: 14 }}>{number}</span>
           {eyebrow}
         </div>
-        <h1 style={{ margin: "27px 0 0", fontSize: 68, lineHeight: 0.98, letterSpacing: -4.2 }}>{title}</h1>
+        <h1 style={{ margin: "12px 0 0", fontSize: 49, lineHeight: 0.96, letterSpacing: -3.2 }}>{title}</h1>
       </Interactive.Div>
 
-      <div style={{ position: "absolute", zIndex: 2, top: 70, right: 84, display: "flex", alignItems: "center", gap: 12, color: dark ? "#c8d7d0" : "#18342a", fontSize: 22, fontWeight: 850 }}>
-        <CanvasImage src={staticFile("assets/truckprofit-bot-avatar.png")} style={{ width: 44, height: 44, borderRadius: 13 }} />
+      <div style={{ position: "absolute", zIndex: 2, top: 52, right: 96, display: "flex", alignItems: "center", gap: 12, color: dark ? "#c8d7d0" : "#18342a", fontSize: 20, fontWeight: 850 }}>
+        <CanvasImage src={staticFile("assets/truckprofit-bot-avatar.png")} style={{ width: 40, height: 40, borderRadius: 12 }} />
         TruckProfit
+      </div>
+
+      <div style={{ position: "absolute", zIndex: 2, top: 122, right: 96, display: "flex", alignItems: "center", gap: 13, color: dark ? "#9fb5ab" : "#63756c", fontSize: 12, fontWeight: 850, letterSpacing: 1.3 }}>
+        <span>ШАГ {currentStep} ИЗ 6</span>
+        <span style={{ display: "flex", gap: 6 }}>
+          {Array.from({ length: 6 }, (_, index) => <i key={index} style={{ width: index + 1 === currentStep ? 30 : 9, height: 9, borderRadius: 99, backgroundColor: index + 1 <= currentStep ? "#dafa58" : dark ? "#33554a" : "#d5ddd9" }} />)}
+        </span>
       </div>
 
       <div
         style={{
           position: "absolute",
           zIndex: 1,
-          top: 165,
-          right: 84,
-          width: 1190,
-          height: 730,
-          opacity: interpolate(frame, [7, 28], [0, 1], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: Easing.bezier(0.16, 1, 0.3, 1),
-          }),
-          scale: interpolate(frame, [7, 28], [0.965, 1], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: Easing.spring({ damping: 200 }),
-            output: "perceptual-scale",
-          }),
+          top: 225,
+          left: 140,
+          width: 1640,
+          height: 685,
+          opacity: 1,
+          scale: 1,
         }}
       >
         {children}
       </div>
       <CaptionTrack scene={scene} />
-      <div style={{ position: "absolute", zIndex: 4, left: 96, bottom: 88, color: dark ? "#789086" : "#8b9791", fontSize: 15, fontWeight: 700 }}>Обучение · Первый рейс</div>
     </AbsoluteFill>
   );
 };
 
 export const AppWindow: React.FC<{ active: string; title: string; children: ReactNode; badge?: string }> = ({ active, title, children, badge }) => {
   return (
-    <div style={{ width: "100%", height: "100%", overflow: "hidden", border: "1px solid #bccbc4", borderRadius: 24, backgroundColor: "#f7f8f5", boxShadow: "0 34px 80px rgba(20,50,38,.18)", display: "grid", gridTemplateRows: "48px 1fr" }}>
+    <div style={{ width: "100%", height: "100%", overflow: "hidden", border: "1px solid #b9c9c1", borderRadius: 22, backgroundColor: "#f7f8f5", boxShadow: "0 32px 80px rgba(20,50,38,.22)", display: "grid", gridTemplateRows: "44px 1fr" }}>
       <div style={{ padding: "0 18px", backgroundColor: "#101d18", color: "#82948c", display: "grid", gridTemplateColumns: "1fr 2fr 1fr", alignItems: "center", fontSize: 12 }}>
         <span style={{ display: "flex", gap: 7 }}><i style={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: "#dc7653" }} /><i style={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: "#e7bb54" }} /><i style={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: "#61b578" }} /></span>
         <span style={{ justifySelf: "center", padding: "7px 55px", borderRadius: 8, backgroundColor: "#1d2e27" }}>fleet-economics.vercel.app/dashboard</span>
         <span style={{ justifySelf: "end", letterSpacing: 3 }}>•••</span>
       </div>
       <div style={{ minHeight: 0, display: "grid", gridTemplateColumns: "205px 1fr" }}>
-        <aside style={{ padding: "26px 18px", backgroundColor: "#112a21", color: "#a3b3ac", display: "flex", flexDirection: "column", gap: 5 }}>
-          <div style={{ marginBottom: 25, color: "#ffffff", display: "flex", alignItems: "center", gap: 10, fontSize: 17, fontWeight: 850 }}><span style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: "#dafa58", color: "#173024", display: "grid", placeItems: "center", fontSize: 12 }}>TP</span>TruckProfit</div>
-          {["Обзор", "Рейсы", "Автомобили", "Водители", "Отчёты", "Расходы", "Сотрудники", "Создание рейса"].map((item) => <span key={item} style={{ padding: "10px 12px", borderRadius: 8, backgroundColor: item === active ? "#294238" : "transparent", color: item === active ? "#ffffff" : "#a3b3ac", fontSize: 13, fontWeight: item === active ? 750 : 500 }}>{item}</span>)}
+        <aside style={{ padding: "22px 18px", backgroundColor: "#112a21", color: "#a3b3ac", display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ marginBottom: 20, color: "#ffffff", display: "flex", alignItems: "center", gap: 10, fontSize: 18, fontWeight: 850 }}><span style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: "#dafa58", color: "#173024", display: "grid", placeItems: "center", fontSize: 12 }}>TP</span>TruckProfit</div>
+          {["Обзор", "Рейсы", "Автомобили", "Водители", "Отчёты", "Расходы", "Сотрудники", "Создание рейса"].map((item) => <span key={item} style={{ padding: "9px 12px", borderRadius: 8, backgroundColor: item === active ? "#294238" : "transparent", color: item === active ? "#ffffff" : "#a3b3ac", fontSize: 14, fontWeight: item === active ? 750 : 500 }}>{item}</span>)}
           <small style={{ marginTop: "auto", padding: "15px 10px 0", borderTop: "1px solid #385047", color: "#82958d", fontSize: 10, lineHeight: 1.6 }}>DEMO TRANS<br />3 авто · KZT</small>
         </aside>
-        <section style={{ minWidth: 0, padding: "30px 34px", overflow: "hidden" }}>
+        <section style={{ minWidth: 0, padding: "24px 30px", overflow: "hidden" }}>
           <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20 }}>
-            <div><small style={{ color: "#718079", fontSize: 10, fontWeight: 800, letterSpacing: 1.4 }}>ЭКОНОМИКА АВТОПАРКА</small><h2 style={{ margin: "5px 0 0", fontSize: 32, letterSpacing: -1.5 }}>{title}</h2></div>
+            <div><small style={{ color: "#718079", fontSize: 10, fontWeight: 800, letterSpacing: 1.4 }}>ЭКОНОМИКА АВТОПАРКА</small><h2 style={{ margin: "4px 0 0", fontSize: 30, letterSpacing: -1.5 }}>{title}</h2></div>
             {badge ? <span style={{ padding: "8px 12px", borderRadius: 999, backgroundColor: "#e5f3ec", color: "#176d50", fontSize: 11, fontWeight: 800 }}>{badge}</span> : null}
           </header>
-          <div style={{ marginTop: 24 }}>{children}</div>
+          <div style={{ marginTop: 18 }}>{children}</div>
         </section>
       </div>
     </div>
@@ -183,25 +171,28 @@ export const GuidedCursor: React.FC<{ stops: CursorStop[] }> = ({ stops }) => {
   const labelVisible = Boolean(settledStop.label) && frame >= settledStop.frame && frame <= settledStop.frame + 34;
 
   return (
+    <>
+      {stops.filter((stop) => stop.click).map((stop) => <Audio key={`click-${stop.frame}`} from={stop.frame} durationInFrames={10} src={staticFile("sfx/mouse-click.wav")} volume={0.16} />)}
     <div
       style={{
         position: "absolute",
         zIndex: 20,
         left: x,
         top: y,
-        width: 30,
-        height: 38,
-        opacity: interpolate(frame, [Math.max(0, first.frame - 12), first.frame], [0, 1], {
+        width: 40,
+        height: 48,
+        opacity: interpolate(frame, [Math.max(0, first.frame - 12), first.frame, stops[stops.length - 1].frame + 45, stops[stops.length - 1].frame + 62], [0, 1, 1, 0], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
         }),
         filter: "drop-shadow(0 5px 5px rgba(0,0,0,.25))",
       }}
     >
-      <span style={{ position: "absolute", width: 54, height: 54, left: -17, top: -16, border: "3px solid #dafa58", borderRadius: "50%", opacity: clickOpacity, scale: clickScale }} />
-      <div style={{ width: 0, height: 0, borderTop: "22px solid #15241d", borderRight: "14px solid transparent", rotate: "-18deg" }} />
-      {labelVisible ? <span style={{ position: "absolute", left: 18, top: 24, width: "max-content", maxWidth: 190, padding: "7px 10px", borderRadius: 8, backgroundColor: "#13261f", color: "#ffffff", boxShadow: "0 8px 24px rgba(14,39,29,.24)", fontSize: 10, fontWeight: 800 }}>{settledStop.label}</span> : null}
+      <span style={{ position: "absolute", width: 62, height: 62, left: -23, top: -22, border: "4px solid #dafa58", borderRadius: "50%", opacity: clickOpacity, scale: clickScale }} />
+      <svg width="38" height="46" viewBox="0 0 38 46" aria-hidden="true" style={{ overflow: "visible" }}><path d="M4 3L31 27H18L11 42L4 3Z" fill="#ffffff" stroke="#10231b" strokeWidth="3.4" strokeLinejoin="round" /></svg>
+      {labelVisible ? <span style={{ position: "absolute", left: 24, top: 30, width: "max-content", maxWidth: 230, padding: "8px 12px", border: "1px solid rgba(255,255,255,.14)", borderRadius: 9, backgroundColor: "#10251d", color: "#ffffff", boxShadow: "0 10px 28px rgba(14,39,29,.3)", fontSize: 13, fontWeight: 800 }}>{settledStop.label}</span> : null}
     </div>
+    </>
   );
 };
 

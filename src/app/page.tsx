@@ -248,7 +248,7 @@ export default function Home() {
 
       <section className={`${styles.section} ${styles.videoSection}`} id="demo">
         <div className={styles.videoCopy}>
-          <p className={styles.kicker}><span /> Обучение · 2,5 минуты</p>
+          <p className={styles.kicker}><span /> Обучение · 1:50</p>
           <h2>Первый рейс:<br />от создания до отчёта.</h2>
           <p>
             Посмотрите полный рабочий сценарий: подготовка автопарка, назначение рейса,

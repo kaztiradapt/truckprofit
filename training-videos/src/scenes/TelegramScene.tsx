@@ -6,7 +6,7 @@ const statuses = ["Ожидаю погрузку", "На погрузке", "В 
 
 export const TelegramScene: React.FC = () => {
   const frame = useCurrentFrame();
-  const selected = frame < 350 ? "Ожидаю погрузку" : frame < 570 ? "В пути" : "Прочее";
+  const selected = frame < 250 ? "Ожидаю погрузку" : frame < 355 ? "В пути" : "Прочее";
 
   return (
     <SceneBase scene="telegram" audio="voiceover/04-telegram.wav" number="03" eyebrow="Telegram водителя" title={<>Водитель работает<br /><span style={{ color: "#dafa58" }}>без новой CRM.</span></>} dark>
@@ -33,10 +33,10 @@ export const TelegramScene: React.FC = () => {
           {selected === "Прочее" ? <div style={{ marginTop: 12, padding: "17px 20px", borderRadius: 14, backgroundColor: "#ffffff", color: "#183128", fontSize: 16 }}><b>Комментарий водителя:</b> задержка на погранпереходе</div> : null}
         </div>
         <GuidedCursor stops={[
-          { frame: 118, x: 305, y: 222, click: true, label: "Открыть мой рейс" },
-          { frame: 245, x: 118, y: 565, click: true, label: "Ожидаю погрузку" },
-          { frame: 350, x: 118, y: 616, click: true, label: "В пути" },
-          { frame: 570, x: 300, y: 666, click: true, label: "Прочее + комментарий" },
+          { frame: 92, x: 305, y: 202, click: true, label: "Открыть мой рейс" },
+          { frame: 182, x: 118, y: 544, click: true, label: "Ожидаю погрузку" },
+          { frame: 250, x: 118, y: 595, click: true, label: "В пути" },
+          { frame: 355, x: 300, y: 645, click: true, label: "Прочее + комментарий" },
         ]} />
       </div>
     </SceneBase>

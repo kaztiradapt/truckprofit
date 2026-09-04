@@ -9,15 +9,15 @@ export const TripScene: React.FC = () => {
     <SceneBase scene="trip" audio="voiceover/03-trip.wav" number="02" eyebrow="Создание рейса" title={<>Соберите рейс<br />в одной форме.</>}>
       <AppWindow active="Создание рейса" title="Новый рейс" badge="Черновик">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 11 }}>
-          <Field label="ВОДИТЕЛЬ" value="Иван Петров" active={frame >= 335 && frame < 385} />
-          <Field label="АВТОМОБИЛЬ" value="Volvo FH · 123 ABC 10" active={frame >= 385 && frame < 430} />
+          <Field label="ВОДИТЕЛЬ" value="Иван Петров" active={frame >= 235 && frame < 285} />
+          <Field label="АВТОМОБИЛЬ" value="Volvo FH · 123 ABC 10" active={frame >= 285 && frame < 325} />
           <Field label="ДАТА СТАРТА" value="03.09.2026" />
         </div>
         <div style={{ marginTop: 15, display: "grid", gridTemplateColumns: ".92fr 1.08fr", gap: 14 }}>
           <section style={{ padding: 17, border: "1px solid #d6e0db", borderRadius: 13, backgroundColor: "#ffffff" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Field label="ПОГРУЗКА" value="Караганда, ул. Складская, 18" active={frame >= 75 && frame < 135} />
-              <Field label="ВЫГРУЗКА" value="Ушарал, Промышленная зона" active={frame >= 135 && frame < 205} />
+              <Field label="ПОГРУЗКА" value="Караганда, ул. Складская, 18" active={frame >= 52 && frame < 100} />
+              <Field label="ВЫГРУЗКА" value="Ушарал, Промышленная зона" active={frame >= 100 && frame < 150} />
             </div>
             <div style={{ marginTop: 13, height: 220, position: "relative", overflow: "hidden", border: "1px solid #cbd9d2", borderRadius: 11, backgroundColor: "#e9efe8", backgroundImage: "linear-gradient(27deg, transparent 46%, #d4ddd3 47%, #d4ddd3 49%, transparent 50%), linear-gradient(119deg, transparent 46%, #d5dfd5 47%, #d5dfd5 49%, transparent 50%)", backgroundSize: "90px 70px, 100px 84px" }}>
               <i style={{ position: "absolute", width: 220, height: 7, left: 70, top: 78, borderRadius: 99, backgroundColor: "#176f53", rotate: "10deg" }} />
@@ -34,11 +34,11 @@ export const TripScene: React.FC = () => {
           <section style={{ padding: 17, border: "1px solid #d6e0db", borderRadius: 13, backgroundColor: "#ffffff", display: "grid", alignContent: "start", gap: 11 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <Field label="ЗАКАЗЧИК" value="ТОО Север Логистик" />
-              <Field label="ДОХОД" value="850 000" active={frame >= 465 && frame < 535} />
+              <Field label="ДОХОД" value="850 000" active={frame >= 350 && frame < 405} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <Field label="ВАЛЮТА" value="KZT — тенге" />
-              <Field label="ПРОБЕГ" value="1 317 км" active={frame >= 270 && frame < 335} />
+              <Field label="ПРОБЕГ" value="1 317 км" active={frame >= 195 && frame < 235} />
             </div>
             <div style={{ padding: 15, borderRadius: 11, backgroundColor: "#eff4f1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <span style={{ color: "#69776f", display: "grid", gap: 5, fontSize: 10 }}>Водитель<b style={{ color: "#18221e", fontSize: 13 }}>Иван Петров</b></span>
@@ -48,14 +48,16 @@ export const TripScene: React.FC = () => {
           </section>
         </div>
         <GuidedCursor stops={[
-          { frame: 78, x: 355, y: 305, click: true, label: "Адрес погрузки" },
-          { frame: 142, x: 555, y: 305, click: true, label: "Адрес выгрузки" },
-          { frame: 220, x: 335, y: 590, click: true, label: "Выбрать маршрут" },
-          { frame: 282, x: 1015, y: 380, click: true, label: "Проверить пробег" },
-          { frame: 342, x: 385, y: 205, click: true, label: "Выбрать водителя" },
-          { frame: 395, x: 690, y: 205, click: true, label: "Машина подставится" },
-          { frame: 478, x: 1015, y: 305, click: true, label: "Указать доход" },
-          { frame: 580, x: 900, y: 520, click: true, label: "Создать рейс" },
+          { frame: 55, x: 395, y: 289, click: true, label: "Адрес погрузки" },
+          { frame: 105, x: 695, y: 289, click: true, label: "Адрес выгрузки" },
+          { frame: 158, x: 345, y: 574, click: true, label: "Выбрать маршрут" },
+          { frame: 205, x: 1390, y: 364, click: true, label: "Проверить пробег" },
+          { frame: 248, x: 455, y: 189, click: true, label: "Выбрать водителя" },
+          { frame: 292, x: 905, y: 189, click: true, label: "Машина подставится" },
+          { frame: 332, x: 1045, y: 289, click: true, label: "Заказчик" },
+          { frame: 375, x: 1390, y: 289, click: true, label: "Доход" },
+          { frame: 415, x: 1045, y: 364, click: true, label: "Валюта" },
+          { frame: 475, x: 1220, y: 504, click: true, label: "Создать рейс" },
         ]} />
       </AppWindow>
     </SceneBase>
