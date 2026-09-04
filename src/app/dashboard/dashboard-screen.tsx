@@ -56,7 +56,7 @@ export const dashboardSections = ["overview", "trips", "vehicles", "drivers", "r
 export type DashboardSection = (typeof dashboardSections)[number];
 
 export async function DashboardScreen({ section, searchParams }: { section: DashboardSection; searchParams: Promise<{ error?: string; message?: string }> }) {
-  const data = await getDashboardData();
+  const data = await getDashboardData(section);
   if (data === "UNAUTHENTICATED") redirect("/login");
   if (data === "NO_ORGANIZATION") redirect("/onboarding");
   const { error, message } = await searchParams;
@@ -266,7 +266,7 @@ export async function DashboardScreen({ section, searchParams }: { section: Dash
 
         {section === "team" && canManageTeam ? <TeamManagement organizationId={data.organization.id} roles={data.accessRoles} staff={data.staff} canManageCoOwners={data.isPrimaryOwner} canDeleteRecords={canDelete} /> : section === "team" ? <section className="panel"><h2>Доступ ограничен</h2><p className="muted">Для управления сотрудниками требуется соответствующее право.</p></section> : null}
 
-        {section === "reports" ? <DriverReports organizationId={data.organization.id} reports={data.driverReports} trips={reportTrips} expenses={data.recentExpenses} vehicles={data.vehicles} baseCurrency={data.organization.baseCurrency} canViewFinance={canViewFinance} /> : null}
+        {section === "reports" ? <DriverReports organizationId={data.organization.id} organizationName={data.organization.name} reports={data.driverReports} trips={reportTrips} expenses={data.recentExpenses} vehicles={data.vehicles} baseCurrency={data.organization.baseCurrency} canViewFinance={canViewFinance} /> : null}
 
         {section === "operations" && canOperate ? <section className="operations">
           <div className="start-intro"><p className="eyebrow">End-to-end контур</p><h2>Провести настоящий рейс</h2><p>Организация уже подключена. Пройдите шаги по порядку — данные сохраняются в защищённом контуре компании.</p></div>

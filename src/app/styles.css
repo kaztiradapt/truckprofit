@@ -276,6 +276,13 @@ td { font-size: 14px; }
 .report-filters select, .report-filters input { width: 100%; min-width: 0; min-height: 42px; border: 1px solid #c8d5cf; border-radius: 9px; padding: 8px 11px; background: #fff; color: var(--ink); }
 .report-filters select { padding-right: 34px; }
 .report-filters .tiny-button { min-height: 42px; white-space: nowrap; }
+.report-export-toolbar { padding: 13px 15px; border: 1px solid #c8d9d0; border-radius: 13px; background: #f8fbf9; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.report-export-toolbar > span { min-width: 0; display: grid; gap: 3px; }
+.report-export-toolbar > span b { color: #30483e; font-size: 12px; }
+.report-export-toolbar > span small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.report-export-toolbar > div { flex: 0 0 auto; display: flex; gap: 8px; }
+.report-export-toolbar button { min-height: 40px; padding: 8px 13px; font-size: 11px; white-space: nowrap; }
+.report-export-toolbar button:disabled { cursor: not-allowed; opacity: .5; }
 .ai-report-analyst { min-width: 0; padding: 20px; border: 1px solid #b9d8c9; border-radius: 16px; background: linear-gradient(145deg, #f7fcf9, #e8f5ee); box-shadow: 0 10px 34px #174f3d0d; display: grid; gap: 15px; }
 .ai-report-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .ai-report-heading h3 { margin: 3px 0 5px; font-size: clamp(20px, 2.2vw, 28px); letter-spacing: -.035em; }
@@ -678,6 +685,9 @@ td { font-size: 14px; }
   .training-video-copy h3 { font-size: 21px; }
   .report-filters { grid-template-columns: 1fr; padding: 12px; }
   .report-filters .tiny-button { width: 100%; }
+  .report-export-toolbar { align-items: stretch; flex-direction: column; }
+  .report-export-toolbar > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-export-toolbar button { width: 100%; white-space: normal; }
   .start-intro { padding: 8px 0 18px; }
   .start-intro h2 { font-size: 27px; line-height: 1.08; }
   .operations > .start-intro { display: none; }
@@ -841,6 +851,27 @@ td { font-size: 14px; }
 .telegram-mini-app .app-shell { min-height: 100dvh; }
 .telegram-mini-app .sidebar { padding-top: max(10px, env(safe-area-inset-top)); }
 .telegram-mini-app .content { padding-bottom: max(42px, calc(env(safe-area-inset-bottom) + 18px)); background: var(--paper); }
+
+@media print {
+  @page { size: landscape; margin: 10mm; }
+  body, .app-shell, .content { background: #fff !important; }
+  .app-shell { display: block; }
+  .sidebar, .topbar-actions, .report-period-presets, .report-filters, .report-export-toolbar, .ai-report-analyst, .ai-report-chat, .disclaimer { display: none !important; }
+  .content { width: 100%; max-width: none; padding: 0; overflow: visible; }
+  .topbar { margin-bottom: 12px; }
+  .topbar h1 { font-size: 26px; }
+  .driver-reports { margin-top: 0; gap: 10px; }
+  .report-dashboard-intro, .report-summary article, .report-comparison, .report-chart-card, .report-table-panel { break-inside: avoid; box-shadow: none; }
+  .report-dashboard-intro { padding: 14px; }
+  .report-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+  .report-summary article { min-height: 88px; padding: 10px; }
+  .report-summary strong { font-size: 17px; }
+  .report-charts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .report-chart-card { padding: 11px; }
+  .table-wrap { overflow: visible; }
+  .driver-report-table { min-width: 0; font-size: 8px; }
+  .driver-report-table th, .driver-report-table td { padding: 5px 4px; }
+}
 
 .beta-admin-page { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 38px 0 64px; }
 .beta-admin-topbar { margin-bottom: 22px; display: flex; align-items: end; justify-content: space-between; gap: 24px; }

@@ -10,6 +10,7 @@ import {
   type ManagementReportExpense,
   type ReportExpenseGroup,
 } from "@/domain/reports/management-report";
+import { buildManagementReportCsv, reportExportFilename } from "@/domain/reports/report-export";
 import { AiReportAnalyst } from "./ai-report-analyst";
 import { AiReportChat } from "./ai-report-chat";
 import { DeviceDateTime } from "./device-date-time";
@@ -112,8 +113,19 @@ function datePart(value: string | null): string {
   return value?.slice(0, 10) ?? "";
 }
 
-export function DriverReports({ organizationId, reports, trips, expenses, vehicles, baseCurrency, canViewFinance }: {
+function tripStatusLabel(value: string): string {
+  return ({ ACTIVE: "В рейсе", CANCELLED: "Отменён", COMPLETED: "Закрыт", DRAFT: "Черновик" } as Record<string, string>)[value] ?? value;
+}
+
+function displayDate(value: string): string {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}.${month}.${year}` : value;
+}
+
+export function DriverReports({ organizationId, organizationName, reports, trips, expenses, vehicles, baseCurrency, canViewFinance }: {
   organizationId: string;
+  organizationName: string;
   reports: DriverReport[];
   trips: ReportTrip[];
   expenses: ReportExpense[];
@@ -193,7 +205,7 @@ export function DriverReports({ organizationId, reports, trips, expenses, vehicl
     .slice(0, 6), [filteredReports]);
   const maximumDriverKm = Math.max(0, ...driverPerformance.map((report) => report.totalKm));
 
-  const vehiclePerformance = useMemo(() => {
+  const vehicleReportRows = useMemo(() => {
     const byVehicle = new Map(vehicles.map((vehicle) => [vehicle.id, {
       id: vehicle.id, name: `${vehicle.displayName} · ${vehicle.plateNumber}`,
       trips: 0, activeTrips: 0, totalKm: 0, revenueMinor: 0, actualExpensesMinor: 0, profitMinor: 0,
@@ -212,8 +224,9 @@ export function DriverReports({ organizationId, reports, trips, expenses, vehicl
       current.profitMinor += tripTotals.actualProfitMinor;
       byVehicle.set(trip.vehicleId, current);
     }
-    return [...byVehicle.values()].filter((vehicle) => vehicle.trips > 0).sort((left, right) => right.totalKm - left.totalKm).slice(0, 6);
+    return [...byVehicle.values()].filter((vehicle) => vehicle.trips > 0).sort((left, right) => right.totalKm - left.totalKm);
   }, [expensesByTrip, matchingTrips, vehicles]);
+  const vehiclePerformance = useMemo(() => vehicleReportRows.slice(0, 6), [vehicleReportRows]);
   const maximumVehicleKm = Math.max(0, ...vehiclePerformance.map((vehicle) => vehicle.totalKm));
 
   const expenseStructure = expenseGroups.map((group) => ({ group, amount: totals.expensesByGroupMinor[group] })).filter((item) => item.amount > 0);
@@ -234,6 +247,70 @@ export function DriverReports({ organizationId, reports, trips, expenses, vehicl
     start.setDate(start.getDate() - days + 1);
     setDateFrom(start.toISOString().slice(0, 10));
     setDateTo(end.toISOString().slice(0, 10));
+  }
+
+  function downloadCurrentReport() {
+    const generatedAt = new Date();
+    const reportNames = new Map(reports.map((report) => [report.driverId, report.displayName]));
+    const selectedDriver = reports.find((report) => report.driverId === driverId);
+    const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+    const period = dateFrom || dateTo
+      ? `${dateFrom ? displayDate(dateFrom) : "начало учёта"} — ${dateTo ? displayDate(dateTo) : "сегодня"}`
+      : "Всё время";
+    const csv = buildManagementReportCsv({
+      organizationName,
+      currency: baseCurrency,
+      generatedAt: generatedAt.toLocaleString("ru-RU"),
+      filters: {
+        period,
+        driver: selectedDriver?.displayName ?? "Все водители",
+        vehicle: selectedVehicle ? `${selectedVehicle.displayName} · ${selectedVehicle.plateNumber}` : "Все автомобили",
+        tripStatus: tripStatus ? tripStatusLabel(tripStatus) : "Все статусы",
+      },
+      totals,
+      trips: matchingTrips.map((trip) => {
+        const tripTotals = aggregateManagementReport([trip], expensesByTrip.get(trip.id) ?? []);
+        return {
+          title: trip.title,
+          driverName: trip.driverId ? reportNames.get(trip.driverId) ?? "Водитель не найден" : "Не назначен",
+          vehicleName: trip.vehicleName,
+          status: trip.status,
+          startedAt: trip.startedAt,
+          totalKm: trip.totalKm,
+          loadedKm: trip.loadedKm,
+          emptyKm: trip.emptyKm,
+          revenueMinor: trip.revenueMinor,
+          directExpensesMinor: tripTotals.directExpensesMinor,
+          driverCompensationMinor: trip.driverCompensationMinor,
+          profitMinor: tripTotals.actualProfitMinor,
+        };
+      }),
+      drivers: filteredReports.map((report) => ({
+        displayName: report.displayName,
+        assignedVehicleName: report.assignedVehicleName,
+        totalTrips: report.totalTrips,
+        activeTrips: report.activeTrips,
+        completedTrips: report.completedTrips,
+        totalKm: report.totalKm,
+        loadedKm: report.loadedKm,
+        emptyKm: report.emptyKm,
+        revenueMinor: report.revenueMinor,
+        actualExpensesMinor: report.actualExpensesMinor,
+        actualProfitMinor: report.managementProfitMinor,
+        normalizedProfitMinor: report.normalizedProfitMinor,
+      })),
+      vehicles: vehicleReportRows,
+      includeFinance: canViewFinance,
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = reportExportFilename(organizationName, generatedAt);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   return <section className="driver-reports">
@@ -257,6 +334,14 @@ export function DriverReports({ organizationId, reports, trips, expenses, vehicl
       <label><span>Автомобиль</span><select value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}><option value="">Все автомобили</option>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.displayName} · {vehicle.plateNumber}</option>)}</select></label>
       <label><span>Статус рейса</span><select value={tripStatus} onChange={(event) => setTripStatus(event.target.value)}><option value="">Все статусы</option><option value="ACTIVE">В рейсе</option><option value="COMPLETED">Закрыт</option><option value="DRAFT">Черновик</option><option value="CANCELLED">Отменён</option></select></label>
       {filtersApplied ? <button type="button" className="tiny-button" onClick={() => { setDriverId(""); setVehicleId(""); setTripStatus(""); setDateFrom(""); setDateTo(""); }}>Сбросить</button> : null}
+    </div>
+
+    <div className="report-export-toolbar" aria-label="Выгрузка отчёта">
+      <span><b>Скачать текущую выборку</b><small>Фильтры применяются и к файлу. CSV открывается в Excel и Google Таблицах.</small></span>
+      <div>
+        <button type="button" className="button-secondary" onClick={() => window.print()}>Печать / PDF</button>
+        <button type="button" onClick={downloadCurrentReport} disabled={!matchingTrips.length}>Скачать CSV</button>
+      </div>
     </div>
 
     {canViewFinance ? <AiReportAnalyst

@@ -1,4 +1,5 @@
 import { normalizeRouteGeometry } from "@/domain/route-geometry";
+import { dashboardDataNeeds, type DashboardDataScope } from "@/domain/dashboard-data-scope";
 import { createClient } from "@/lib/supabase/server";
 import { permissionCodes } from "@/server/team-access";
 
@@ -289,7 +290,7 @@ function asOne<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
-export async function getDashboardData(): Promise<DashboardLoadResult> {
+export async function getDashboardData(scope: DashboardDataScope = "overview"): Promise<DashboardLoadResult> {
   const supabase = await createClient();
   const { data: claimsResult, error: claimsError } = await supabase.auth.getClaims();
   const userId = claimsResult?.claims?.sub;
@@ -311,22 +312,24 @@ export async function getDashboardData(): Promise<DashboardLoadResult> {
   if (!organization) throw new Error("Active membership has no organization");
   const accessRole = asOne(membership.organization_access_roles);
   const permissions = membership.role === "OWNER" ? [...permissionCodes] : accessRole?.permissions ?? [];
+  const needs = dashboardDataNeeds(scope);
+  const emptyResult = () => Promise.resolve({ data: [], error: null });
 
   const [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, recentExpensesResult, incomesResult, pnlResult, invitesResult, accessRolesResult, staffResult, locationsResult, vehicleStatusesResult, supportTicketsResult, platformAdminResult] = await Promise.all([
     supabase.from("profiles").select("telegram_user_id, telegram_username").eq("id", userId).maybeSingle(),
     supabase.from("vehicles").select("id, display_name, plate_number, make_model, fuel_norm_l_per_100km, status").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
     supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id, assigned_vehicle_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name"),
-    supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km, route_geometry)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(500),
-    supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id),
-    supabase.from("expenses").select("id, trip_id, vehicle_id, driver_id, amount, currency, reporting_amount_minor, quantity, unit, occurred_at, source, location_text, comment, cost_behavior, include_in_normalized_cost, expense_categories(display_name, economic_group), trips(title), drivers(display_name), attachments(id, original_filename, content_type)").eq("organization_id", membership.organization_id).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(2000),
-    supabase.from("incomes").select("id, trip_id, customer_name, amount, currency, reporting_currency, reporting_amount_minor, fx_rate_to_reporting, expected_payment_at, payment_status, comment").eq("organization_id", membership.organization_id).neq("payment_status", "VOIDED").is("deleted_at", null).order("created_at", { ascending: false }).limit(500),
-    supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true),
-    supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()),
-    supabase.from("organization_access_roles").select("id, name, permissions, is_system, system_code").eq("organization_id", membership.organization_id).order("is_system", { ascending: false }).order("name"),
-    supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name, system_code)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("created_at"),
-    supabase.from("trip_location_points").select("id, trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at, event_type, note").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(500),
-    supabase.from("vehicle_status_records").select("id, trip_id, status_code, load_state, location_text, recorded_at").eq("organization_id", membership.organization_id).not("trip_id", "is", null).order("recorded_at", { ascending: false }).limit(1000),
-    supabase.from("support_tickets").select("id, ticket_number, category, priority, status, subject, description, steps_to_reproduce, contact, response_text, responded_at, attachment_filename, created_at, updated_at").eq("organization_id", membership.organization_id).order("created_at", { ascending: false }).limit(50),
+    needs.trips ? supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km, route_geometry)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).limit(500) : emptyResult(),
+    needs.summaries ? supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id) : emptyResult(),
+    needs.expenses ? supabase.from("expenses").select("id, trip_id, vehicle_id, driver_id, amount, currency, reporting_amount_minor, quantity, unit, occurred_at, source, location_text, comment, cost_behavior, include_in_normalized_cost, expense_categories(display_name, economic_group), trips(title), drivers(display_name), attachments(id, original_filename, content_type)").eq("organization_id", membership.organization_id).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).limit(2000) : emptyResult(),
+    needs.incomes ? supabase.from("incomes").select("id, trip_id, customer_name, amount, currency, reporting_currency, reporting_amount_minor, fx_rate_to_reporting, expected_payment_at, payment_status, comment").eq("organization_id", membership.organization_id).neq("payment_status", "VOIDED").is("deleted_at", null).order("created_at", { ascending: false }).limit(500) : emptyResult(),
+    needs.pnl ? supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true) : emptyResult(),
+    needs.driverInvites ? supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()) : emptyResult(),
+    needs.team ? supabase.from("organization_access_roles").select("id, name, permissions, is_system, system_code").eq("organization_id", membership.organization_id).order("is_system", { ascending: false }).order("name") : emptyResult(),
+    needs.team ? supabase.from("organization_staff").select("id, profile_id, access_role_id, display_name, email, telegram_username, telegram_user_id, status, organization_access_roles(name, system_code)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("created_at") : emptyResult(),
+    needs.locations ? supabase.from("trip_location_points").select("id, trip_id, latitude, longitude, horizontal_accuracy_m, recorded_at, event_type, note").eq("organization_id", membership.organization_id).order("recorded_at", { ascending: false }).limit(500) : emptyResult(),
+    needs.vehicleStatuses ? supabase.from("vehicle_status_records").select("id, trip_id, status_code, load_state, location_text, recorded_at").eq("organization_id", membership.organization_id).not("trip_id", "is", null).order("recorded_at", { ascending: false }).limit(1000) : emptyResult(),
+    needs.supportTickets ? supabase.from("support_tickets").select("id, ticket_number, category, priority, status, subject, description, steps_to_reproduce, contact, response_text, responded_at, attachment_filename, created_at, updated_at").eq("organization_id", membership.organization_id).order("created_at", { ascending: false }).limit(50) : emptyResult(),
     supabase.from("platform_admins").select("user_id").eq("user_id", userId).maybeSingle(),
   ]);
   for (const result of [profileResult, vehiclesResult, driversResult, tripsResult, summariesResult, incomesResult, accessRolesResult, staffResult]) {

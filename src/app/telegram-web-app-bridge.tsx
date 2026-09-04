@@ -3,6 +3,8 @@
 import Script from "next/script";
 
 type TelegramWebApp = {
+  initData: string;
+  isVersionAtLeast(version: string): boolean;
   ready(): void;
   expand(): void;
   openTelegramLink(url: string): void;
@@ -21,14 +23,18 @@ declare global {
 export function TelegramWebAppBridge() {
   function initializeTelegramWebApp() {
     const webApp = window.Telegram?.WebApp;
-    if (!webApp) return;
+    // Скрипт Telegram создаёт WebApp и в обычном браузере, но без подписанного
+    // initData это не Mini App. Не применяем Telegram-стили к обычному сайту.
+    if (!webApp?.initData) return;
     document.documentElement.classList.add("telegram-mini-app");
     webApp.ready();
     webApp.expand();
-    webApp.setHeaderColor("#14231e");
-    webApp.setBackgroundColor("#f6f7f4");
-    webApp.setBottomBarColor?.("#f6f7f4");
-    webApp.disableVerticalSwipes?.();
+    if (webApp.isVersionAtLeast("6.1")) {
+      webApp.setHeaderColor("#14231e");
+      webApp.setBackgroundColor("#f6f7f4");
+    }
+    if (webApp.isVersionAtLeast("7.10")) webApp.setBottomBarColor?.("#f6f7f4");
+    if (webApp.isVersionAtLeast("7.7")) webApp.disableVerticalSwipes?.();
   }
 
   return (
