@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { prepareTeamWebAccount } from "@/server/team-accounts";
-import { authenticatedTeamRequest, getOrganizationTeamAccess, normalizeTelegramUsername } from "@/server/team-access";
+import { authenticatedTeamRequest, canDelegatePermissions, getOrganizationTeamAccess, normalizeTelegramUsername } from "@/server/team-access";
 import { telegramBotUsername, telegramStartLink } from "@/server/telegram";
 
 const inputSchema = z.object({
@@ -35,11 +35,14 @@ export async function POST(request: Request): Promise<Response> {
 
   const { data: accessRole, error: roleError } = await context.supabase
     .from("organization_access_roles")
-    .select("id, name, system_code")
+    .select("id, name, permissions, system_code")
     .eq("id", parsed.data.accessRoleId)
     .eq("organization_id", parsed.data.organizationId)
     .maybeSingle();
   if (roleError || !accessRole) return Response.json({ error: "Выбранная роль недоступна." }, { status: 400 });
+  if (!canDelegatePermissions(teamAccess, accessRole.permissions)) {
+    return Response.json({ error: "Нельзя назначить сотруднику больше прав, чем есть у вас." }, { status: 403 });
+  }
   if (accessRole.system_code === "CO_OWNER" && !teamAccess.isPrimaryOwner) {
     return Response.json({ error: "Назначать совладельцев может только основной владелец." }, { status: 403 });
   }

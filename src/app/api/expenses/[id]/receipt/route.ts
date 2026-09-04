@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isExpenseReceiptStorageReference } from "@/server/private-storage-reference";
 import { authenticatedTeamRequest, type TeamRequestContext } from "@/server/team-access";
 
 type MembershipRow = {
@@ -33,8 +34,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const auth = await authenticatedTeamRequest();
   if (!auth) return Response.json({ error: "Требуется вход." }, { status: 401 });
 
-  const admin = createAdminClient();
-  const { data: attachment, error: attachmentError } = await admin
+  const { data: attachment, error: attachmentError } = await auth.supabase
     .from("attachments")
     .select("organization_id, storage_bucket, storage_path")
     .eq("expense_id", id)
@@ -46,7 +46,16 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (!await canViewOrganizationFinance(auth, attachment.organization_id)) {
     return Response.json({ error: "Нет доступа к финансовым документам." }, { status: 403 });
   }
+  if (!isExpenseReceiptStorageReference({
+    organizationId: attachment.organization_id,
+    expenseId: id,
+    bucket: attachment.storage_bucket,
+    path: attachment.storage_path,
+  })) {
+    return Response.json({ error: "Ссылка на чек не прошла проверку безопасности." }, { status: 404 });
+  }
 
+  const admin = createAdminClient();
   const { data: signed, error: signedError } = await admin.storage
     .from(attachment.storage_bucket)
     .createSignedUrl(attachment.storage_path, 5 * 60);

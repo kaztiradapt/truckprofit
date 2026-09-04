@@ -21,6 +21,7 @@ MVP SaaS для собственников автопарков из 1–20 гр
 
 - [Продукт](docs/PRODUCT.md)
 - [Архитектура](docs/ARCHITECTURE.md)
+- [Безопасность](docs/SECURITY.md)
 - [Модель данных](docs/DATABASE.md)
 - [Границы MVP](docs/MVP_SCOPE.md)
 - [Дорожная карта](docs/ROADMAP.md)

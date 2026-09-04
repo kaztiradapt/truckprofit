@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { z } from "zod";
 
-import { authenticatedTeamRequest, getOrganizationTeamAccess } from "@/server/team-access";
+import { authenticatedTeamRequest, canDelegatePermissions, getOrganizationTeamAccess } from "@/server/team-access";
 import { telegramBotUsername, telegramStartLink } from "@/server/telegram";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
@@ -16,11 +16,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!teamAccess.canManageTeam) return Response.json({ error: "Недостаточно прав для управления командой." }, { status: 403 });
 
   const { data: staff, error: staffError } = await auth.supabase.from("organization_staff")
-    .select("id, telegram_username, telegram_user_id, organization_access_roles(system_code)")
+    .select("id, telegram_username, telegram_user_id, organization_access_roles(permissions, system_code)")
     .eq("id", id).eq("organization_id", organizationId).is("deleted_at", null).maybeSingle();
   if (staffError || !staff) return Response.json({ error: "Сотрудник не найден." }, { status: 404 });
   const nestedRole = staff.organization_access_roles;
   const staffRole = Array.isArray(nestedRole) ? nestedRole[0] : nestedRole;
+  if (!canDelegatePermissions(teamAccess, staffRole?.permissions)) {
+    return Response.json({ error: "Нельзя управлять приглашением сотрудника с более широкими правами." }, { status: 403 });
+  }
   if (staffRole?.system_code === "CO_OWNER" && !teamAccess.isPrimaryOwner) {
     return Response.json({ error: "Создавать ссылку совладельца может только основной владелец." }, { status: 403 });
   }

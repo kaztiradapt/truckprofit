@@ -228,6 +228,20 @@ export async function POST(request: Request): Promise<Response> {
   });
   if (permissionError || !allowed) return Response.json({ error: "Нет доступа к финансовой аналитике." }, { status: 403 });
 
+  const minuteAgo = new Date(Date.now() - 60_000).toISOString();
+  const { count: recentAnalysisCount, error: rateLimitError } = await auth.supabase
+    .from("report_ai_analyses")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", parsed.data.organizationId)
+    .eq("requested_by", auth.userId)
+    .gte("created_at", minuteAgo);
+  if (rateLimitError && rateLimitError.code !== "42P01") {
+    return Response.json({ error: "Не удалось проверить лимит анализа." }, { status: 500 });
+  }
+  if ((recentAnalysisCount ?? 0) >= 6) {
+    return Response.json({ error: "Слишком много новых анализов подряд. Подождите минуту." }, { status: 429 });
+  }
+
   const periods = resolvePeriods(parsed.data.dateFrom, parsed.data.dateTo);
   const { data: organization } = await auth.supabase.from("organizations").select("base_currency")
     .eq("id", parsed.data.organizationId).maybeSingle();

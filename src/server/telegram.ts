@@ -1,6 +1,6 @@
-type TelegramIdentity = { ok?: boolean; result?: { username?: string } };
+import "server-only";
 
-export const MINI_APP_URL = "https://fleet-economics.vercel.app/dashboard";
+type TelegramIdentity = { ok?: boolean; result?: { username?: string } };
 
 export async function telegramBotUsername(): Promise<string | null> {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();

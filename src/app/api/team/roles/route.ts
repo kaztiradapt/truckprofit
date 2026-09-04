@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { authenticatedTeamRequest, getOrganizationTeamAccess, permissionCodes } from "@/server/team-access";
+import { authenticatedTeamRequest, canDelegatePermissions, getOrganizationTeamAccess, permissionCodes } from "@/server/team-access";
 
 const inputSchema = z.object({
   organizationId: z.uuid(),
@@ -20,6 +20,9 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const permissions = Array.from(new Set(["VIEW_DASHBOARD", ...parsed.data.permissions]));
+  if (!canDelegatePermissions(teamAccess, permissions)) {
+    return Response.json({ error: "Нельзя передать роли права, которых нет у вас." }, { status: 403 });
+  }
   const { data, error } = await context.supabase.from("organization_access_roles").insert({
     organization_id: parsed.data.organizationId,
     name: parsed.data.name,

@@ -1,6 +1,6 @@
 import { Bot, Context, InlineKeyboard, Keyboard, session, type SessionFlavor } from "grammy";
 
-import { MINI_APP_URL } from "../server/telegram";
+import { MINI_APP_URL } from "../domain/telegram/mini-app";
 
 import {
   advanceExpenseWizard,

@@ -124,7 +124,7 @@ export function AiReportChat({ organizationId, driverId, vehicleId, tripStatus, 
       {messages.length ? <button type="button" className={`tiny-button clear-chat-button${confirmingClear ? " confirming" : ""}`} onClick={clearHistory} disabled={busy}>{confirmingClear ? "Подтвердить удаление" : "Очистить чат"}</button> : null}
     </div>
 
-    <div className="ai-chat-scope"><span aria-hidden="true">🔒</span><p><b>Текущая область:</b> выбранные выше период, водитель, автомобиль и статус рейса. Чеки, контакты, Telegram‑ID и геопозиции автоматически из базы в ИИ не передаются.</p></div>
+    <div className="ai-chat-scope"><span aria-hidden="true">🔒</span><p><b>Текущая область:</b> выбранные выше период, водитель, автомобиль и статус рейса. Для ответа обработчику OpenAI передаются вопрос, финансовые агрегаты и рабочие названия из отчёта с отключённым хранением ответа. Чеки, контакты, Telegram‑ID, адреса и геопозиции не передаются.</p></div>
 
     <div className="ai-chat-messages" aria-live="polite">
       {loadingHistory ? <p className="ai-chat-empty">Загружаю историю…</p> : null}

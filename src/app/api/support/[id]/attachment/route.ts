@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { authenticatedTeamRequest, isOrganizationOwner } from "@/server/team-access";
+import { isSupportAttachmentStorageReference } from "@/server/private-storage-reference";
+import { authenticatedTeamRequest } from "@/server/team-access";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
   const { id } = await context.params;
@@ -10,8 +11,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const auth = await authenticatedTeamRequest();
   if (!auth) return Response.json({ error: "Требуется вход." }, { status: 401 });
 
-  const admin = createAdminClient();
-  const { data: ticket, error } = await admin
+  const { data: ticket, error } = await auth.supabase
     .from("support_tickets")
     .select("organization_id, created_by, attachment_bucket, attachment_path")
     .eq("id", id)
@@ -20,9 +20,17 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return Response.json({ error: "К обращению не приложен файл." }, { status: 404 });
   }
 
-  const canView = ticket.created_by === auth.userId || await isOrganizationOwner(auth, ticket.organization_id);
-  if (!canView) return Response.json({ error: "Нет доступа к этому обращению." }, { status: 403 });
+  if (!isSupportAttachmentStorageReference({
+    organizationId: ticket.organization_id,
+    creatorId: ticket.created_by,
+    ticketId: id,
+    bucket: ticket.attachment_bucket,
+    path: ticket.attachment_path,
+  })) {
+    return Response.json({ error: "Ссылка на вложение не прошла проверку безопасности." }, { status: 404 });
+  }
 
+  const admin = createAdminClient();
   const { data: signed, error: signedError } = await admin.storage
     .from(ticket.attachment_bucket)
     .createSignedUrl(ticket.attachment_path, 5 * 60);

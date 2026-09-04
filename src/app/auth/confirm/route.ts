@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
+import { safeInternalRedirectPath } from "@/domain/security/internal-redirect";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
   const type = url.searchParams.get("type");
   const isPasswordRecovery = type === "recovery";
   const requestedNext = url.searchParams.get("next");
-  const safeNext = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : null;
+  const safeNext = safeInternalRedirectPath(requestedNext);
   const successPath = isPasswordRecovery ? "/update-password" : safeNext ?? (type === "invite" ? "/dashboard" : "/onboarding");
   const supabase = await createClient();
 

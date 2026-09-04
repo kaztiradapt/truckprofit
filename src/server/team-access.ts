@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 
+export { canDelegatePermissions } from "@/domain/security/team-permissions";
+
 export const permissionCodes = [
   "VIEW_DASHBOARD",
   "VIEW_FINANCE",
@@ -19,6 +21,12 @@ export type PermissionCode = typeof permissionCodes[number];
 export type TeamRequestContext = {
   supabase: SupabaseClient;
   userId: string;
+};
+
+export type OrganizationTeamAccess = {
+  canManageTeam: boolean;
+  isPrimaryOwner: boolean;
+  permissions: PermissionCode[];
 };
 
 export async function authenticatedTeamRequest(): Promise<TeamRequestContext | null> {
@@ -46,7 +54,7 @@ export async function isOrganizationOwner(
 export async function getOrganizationTeamAccess(
   context: TeamRequestContext,
   organizationId: string,
-): Promise<{ canManageTeam: boolean; isPrimaryOwner: boolean }> {
+): Promise<OrganizationTeamAccess> {
   const { data, error } = await context.supabase
     .from("organization_memberships")
     .select("role, organization_access_roles(permissions)")
@@ -54,13 +62,17 @@ export async function getOrganizationTeamAccess(
     .eq("user_id", context.userId)
     .eq("status", "ACTIVE")
     .maybeSingle();
-  if (error || !data) return { canManageTeam: false, isPrimaryOwner: false };
+  if (error || !data) return { canManageTeam: false, isPrimaryOwner: false, permissions: [] };
   const nestedRole = data.organization_access_roles;
   const accessRole = Array.isArray(nestedRole) ? nestedRole[0] : nestedRole;
   const isPrimaryOwner = data.role === "OWNER";
+  const permissions = isPrimaryOwner
+    ? [...permissionCodes]
+    : permissionCodes.filter((permission) => accessRole?.permissions?.includes(permission));
   return {
     isPrimaryOwner,
-    canManageTeam: isPrimaryOwner || Boolean(accessRole?.permissions?.includes("MANAGE_TEAM")),
+    permissions,
+    canManageTeam: permissions.includes("MANAGE_TEAM"),
   };
 }
 

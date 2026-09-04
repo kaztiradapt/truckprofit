@@ -108,7 +108,7 @@ export function AiReportAnalyst({ organizationId, driverId, vehicleId, tripStatu
         </article>;
       })}</div>
       <p className="ai-data-quality"><b>Качество данных:</b> {analysis.dataQuality}</p>
-      <small className="ai-report-footnote">Справка не изменяет учётные записи. {analysis.cached ? "Показан сохранённый анализ." : "Анализ сформирован сейчас."}{analysis.mode === "RULES" ? ` ${analysis.fallbackReason ? fallbackLabels[analysis.fallbackReason] : "Подключение модели временно недоступно, точные расчётные сигналы сохранены."}` : ""}</small>
+      <small className="ai-report-footnote">Справка не изменяет учётные записи. Для режима «ИИ + расчёты» внешнему обработчику передаются только агрегированные показатели и сигналы без чеков, контактов, адресов, Telegram‑ID и геопозиций; хранение ответа отключено. {analysis.cached ? "Показан сохранённый анализ." : "Анализ сформирован сейчас."}{analysis.mode === "RULES" ? ` ${analysis.fallbackReason ? fallbackLabels[analysis.fallbackReason] : "Подключение модели временно недоступно, точные расчётные сигналы сохранены."}` : ""}</small>
     </> : null}
   </section>;
 }

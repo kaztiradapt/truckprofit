@@ -1,25 +1,14 @@
-import { createClient } from "@/lib/supabase/server";
-import { MINI_APP_URL } from "@/server/telegram";
+import { MINI_APP_URL } from "@/domain/telegram/mini-app";
+import { authenticatedTeamRequest, getOrganizationTeamAccess } from "@/server/team-access";
 
 type TelegramResponse<T> = { ok?: boolean; result?: T; description?: string };
 type TelegramMenuButton = { type?: string; text?: string; web_app?: { url?: string } };
 
-async function requireOperator(organizationId: string): Promise<Response | null> {
-  const supabase = await createClient();
-  const { data: claimsResult, error: claimsError } = await supabase.auth.getClaims();
-  const userId = claimsResult?.claims?.sub;
-  if (claimsError || !userId) return Response.json({ error: "Требуется вход." }, { status: 401 });
-
-  const { data: membership, error } = await supabase
-    .from("organization_memberships")
-    .select("role")
-    .eq("organization_id", organizationId)
-    .eq("user_id", userId)
-    .eq("status", "ACTIVE")
-    .maybeSingle();
-  if (error || !membership || !["OWNER", "MANAGER"].includes(membership.role)) {
-    return Response.json({ error: "Недостаточно прав." }, { status: 403 });
-  }
+async function requireMenuManager(organizationId: string): Promise<Response | null> {
+  const auth = await authenticatedTeamRequest();
+  if (!auth) return Response.json({ error: "Требуется вход." }, { status: 401 });
+  const access = await getOrganizationTeamAccess(auth, organizationId);
+  if (!access.canManageTeam) return Response.json({ error: "Недостаточно прав." }, { status: 403 });
   return null;
 }
 
@@ -40,7 +29,7 @@ async function callTelegram<T>(method: string, body: object): Promise<TelegramRe
 
 export async function GET(request: Request): Promise<Response> {
   const organizationId = new URL(request.url).searchParams.get("organization_id") ?? "";
-  const denied = await requireOperator(organizationId);
+  const denied = await requireMenuManager(organizationId);
   if (denied) return denied;
   try {
     const payload = await callTelegram<TelegramMenuButton>("getChatMenuButton", {});
@@ -57,7 +46,7 @@ export async function GET(request: Request): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   const body = await request.json().catch(() => ({})) as { organizationId?: string };
   const organizationId = body.organizationId ?? "";
-  const denied = await requireOperator(organizationId);
+  const denied = await requireMenuManager(organizationId);
   if (denied) return denied;
   try {
     await callTelegram<boolean>("setChatMenuButton", {

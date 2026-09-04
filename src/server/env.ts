@@ -1,3 +1,5 @@
+import "server-only";
+
 export type BotEnvironment = {
   telegramBotToken: string;
   supabaseUrl: string;

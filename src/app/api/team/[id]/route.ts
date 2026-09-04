@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { prepareTeamWebAccount } from "@/server/team-accounts";
-import { authenticatedTeamRequest, getOrganizationTeamAccess, normalizeTelegramUsername } from "@/server/team-access";
+import { authenticatedTeamRequest, canDelegatePermissions, getOrganizationTeamAccess, normalizeTelegramUsername } from "@/server/team-access";
 
 const inputSchema = z.object({
   organizationId: z.uuid(),
@@ -27,17 +27,23 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const teamAccess = await getOrganizationTeamAccess(auth, parsed.data.organizationId);
   if (!teamAccess.canManageTeam) return Response.json({ error: "Недостаточно прав для управления командой." }, { status: 403 });
 
-  const { data: role } = await auth.supabase.from("organization_access_roles").select("id, system_code")
+  const { data: role } = await auth.supabase.from("organization_access_roles").select("id, permissions, system_code")
     .eq("id", parsed.data.accessRoleId).eq("organization_id", parsed.data.organizationId).maybeSingle();
   if (!role) return Response.json({ error: "Роль не найдена." }, { status: 400 });
+  if (!canDelegatePermissions(teamAccess, role.permissions)) {
+    return Response.json({ error: "Нельзя назначить сотруднику больше прав, чем есть у вас." }, { status: 403 });
+  }
 
   const admin = createAdminClient();
   const { data: currentStaff, error: staffLookupError } = await admin.from("organization_staff")
-    .select("id, profile_id, email, access_role_id, organization_access_roles(system_code)")
+    .select("id, profile_id, email, access_role_id, organization_access_roles(permissions, system_code)")
     .eq("id", id).eq("organization_id", parsed.data.organizationId).is("deleted_at", null).maybeSingle();
   if (staffLookupError || !currentStaff) return Response.json({ error: "Участник не найден." }, { status: 404 });
   const nestedCurrentRole = currentStaff.organization_access_roles;
   const currentRole = Array.isArray(nestedCurrentRole) ? nestedCurrentRole[0] : nestedCurrentRole;
+  if (!canDelegatePermissions(teamAccess, currentRole?.permissions)) {
+    return Response.json({ error: "Нельзя изменять сотрудника с более широкими правами." }, { status: 403 });
+  }
   if (currentStaff.profile_id) {
     const { data: membership } = await admin.from("organization_memberships").select("role")
       .eq("organization_id", parsed.data.organizationId).eq("user_id", currentStaff.profile_id).maybeSingle();
@@ -107,12 +113,15 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   const teamAccess = await getOrganizationTeamAccess(auth, parsed.data.organizationId);
   if (!teamAccess.canManageTeam) return Response.json({ error: "Недостаточно прав для управления командой." }, { status: 403 });
   const { data: target } = await auth.supabase.from("organization_staff")
-    .select("access_role_id, organization_access_roles(system_code)")
+    .select("access_role_id, organization_access_roles(permissions, system_code)")
     .eq("id", id).eq("organization_id", parsed.data.organizationId).is("deleted_at", null).maybeSingle();
   if (!target) return Response.json({ error: "Участник не найден." }, { status: 404 });
   const nestedRole = target.organization_access_roles;
   const targetRole = Array.isArray(nestedRole) ? nestedRole[0] : nestedRole;
   if (!target.access_role_id) return Response.json({ error: "Основного владельца удалить нельзя." }, { status: 403 });
+  if (!canDelegatePermissions(teamAccess, targetRole?.permissions)) {
+    return Response.json({ error: "Нельзя удалить сотрудника с более широкими правами." }, { status: 403 });
+  }
   if (targetRole?.system_code === "CO_OWNER" && !teamAccess.isPrimaryOwner) {
     return Response.json({ error: "Удалять совладельцев может только основной владелец." }, { status: 403 });
   }
