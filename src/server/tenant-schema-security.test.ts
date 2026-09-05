@@ -40,4 +40,12 @@ describe("tenant database security", () => {
     expect(migrations).toContain("public.can_manage_org_staff(organization_id, staff_id)");
     expect(migrations).toContain("public.has_org_permission(organization_id, 'DELETE_RECORDS')");
   });
+
+  it("removes default public execution from security-definer functions", () => {
+    expect(migrations).toContain("and proc.prosecdef");
+    expect(migrations).toContain("revoke all on function %I.%I(%s) from public, anon");
+    expect(migrations).toContain("alter function public.set_updated_at() set search_path = ''");
+    expect(migrations).toContain("alter function public.validate_expense_relations() set search_path = ''");
+    expect(migrations).toContain("alter function public.validate_income_relations() set search_path = ''");
+  });
 });
