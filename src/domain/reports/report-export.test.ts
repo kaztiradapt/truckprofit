@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildManagementReportCsv, reportExportFilename, rowsToCsv } from "./report-export";
+import { buildManagementReportCsv, buildManagementReportHtml, reportExportFilename, rowsToCsv } from "./report-export";
 
 describe("rowsToCsv", () => {
   it("creates an Excel-friendly UTF-8 CSV with escaped values", () => {
@@ -62,5 +62,41 @@ describe("buildManagementReportCsv", () => {
 describe("reportExportFilename", () => {
   it("creates a safe local-date filename", () => {
     expect(reportExportFilename("ТОО КАЗ/ТИР", new Date(2026, 8, 4))).toBe("TruckProfit-ТОО-КАЗ-ТИР-2026-09-04.csv");
+  });
+});
+
+describe("buildManagementReportHtml", () => {
+  it("creates a printable report and escapes user-controlled values", () => {
+    const printable = buildManagementReportHtml({
+      organizationName: "<script>alert(1)</script>",
+      currency: "KZT",
+      generatedAt: "07.09.2026, 12:00",
+      filters: { period: "Всё время", driver: "Все водители", vehicle: "Все автомобили", tripStatus: "Все статусы" },
+      totals: {
+        trips: 0,
+        revenueMinor: 0,
+        directExpensesMinor: 0,
+        driverCompensationMinor: 0,
+        actualExpensesMinor: 0,
+        normalizedExpensesMinor: 0,
+        excludedExpensesMinor: 0,
+        actualProfitMinor: 0,
+        normalizedProfitMinor: 0,
+        totalKm: 0,
+        loadedKm: 0,
+        emptyKm: 0,
+        fuelLiters: 0,
+        expensesByGroupMinor: { FUEL: 0, TOLLS: 0, REPAIR: 0, MAINTENANCE: 0, OTHER: 0 },
+        expensesByBehaviorMinor: { VARIABLE: 0, FIXED: 0, RESERVE: 0, ONE_OFF: 0, CAPITAL: 0 },
+      },
+      trips: [],
+      drivers: [],
+      vehicles: [],
+      includeFinance: true,
+    });
+
+    expect(printable).toContain("Печать / сохранить PDF");
+    expect(printable).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(printable).not.toContain("<script>alert(1)</script>");
   });
 });

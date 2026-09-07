@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 
 import {
   aggregateManagementReport,
@@ -10,7 +10,6 @@ import {
   type ManagementReportExpense,
   type ReportExpenseGroup,
 } from "@/domain/reports/management-report";
-import { buildManagementReportCsv, reportExportFilename } from "@/domain/reports/report-export";
 import { AiReportAnalyst } from "./ai-report-analyst";
 import { AiReportChat } from "./ai-report-chat";
 import { DeviceDateTime } from "./device-date-time";
@@ -113,17 +112,7 @@ function datePart(value: string | null): string {
   return value?.slice(0, 10) ?? "";
 }
 
-function tripStatusLabel(value: string): string {
-  return ({ ACTIVE: "В рейсе", CANCELLED: "Отменён", COMPLETED: "Закрыт", DRAFT: "Черновик" } as Record<string, string>)[value] ?? value;
-}
-
-function displayDate(value: string): string {
-  if (!value) return "";
-  const [year, month, day] = value.split("-");
-  return year && month && day ? `${day}.${month}.${year}` : value;
-}
-
-export function DriverReports({ organizationId, organizationName, reports, trips, expenses, vehicles, baseCurrency, canViewFinance }: {
+export function DriverReports({ organizationId, reports, trips, expenses, vehicles, baseCurrency, canViewFinance }: {
   organizationId: string;
   organizationName: string;
   reports: DriverReport[];
@@ -249,68 +238,22 @@ export function DriverReports({ organizationId, organizationName, reports, trips
     setDateTo(end.toISOString().slice(0, 10));
   }
 
-  function downloadCurrentReport() {
-    const generatedAt = new Date();
-    const reportNames = new Map(reports.map((report) => [report.driverId, report.displayName]));
-    const selectedDriver = reports.find((report) => report.driverId === driverId);
-    const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
-    const period = dateFrom || dateTo
-      ? `${dateFrom ? displayDate(dateFrom) : "начало учёта"} — ${dateTo ? displayDate(dateTo) : "сегодня"}`
-      : "Всё время";
-    const csv = buildManagementReportCsv({
-      organizationName,
-      currency: baseCurrency,
-      generatedAt: generatedAt.toLocaleString("ru-RU"),
-      filters: {
-        period,
-        driver: selectedDriver?.displayName ?? "Все водители",
-        vehicle: selectedVehicle ? `${selectedVehicle.displayName} · ${selectedVehicle.plateNumber}` : "Все автомобили",
-        tripStatus: tripStatus ? tripStatusLabel(tripStatus) : "Все статусы",
-      },
-      totals,
-      trips: matchingTrips.map((trip) => {
-        const tripTotals = aggregateManagementReport([trip], expensesByTrip.get(trip.id) ?? []);
-        return {
-          title: trip.title,
-          driverName: trip.driverId ? reportNames.get(trip.driverId) ?? "Водитель не найден" : "Не назначен",
-          vehicleName: trip.vehicleName,
-          status: trip.status,
-          startedAt: trip.startedAt,
-          totalKm: trip.totalKm,
-          loadedKm: trip.loadedKm,
-          emptyKm: trip.emptyKm,
-          revenueMinor: trip.revenueMinor,
-          directExpensesMinor: tripTotals.directExpensesMinor,
-          driverCompensationMinor: trip.driverCompensationMinor,
-          profitMinor: tripTotals.actualProfitMinor,
-        };
-      }),
-      drivers: filteredReports.map((report) => ({
-        displayName: report.displayName,
-        assignedVehicleName: report.assignedVehicleName,
-        totalTrips: report.totalTrips,
-        activeTrips: report.activeTrips,
-        completedTrips: report.completedTrips,
-        totalKm: report.totalKm,
-        loadedKm: report.loadedKm,
-        emptyKm: report.emptyKm,
-        revenueMinor: report.revenueMinor,
-        actualExpensesMinor: report.actualExpensesMinor,
-        actualProfitMinor: report.managementProfitMinor,
-        normalizedProfitMinor: report.normalizedProfitMinor,
-      })),
-      vehicles: vehicleReportRows,
-      includeFinance: canViewFinance,
-    });
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = reportExportFilename(organizationName, generatedAt);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  function currentReportHref(format: "csv" | "print") {
+    const params = new URLSearchParams({ format });
+    if (driverId) params.set("driverId", driverId);
+    if (vehicleId) params.set("vehicleId", vehicleId);
+    if (tripStatus) params.set("tripStatus", tripStatus);
+    if (dateFrom) params.set("dateFrom", dateFrom);
+    if (dateTo) params.set("dateTo", dateTo);
+    return `/api/reports/export?${params.toString()}`;
+  }
+
+  function attachDeviceTimeZone(event: MouseEvent<HTMLAnchorElement>) {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!timeZone) return;
+    const url = new URL(event.currentTarget.href);
+    url.searchParams.set("timeZone", timeZone);
+    event.currentTarget.href = url.toString();
   }
 
   return <section className="driver-reports">
@@ -337,10 +280,15 @@ export function DriverReports({ organizationId, organizationName, reports, trips
     </div>
 
     <div className="report-export-toolbar" aria-label="Выгрузка отчёта">
-      <span><b>Скачать текущую выборку</b><small>Фильтры применяются и к файлу. CSV открывается в Excel и Google Таблицах.</small></span>
+      <span><b>Скачать текущую выборку</b><small>Фильтры применяются к файлу. Выгрузка работает и во встроенном браузере Telegram.</small></span>
       <div>
-        <button type="button" className="button-secondary" onClick={() => window.print()}>Печать / PDF</button>
-        <button type="button" onClick={downloadCurrentReport} disabled={!matchingTrips.length}>Скачать CSV</button>
+        {matchingTrips.length ? <>
+          <a className="button-secondary" href={currentReportHref("print")} onClick={attachDeviceTimeZone}>Печать / PDF</a>
+          <a className="button" href={currentReportHref("csv")} onClick={attachDeviceTimeZone}>Скачать CSV</a>
+        </> : <>
+          <button type="button" className="button-secondary" disabled>Печать / PDF</button>
+          <button type="button" disabled>Скачать CSV</button>
+        </>}
       </div>
     </div>
 
