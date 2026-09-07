@@ -71,16 +71,25 @@ async function requestOsrmRoutes(
   } : null;
 }
 
-export async function osrmRoutes(origin: RoutePoint, destination: RoutePoint): Promise<{ routes: RoutingAlternative[]; automaticCorridors: boolean } | null> {
-  const native = await requestOsrmRoutes([origin, destination], "osrm", 3);
+export async function osrmRoutes(origin: RoutePoint, destination: RoutePoint, via?: RoutePoint): Promise<{ routes: RoutingAlternative[]; automaticCorridors: boolean } | null> {
+  const requiredPoints = via ? [origin, via, destination] : [origin, destination];
+  const native = await requestOsrmRoutes(requiredPoints, via ? "osrm-via" : "osrm", 3);
   if (!native?.routes.length) return null;
   const nativeDistinct = chooseDistinctRoutes(native.routes);
   if (nativeDistinct.length >= 3) return { routes: nativeDistinct, automaticCorridors: false };
 
-  const corridorRequests = automaticCorridorWaypoints(origin, destination).map(async (waypoint, index) => {
-    const result = await requestOsrmRoutes([origin, waypoint, destination], `osrm-corridor-${index + 1}`, false);
-    const waypointSnapDistance = result?.waypointDistances[1] ?? Number.POSITIVE_INFINITY;
-    return waypointSnapDistance <= 60_000 ? result?.routes[0] ?? null : null;
+  const corridorPointSets = via
+    ? [
+      ...automaticCorridorWaypoints(origin, via).slice(0, 3).map((waypoint) => [origin, waypoint, via, destination]),
+      ...automaticCorridorWaypoints(via, destination).slice(0, 3).map((waypoint) => [origin, via, waypoint, destination]),
+    ]
+    : automaticCorridorWaypoints(origin, destination).map((waypoint) => [origin, waypoint, destination]);
+  const corridorRequests = corridorPointSets.map(async (points, index) => {
+    const result = await requestOsrmRoutes(points, `osrm-corridor-${index + 1}`, false);
+    const intermediatesAreOnRoad = result?.waypointDistances
+      .slice(1, -1)
+      .every((distance) => distance <= 60_000) ?? false;
+    return intermediatesAreOnRoad ? result?.routes[0] ?? null : null;
   });
   const settled = await Promise.allSettled(corridorRequests);
   const corridorRoutes = settled.flatMap((result) => result.status === "fulfilled" && result.value ? [result.value] : []);

@@ -7,7 +7,7 @@ import { createTrip } from "@/app/actions/owner";
 import { currencyLabels, isSupportedCurrency, supportedCurrencies, type SupportedCurrency } from "@/domain/currencies";
 
 type RoutePoint = { latitude: number; longitude: number };
-type PointKind = "origin" | "destination";
+type PointKind = "origin" | "via" | "destination";
 type GeocodingResult = RoutePoint & { id: string; label: string; city: string | null };
 type RoutingAlternative = {
   id: string;
@@ -30,17 +30,21 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
   const map = useRef<LeafletMap | null>(null);
   const leafletModule = useRef<typeof import("leaflet") | null>(null);
   const originMarker = useRef<CircleMarker | null>(null);
+  const viaMarker = useRef<CircleMarker | null>(null);
   const destinationMarker = useRef<CircleMarker | null>(null);
   const routeLayers = useRef<Map<string, Polyline>>(new Map());
   const originAddressRef = useRef("");
+  const viaAddressRef = useRef("");
   const destinationAddressRef = useRef("");
   const activePointRef = useRef<PointKind>("origin");
   const [activePoint, setActivePoint] = useState<PointKind>("origin");
   const [originPoint, setOriginPoint] = useState<RoutePoint | null>(null);
+  const [viaPoint, setViaPoint] = useState<RoutePoint | null>(null);
   const [destinationPoint, setDestinationPoint] = useState<RoutePoint | null>(null);
   const [originCity, setOriginCity] = useState("");
   const [destinationCity, setDestinationCity] = useState("");
   const [originAddress, setOriginAddress] = useState("");
+  const [viaAddress, setViaAddress] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<GeocodingResult[]>([]);
@@ -52,7 +56,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
   const [routing, setRouting] = useState(false);
   const [routingError, setRoutingError] = useState("");
   const [routingProvider, setRoutingProvider] = useState<"google" | "osrm" | "">("");
-  const [alternativesMode, setAlternativesMode] = useState<"provider" | "automatic-corridors" | "">("");
+  const [alternativesMode, setAlternativesMode] = useState<"provider" | "automatic-corridors" | "explicit-waypoint" | "">("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
   const baseCurrencyCode: SupportedCurrency = isSupportedCurrency(baseCurrency) ? baseCurrency : "KZT";
@@ -71,7 +75,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
   const choosePoint = useCallback((point: PointKind) => {
     activePointRef.current = point;
     setActivePoint(point);
-    setSearchQuery(point === "origin" ? originAddressRef.current : destinationAddressRef.current);
+    setSearchQuery(point === "origin" ? originAddressRef.current : point === "via" ? viaAddressRef.current : destinationAddressRef.current);
     setSearchResults([]);
     setSearchError("");
   }, []);
@@ -96,19 +100,22 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
     setSelectedRouteId("");
     setRoutingError("");
     const isOrigin = kind === "origin";
-    const markerRef = isOrigin ? originMarker : destinationMarker;
+    const isVia = kind === "via";
+    const markerRef = isOrigin ? originMarker : isVia ? viaMarker : destinationMarker;
     markerRef.current?.remove();
     markerRef.current = leaflet.circleMarker([point.latitude, point.longitude], {
       radius: 8,
       weight: 3,
-      color: isOrigin ? "#166b4f" : "#de7b32",
+      color: isOrigin ? "#166b4f" : isVia ? "#3568b8" : "#de7b32",
       fillColor: "#ffffff",
       fillOpacity: 1,
-    }).addTo(currentMap).bindTooltip(isOrigin ? "Погрузка" : "Выгрузка", { permanent: true, direction: "top" });
+    }).addTo(currentMap).bindTooltip(isOrigin ? "Погрузка" : isVia ? "Через" : "Выгрузка", { permanent: true, direction: "top" });
     if (focus) currentMap.setView([point.latitude, point.longitude], 14);
     if (isOrigin) {
       setOriginPoint(point);
       choosePoint("destination");
+    } else if (isVia) {
+      setViaPoint(point);
     } else {
       setDestinationPoint(point);
     }
@@ -157,12 +164,13 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
       origin: `${originPoint.latitude},${originPoint.longitude}`,
       destination: `${destinationPoint.latitude},${destinationPoint.longitude}`,
     });
+    if (viaPoint) query.set("via", `${viaPoint.latitude},${viaPoint.longitude}`);
 
     async function loadRoutes() {
       setRouting(true);
       try {
         const response = await fetch(`/api/routing?${query}`, { signal: controller.signal });
-        const payload = await response.json() as { routes?: RoutingAlternative[]; provider?: "google" | "osrm"; alternativesMode?: "provider" | "automatic-corridors"; error?: string };
+        const payload = await response.json() as { routes?: RoutingAlternative[]; provider?: "google" | "osrm"; alternativesMode?: "provider" | "automatic-corridors" | "explicit-waypoint"; error?: string };
         if (!response.ok) throw new Error(payload.error ?? "Не удалось построить маршрут.");
         const routes = payload.routes ?? [];
         if (controller.signal.aborted || !routes.length) return;
@@ -193,7 +201,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
     void loadRoutes();
 
     return () => controller.abort();
-  }, [destinationPoint, originPoint, selectRoute]);
+  }, [destinationPoint, originPoint, selectRoute, viaPoint]);
 
   async function searchAddress() {
     const query = searchQuery.trim();
@@ -231,15 +239,32 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
       if (result.city) setOriginCity(result.city);
       setOriginAddress(result.label);
       originAddressRef.current = result.label;
+    } else if (kind === "via") {
+      setViaAddress(result.label);
+      viaAddressRef.current = result.label;
     } else {
       if (result.city) setDestinationCity(result.city);
       setDestinationAddress(result.label);
       destinationAddressRef.current = result.label;
     }
     placePoint(kind, { latitude: result.latitude, longitude: result.longitude }, true);
-    if (kind === "destination") setSearchQuery(result.label);
+    if (kind !== "origin") setSearchQuery(result.label);
     setSearchResults([]);
     setSearchError("");
+  }
+
+  function clearViaPoint() {
+    viaMarker.current?.remove();
+    viaMarker.current = null;
+    setViaPoint(null);
+    setViaAddress("");
+    viaAddressRef.current = "";
+    if (activePointRef.current === "via") setSearchQuery("");
+    for (const layer of routeLayers.current.values()) layer.remove();
+    routeLayers.current.clear();
+    setRouteAlternatives([]);
+    setSelectedRouteId("");
+    setRoutingError("");
   }
 
   return (
@@ -277,10 +302,13 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
           <span>Точные точки на карте <small>необязательно</small></span>
           <div className="route-map-controls">
             <button type="button" className={activePoint === "origin" ? "active" : ""} onClick={() => choosePoint("origin")}>1. Точка погрузки{originPoint ? " ✓" : ""}</button>
-            <button type="button" className={activePoint === "destination" ? "active" : ""} onClick={() => choosePoint("destination")}>2. Точка выгрузки{destinationPoint ? " ✓" : ""}</button>
+            <button type="button" className={activePoint === "via" ? "active" : ""} onClick={() => choosePoint("via")}>2. Через <small>необязательно</small>{viaPoint ? " ✓" : ""}</button>
+            <button type="button" className={activePoint === "destination" ? "active" : ""} onClick={() => choosePoint("destination")}>3. Точка выгрузки{destinationPoint ? " ✓" : ""}</button>
+            {viaPoint ? <button type="button" className="route-via-clear" onClick={clearViaPoint}>Убрать «Через»</button> : null}
           </div>
+          {viaAddress ? <p className="route-via-summary"><b>Маршрут через:</b> {viaAddress}</p> : null}
           <div className="route-search">
-            <label htmlFor="route-point-search">Поиск: {activePoint === "origin" ? "точка погрузки" : "точка выгрузки"}</label>
+            <label htmlFor="route-point-search">Поиск: {activePoint === "origin" ? "точка погрузки" : activePoint === "via" ? "промежуточная точка «Через»" : "точка выгрузки"}</label>
             <div className="route-search-input">
               <input id="route-point-search" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={handleSearchKeyDown} placeholder="Город, улица, склад или ориентир" />
               <button type="button" onClick={() => void searchAddress()} disabled={searching}>{searching ? "Ищу…" : "Найти"}</button>
@@ -291,7 +319,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
             </div> : null}
             <small>Поиск выполняется только по кнопке. Данные карты © OpenStreetMap.</small>
           </div>
-          <div ref={mapContainer} className="route-map" role="application" aria-label="Карта выбора погрузки и выгрузки" />
+          <div ref={mapContainer} className="route-map" role="application" aria-label="Карта выбора погрузки, промежуточной точки и выгрузки" />
           {routing ? <div className="route-building" role="status">Строю варианты автомобильного маршрута…</div> : null}
           {routingError ? <span className="route-search-error" role="status">{routingError}</span> : null}
           {routeAlternatives.length ? <div className="route-alternatives" aria-label="Варианты маршрута">
@@ -300,12 +328,14 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
               <span>Вариант {index + 1}</span><strong>{route.distanceKm.toLocaleString("ru-RU")} км</strong><small>≈ {Math.floor(route.durationMinutes / 60)} ч {route.durationMinutes % 60} мин</small>
             </button>)}</div>
             <small>{routingProvider === "google"
-              ? "Альтернативы рассчитаны Google Routes."
+              ? alternativesMode === "explicit-waypoint" ? "Маршрут построен через выбранную промежуточную точку Google Routes." : "Альтернативы рассчитаны Google Routes."
+              : alternativesMode === "explicit-waypoint"
+                ? "Все показанные маршруты проходят через выбранную промежуточную точку."
               : alternativesMode === "automatic-corridors"
                 ? "Основной маршрут рассчитан OSRM; дополнительные варианты найдены автоматически по другим дорожным коридорам."
                 : "Альтернативы рассчитаны OSRM / OpenStreetMap."} Фактическое время зависит от границ, пробок и ограничений для грузовиков.</small>
           </div> : null}
-          <small>Выберите тип точки и нажмите нужное место на карте. После двух точек варианты маршрута построятся автоматически.</small>
+          <small>Погрузка и выгрузка обязательны для расчёта. Если нужен конкретный коридор, добавьте необязательную точку «Через» поиском или нажатием на карту.</small>
         </div>
       </div>
       <div className="flow-card-action"><button type="submit" disabled={!activeVehicles.length}>Создать рейс{canManageFinance ? " с доходом" : ""}</button></div>

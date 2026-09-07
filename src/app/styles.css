@@ -52,6 +52,9 @@ button { cursor: pointer; }
 .realtime-indicator.online i { background: #22a06b; box-shadow: 0 0 0 4px #22a06b1c; }
 .realtime-indicator.connecting i { animation: realtime-pulse 1s ease-in-out infinite alternate; }
 .realtime-indicator.offline { border-color: #efd8c8; background: #fff7f1; color: #9b5b35; }
+.realtime-indicator.updates { border-color: #e6b988; background: #fff3df; color: #824817; box-shadow: 0 0 0 3px #de7b3214; }
+.realtime-indicator.updates i { background: var(--orange); box-shadow: 0 0 0 4px #de7b3220; }
+.realtime-indicator:disabled { cursor: wait; opacity: .7; }
 @keyframes realtime-pulse { to { opacity: .35; } }
 .eyebrow { margin: 0; color: var(--muted); font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .primary-link { border: 0; border-radius: 10px; padding: 12px 18px; background: var(--green); color: #fff; font-weight: 700; cursor: pointer; text-decoration: none; box-shadow: 0 5px 16px #166b4f22; }
@@ -539,8 +542,11 @@ td { font-size: 14px; }
 .route-map-field { grid-column: 1 / -1; display: grid; gap: 8px; min-width: 0; color: #53615b; font-size: 11px; font-weight: 750; }
 .route-map-field > span small, .route-map-field > small { color: var(--muted); font-size: 10px; font-weight: 500; line-height: 1.4; }
 .route-map-controls { display: flex; flex-wrap: wrap; gap: 7px; }
+.route-map-controls button small { display: block; margin-top: 1px; font-size: 8px; font-weight: 650; }
 .flow-card .route-map-controls button { min-height: 36px; padding: 7px 10px; border: 1px solid #bdcbc4; background: #fff; color: var(--green); font-size: 11px; }
 .flow-card .route-map-controls button:hover, .flow-card .route-map-controls button.active { border-color: var(--green); background: var(--green-soft); color: #174f3d; }
+.flow-card .route-map-controls .route-via-clear { border-color: #ead6cc; color: #9b4d32; }
+.route-via-summary { margin: 0; padding: 8px 10px; border-radius: 8px; background: #eef3fb; color: #31547f; font-size: 11px; }
 .route-search { display: grid; gap: 7px; padding: 11px; border: 1px solid #dbe4df; border-radius: 10px; background: #f8faf8; }
 .route-search > label { color: #315d4b; font-size: 11px; font-weight: 800; }
 .route-search-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }

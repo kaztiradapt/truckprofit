@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { createClient } from "@/lib/supabase/browser";
 
@@ -21,17 +21,15 @@ type ConnectionState = "connecting" | "online" | "offline";
 
 export function DashboardRealtimeSync({ organizationId }: { organizationId: string }) {
   const router = useRouter();
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pending, startTransition] = useTransition();
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
+  const [hasUpdates, setHasUpdates] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
     let disposed = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
-    const refreshDashboard = () => {
-      if (refreshTimer.current) clearTimeout(refreshTimer.current);
-      refreshTimer.current = setTimeout(() => router.refresh(), 350);
-    };
+    const notifyAboutUpdates = () => setHasUpdates(true);
     const subscribe = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) await supabase.realtime.setAuth(session.access_token);
@@ -41,7 +39,7 @@ export function DashboardRealtimeSync({ organizationId }: { organizationId: stri
         channel = channel.on(
           "postgres_changes",
           { event: "*", schema: "public", table, filter: `organization_id=eq.${organizationId}` },
-          refreshDashboard,
+          notifyAboutUpdates,
         );
       }
       channel.subscribe((status: string) => {
@@ -51,26 +49,29 @@ export function DashboardRealtimeSync({ organizationId }: { organizationId: stri
     };
     void subscribe();
 
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") refreshDashboard();
-    };
-    window.addEventListener("online", refreshDashboard);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("online", notifyAboutUpdates);
     return () => {
       disposed = true;
-      if (refreshTimer.current) clearTimeout(refreshTimer.current);
-      window.removeEventListener("online", refreshDashboard);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("online", notifyAboutUpdates);
       if (channel) void supabase.removeChannel(channel);
     };
-  }, [organizationId, router]);
+  }, [organizationId]);
 
-  const label = connectionState === "online"
+  function refreshDashboard() {
+    startTransition(() => {
+      router.refresh();
+      setHasUpdates(false);
+    });
+  }
+
+  const label = hasUpdates
+    ? pending ? "Обновляю данные…" : "Есть новые данные — обновить"
+    : connectionState === "online"
     ? "Обновления онлайн"
     : connectionState === "connecting"
       ? "Подключение…"
       : "Обновление вручную";
-  return <span className={`realtime-indicator ${connectionState}`} role="status" aria-live="polite" title="Статусы, геопозиции, расходы, чеки, рейсы, доходы и обращения обновляются автоматически">
+  return <button type="button" className={`realtime-indicator ${hasUpdates ? "updates" : connectionState}`} onClick={refreshDashboard} disabled={pending} aria-live="polite" title={hasUpdates ? "В системе появились изменения. Нажмите, чтобы загрузить свежие данные." : "Система сообщит, когда в CRM появятся новые данные"}>
     <i aria-hidden="true" />{label}
-  </span>;
+  </button>;
 }

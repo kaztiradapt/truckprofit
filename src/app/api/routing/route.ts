@@ -30,7 +30,7 @@ function durationSeconds(value: unknown): number | null {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
 }
 
-async function googleRoutes(origin: RoutePoint, destination: RoutePoint, apiKey: string): Promise<RoutingAlternative[] | null> {
+async function googleRoutes(origin: RoutePoint, destination: RoutePoint, via: RoutePoint | null, apiKey: string): Promise<RoutingAlternative[] | null> {
   const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
     method: "POST",
     headers: {
@@ -41,9 +41,10 @@ async function googleRoutes(origin: RoutePoint, destination: RoutePoint, apiKey:
     body: JSON.stringify({
       origin: { location: { latLng: origin } },
       destination: { location: { latLng: destination } },
+      ...(via ? { intermediates: [{ location: { latLng: via } }] } : {}),
       travelMode: "DRIVE",
       routingPreference: "TRAFFIC_UNAWARE",
-      computeAlternativeRoutes: true,
+      computeAlternativeRoutes: !via,
       languageCode: "ru",
       units: "METRIC",
     }),
@@ -75,22 +76,25 @@ export async function GET(request: Request): Promise<Response> {
   const search = new URL(request.url).searchParams;
   const origin = parsePoint(search.get("origin"));
   const destination = parsePoint(search.get("destination"));
+  const viaValue = search.get("via");
+  const via = parsePoint(viaValue);
   if (!origin || !destination) return Response.json({ error: "Проверьте точки маршрута." }, { status: 400 });
+  if (viaValue && !via) return Response.json({ error: "Проверьте промежуточную точку «Через»." }, { status: 400 });
   if (origin.latitude === destination.latitude && origin.longitude === destination.longitude) {
     return Response.json({ error: "Погрузка и выгрузка должны быть в разных точках." }, { status: 400 });
   }
 
   try {
     const googleApiKey = process.env.GOOGLE_ROUTES_API_KEY?.trim();
-    const google = googleApiKey ? await googleRoutes(origin, destination, googleApiKey).catch(() => null) : null;
-    if (google && google.length > 1) return Response.json({ routes: google, provider: "google", alternativesMode: "provider" }, { headers: { "Cache-Control": "private, max-age=300" } });
+    const google = googleApiKey ? await googleRoutes(origin, destination, via, googleApiKey).catch(() => null) : null;
+    if (google && (via || google.length > 1)) return Response.json({ routes: google, provider: "google", alternativesMode: via ? "explicit-waypoint" : "provider" }, { headers: { "Cache-Control": "private, max-age=300" } });
 
-    const osrm = await osrmRoutes(origin, destination);
+    const osrm = await osrmRoutes(origin, destination, via ?? undefined);
     if (!osrm) return Response.json({ error: "Между выбранными точками автомобильный маршрут не найден." }, { status: 422 });
     return Response.json({
       routes: osrm.routes,
       provider: "osrm",
-      alternativesMode: osrm.automaticCorridors ? "automatic-corridors" : "provider",
+      alternativesMode: via ? "explicit-waypoint" : osrm.automaticCorridors ? "automatic-corridors" : "provider",
     }, { headers: { "Cache-Control": "private, max-age=300" } });
   } catch {
     return Response.json({ error: "Не удалось загрузить варианты маршрута." }, { status: 503 });

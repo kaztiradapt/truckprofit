@@ -27,7 +27,10 @@ describe("OSRM routing", () => {
       osrmPayload(1_880, 1_090, 44.3, 3),
       osrmPayload(1_315, 980, 50.21, 3),
     ];
-    const fetchMock = vi.fn(async () => Response.json(alternatives.shift()));
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      void input;
+      return Response.json(alternatives.shift());
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await osrmRoutes(
@@ -38,5 +41,31 @@ describe("OSRM routing", () => {
     expect(fetchMock).toHaveBeenCalledTimes(7);
     expect(result?.automaticCorridors).toBe(true);
     expect(result?.routes.map((route) => route.distanceKm)).toEqual([942, 1_025, 1_310]);
+  });
+
+  it("keeps an explicit via point in every routing request", async () => {
+    const alternatives = [
+      osrmPayload(1_317, 895, 50.4, 3),
+      ...Array.from({ length: 6 }, (_, index) => osrmPayload(1_330 + index * 20, 910 + index * 10, 50.6 + index * .2, 4)),
+    ];
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      void input;
+      return Response.json(alternatives.shift());
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const via = { latitude: 50.4111, longitude: 80.2275 };
+    const result = await osrmRoutes(
+      { latitude: 49.8161, longitude: 73.1027 },
+      { latitude: 46.1761, longitude: 80.9526 },
+      via,
+    );
+
+    expect(result?.routes[0]?.distanceKm).toBe(1_317);
+    expect(fetchMock).toHaveBeenCalledTimes(7);
+    for (const [request] of fetchMock.mock.calls) {
+      const url = String(request);
+      expect(url).toContain(`${via.longitude},${via.latitude}`);
+    }
   });
 });
