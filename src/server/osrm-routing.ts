@@ -93,6 +93,8 @@ export async function osrmRoutes(origin: RoutePoint, destination: RoutePoint, vi
   });
   const settled = await Promise.allSettled(corridorRequests);
   const corridorRoutes = settled.flatMap((result) => result.status === "fulfilled" && result.value ? [result.value] : []);
-  const routes = chooseDistinctRoutes([...nativeDistinct, ...corridorRoutes]);
+  const routeCandidates = [...nativeDistinct, ...corridorRoutes];
+  if (via) routeCandidates.sort((a, b) => a.durationMinutes - b.durationMinutes || a.distanceKm - b.distanceKm);
+  const routes = chooseDistinctRoutes(routeCandidates);
   return { routes, automaticCorridors: routes.length > nativeDistinct.length };
 }

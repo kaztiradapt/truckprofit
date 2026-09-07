@@ -46,7 +46,8 @@ describe("OSRM routing", () => {
   it("keeps an explicit via point in every routing request", async () => {
     const alternatives = [
       osrmPayload(1_317, 895, 50.4, 3),
-      ...Array.from({ length: 6 }, (_, index) => osrmPayload(1_330 + index * 20, 910 + index * 10, 50.6 + index * .2, 4)),
+      osrmPayload(1_290, 870, 50.6, 4),
+      ...Array.from({ length: 5 }, (_, index) => osrmPayload(1_350 + index * 20, 920 + index * 10, 50.8 + index * .2, 4)),
     ];
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       void input;
@@ -61,7 +62,7 @@ describe("OSRM routing", () => {
       via,
     );
 
-    expect(result?.routes[0]?.distanceKm).toBe(1_317);
+    expect(result?.routes[0]?.distanceKm).toBe(1_290);
     expect(fetchMock).toHaveBeenCalledTimes(7);
     for (const [request] of fetchMock.mock.calls) {
       const url = String(request);
