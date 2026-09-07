@@ -1,0 +1,42 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { osrmRoutes } from "./osrm-routing";
+
+function osrmPayload(distanceKm: number, durationMinutes: number, middleLatitude: number, waypointCount: number) {
+  return {
+    code: "Ok",
+    routes: [{
+      distance: distanceKm * 1_000,
+      duration: durationMinutes * 60,
+      geometry: { type: "LineString", coordinates: [[73.1, 49.8], [77, middleLatitude], [80.95, 46.18]] },
+    }],
+    waypoints: Array.from({ length: waypointCount }, () => ({ distance: 100 })),
+  };
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("OSRM routing", () => {
+  it("automatically calculates distinct corridors when OSRM returns one route", async () => {
+    const alternatives = [
+      osrmPayload(942, 730, 47.8, 2),
+      osrmPayload(1_025, 875, 49.1, 3),
+      osrmPayload(1_900, 1_100, 44.2, 3),
+      osrmPayload(1_310, 970, 50.2, 3),
+      osrmPayload(1_030, 880, 49.11, 3),
+      osrmPayload(1_880, 1_090, 44.3, 3),
+      osrmPayload(1_315, 980, 50.21, 3),
+    ];
+    const fetchMock = vi.fn(async () => Response.json(alternatives.shift()));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await osrmRoutes(
+      { latitude: 49.8161, longitude: 73.1027 },
+      { latitude: 46.1761, longitude: 80.9526 },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(7);
+    expect(result?.automaticCorridors).toBe(true);
+    expect(result?.routes.map((route) => route.distanceKm)).toEqual([942, 1_025, 1_310]);
+  });
+});

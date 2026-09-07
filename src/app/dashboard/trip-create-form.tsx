@@ -52,6 +52,7 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
   const [routing, setRouting] = useState(false);
   const [routingError, setRoutingError] = useState("");
   const [routingProvider, setRoutingProvider] = useState<"google" | "osrm" | "">("");
+  const [alternativesMode, setAlternativesMode] = useState<"provider" | "automatic-corridors" | "">("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
   const baseCurrencyCode: SupportedCurrency = isSupportedCurrency(baseCurrency) ? baseCurrency : "KZT";
@@ -161,12 +162,13 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
       setRouting(true);
       try {
         const response = await fetch(`/api/routing?${query}`, { signal: controller.signal });
-        const payload = await response.json() as { routes?: RoutingAlternative[]; provider?: "google" | "osrm"; error?: string };
+        const payload = await response.json() as { routes?: RoutingAlternative[]; provider?: "google" | "osrm"; alternativesMode?: "provider" | "automatic-corridors"; error?: string };
         if (!response.ok) throw new Error(payload.error ?? "Не удалось построить маршрут.");
         const routes = payload.routes ?? [];
         if (controller.signal.aborted || !routes.length) return;
         setRouteAlternatives(routes);
         setRoutingProvider(payload.provider ?? "osrm");
+        setAlternativesMode(payload.alternativesMode ?? "provider");
         setSelectedRouteId(routes[0].id);
         setDistanceKm(String(routes[0].distanceKm));
         for (const [index, route] of routes.entries()) {
@@ -297,7 +299,11 @@ export function TripCreateForm({ organizationId, vehicles, drivers, baseCurrency
             <div className="route-alternative-list">{routeAlternatives.map((route, index) => <button type="button" className={selectedRouteId === route.id ? "active" : ""} onClick={() => selectRoute(route.id, route.distanceKm)} key={route.id}>
               <span>Вариант {index + 1}</span><strong>{route.distanceKm.toLocaleString("ru-RU")} км</strong><small>≈ {Math.floor(route.durationMinutes / 60)} ч {route.durationMinutes % 60} мин</small>
             </button>)}</div>
-            <small>{routingProvider === "google" ? "Альтернативы рассчитаны Google Routes." : "Альтернативы рассчитаны OSRM / OpenStreetMap."} Фактическое время зависит от границ, пробок и ограничений для грузовиков.</small>
+            <small>{routingProvider === "google"
+              ? "Альтернативы рассчитаны Google Routes."
+              : alternativesMode === "automatic-corridors"
+                ? "Основной маршрут рассчитан OSRM; дополнительные варианты найдены автоматически по другим дорожным коридорам."
+                : "Альтернативы рассчитаны OSRM / OpenStreetMap."} Фактическое время зависит от границ, пробок и ограничений для грузовиков.</small>
           </div> : null}
           <small>Выберите тип точки и нажмите нужное место на карте. После двух точек варианты маршрута построятся автоматически.</small>
         </div>
