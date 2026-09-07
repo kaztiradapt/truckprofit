@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 import type {
   ActiveTrip,
@@ -128,6 +129,7 @@ function toAmount(amountMinor: number): number {
 
 export class SupabaseDriverBotRepository implements DriverBotRepository {
   private readonly client: SupabaseClient;
+  private readonly updateContext = new AsyncLocalStorage<{ updateId: number; token: string; conversationKey: string; state?: object | null }>();
 
   constructor(environment: Pick<BotEnvironment, "supabaseUrl" | "supabaseServiceRoleKey">) {
     this.client = createClient(environment.supabaseUrl, environment.supabaseServiceRoleKey, {
@@ -151,6 +153,8 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   }
 
   async saveConversation(conversationKey: string, state: object): Promise<void> {
+    const update = this.updateContext.getStore();
+    if (update && update.conversationKey === conversationKey) { update.state = state; return; }
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
     const { error } = await this.client.from("telegram_conversations").upsert({
       conversation_key: conversationKey,
@@ -161,23 +165,44 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   }
 
   async deleteConversation(conversationKey: string): Promise<void> {
+    const update = this.updateContext.getStore();
+    if (update && update.conversationKey === conversationKey) { update.state = null; return; }
     const { error } = await this.client.from("telegram_conversations").delete().eq("conversation_key", conversationKey);
     throwOnError(error);
   }
 
-  async reserveIncomingUpdate(updateId: number): Promise<boolean> {
-    const { data, error } = await this.client.rpc("reserve_telegram_update", { p_telegram_update_id: updateId });
+  async processIncomingUpdate(updateId: number, conversationKey: string, handler: () => Promise<void>): Promise<void> {
+    const token = crypto.randomUUID();
+    const { data, error } = await this.client.rpc("claim_telegram_update", { p_update_id: updateId, p_conversation_key: conversationKey, p_token: token });
     throwOnError(error);
-    return data === true;
+    if (data === "PROCESSED") return;
+    if (data !== "CLAIMED") throw new Error("Telegram conversation is busy; retry this update");
+    await this.updateContext.run({ updateId, token, conversationKey }, async () => {
+      try {
+        await handler();
+        const state = this.updateContext.getStore()?.state;
+        const result = await this.client.rpc("complete_telegram_update", {
+          p_update_id: updateId, p_token: token, p_success: true,
+          p_write_state: state !== undefined, p_state: state ?? null,
+        });
+        throwOnError(result.error);
+      } catch (error) {
+        // If a successful commit's response was lost, the DB refuses to demote
+        // PROCESSED. The redelivery will simply acknowledge that completed event.
+        await this.client.rpc("complete_telegram_update", {
+          p_update_id: updateId, p_token: token, p_success: false, p_write_state: false, p_state: null,
+        });
+        throw error;
+      }
+    });
   }
 
-  async finishIncomingUpdate(updateId: number, outcome: "PROCESSED" | "FAILED", safeErrorSummary?: string): Promise<void> {
-    const { error } = await this.client.rpc("finish_telegram_update", {
-      p_telegram_update_id: updateId,
-      p_status: outcome,
-      p_error_summary: safeErrorSummary ?? null,
+  private telegramMutation(operation: string, args: Record<string, unknown>) {
+    const update = this.updateContext.getStore();
+    if (!update) throw new Error("Telegram mutation requires a leased update");
+    return this.client.rpc("execute_telegram_operation", {
+      p_update_id: update.updateId, p_token: update.token, p_operation: operation, p_args: args,
     });
-    throwOnError(error);
   }
 
   async claimInvitation(invitationCode: string, telegramUserId: number): Promise<DriverIdentity> {
@@ -446,7 +471,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
 
   async recordExpense(input: RecordExpenseInput): Promise<{ expenseId: string }> {
     const fuelPricePerLitre = input.fuelLitres ? toAmount(input.amountMinor) / input.fuelLitres : null;
-    const { data, error } = await this.client.rpc("record_telegram_expense", {
+    const { data, error } = await this.telegramMutation("record_telegram_expense", {
       p_organization_id: input.organizationId,
       p_driver_id: input.driverId,
       p_trip_id: input.tripId,
@@ -467,7 +492,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
 
   async recordOdometer(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm" | "occurredAt">): Promise<void> {
     if (input.odometerKm === undefined) throw new Error("Odometer value is required");
-    const { error } = await this.client.rpc("record_telegram_odometer", {
+    const { error } = await this.telegramMutation("record_telegram_odometer", {
       p_organization_id: input.organizationId,
       p_driver_id: input.driverId,
       p_trip_id: input.tripId,
@@ -479,7 +504,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
 
   async startAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm"> & { loadState: "LOADED" | "EMPTY" }): Promise<void> {
     if (input.odometerKm === undefined || !Number.isInteger(input.odometerKm)) throw new Error("A whole-kilometre odometer value is required");
-    const { error } = await this.client.rpc("driver_start_assigned_leg", {
+    const { error } = await this.telegramMutation("driver_start_assigned_leg", {
       p_organization_id: input.organizationId,
       p_driver_id: input.driverId,
       p_trip_id: input.tripId,
@@ -491,7 +516,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
 
   async finishAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm">): Promise<void> {
     if (input.odometerKm === undefined || !Number.isInteger(input.odometerKm)) throw new Error("A whole-kilometre odometer value is required");
-    const { error } = await this.client.rpc("driver_finish_assigned_leg", {
+    const { error } = await this.telegramMutation("driver_finish_assigned_leg", {
       p_organization_id: input.organizationId,
       p_driver_id: input.driverId,
       p_trip_id: input.tripId,
@@ -501,7 +526,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   }
 
   async recordStatus(input: RecordStatusInput): Promise<void> {
-    const { error } = await this.client.rpc("record_telegram_vehicle_status", {
+    const { error } = await this.telegramMutation("record_telegram_vehicle_status", {
       p_organization_id: input.organizationId,
       p_driver_id: input.driverId,
       p_trip_id: input.tripId,
@@ -514,7 +539,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   }
 
   async recordLocation(input: RecordLocationInput): Promise<{ locationId: string }> {
-    const { data, error } = await this.client.rpc("record_telegram_trip_location", {
+    const { data, error } = await this.telegramMutation("record_telegram_trip_location", {
       p_organization_id: input.organizationId,
       p_driver_id: input.driverId,
       p_trip_id: input.tripId,

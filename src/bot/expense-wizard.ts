@@ -48,7 +48,7 @@ export function advanceExpenseWizard(state: ExpenseWizardState, input: string): 
     return {
       kind: "NEXT",
       state: { step: "AMOUNT", draft: { ...state.draft, categoryCode: text } },
-      prompt: "Укажите сумму расхода в тенге.",
+      prompt: `Укажите сумму расхода в валюте компании: ${state.draft.currency}. Если чек в другой валюте, сначала пересчитайте сумму в ${state.draft.currency} по курсу операции.`,
     };
   }
 
@@ -85,4 +85,3 @@ export function advanceExpenseWizard(state: ExpenseWizardState, input: string): 
 
   return { kind: "ERROR", state, prompt: "Сессия уже готова к подтверждению. Отправьте CONFIRM или отмените ввод." };
 }
-

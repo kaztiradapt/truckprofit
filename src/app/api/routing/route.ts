@@ -89,7 +89,11 @@ export async function GET(request: Request): Promise<Response> {
     const google = googleApiKey ? await googleRoutes(origin, destination, via, googleApiKey).catch(() => null) : null;
     if (google && (via || google.length > 1)) return Response.json({ routes: google, provider: "google", alternativesMode: via ? "explicit-waypoint" : "provider" }, { headers: { "Cache-Control": "private, max-age=300" } });
 
-    const osrm = await osrmRoutes(origin, destination, via ?? undefined);
+    // A secondary provider must never erase an already valid primary route.
+    const osrm = await osrmRoutes(origin, destination, via ?? undefined).catch(() => null);
+    if (google && (!osrm || osrm.routes.length <= google.length)) {
+      return Response.json({ routes: google, provider: "google", alternativesMode: "provider" }, { headers: { "Cache-Control": "private, max-age=300" } });
+    }
     if (!osrm) return Response.json({ error: "Между выбранными точками автомобильный маршрут не найден." }, { status: 422 });
     return Response.json({
       routes: osrm.routes,

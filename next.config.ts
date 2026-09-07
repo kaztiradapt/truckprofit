@@ -15,6 +15,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  serverExternalPackages: ["pdfkit"],
+  outputFileTracingIncludes: { "/api/reports/*": ["./assets/fonts/*.ttf"] },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

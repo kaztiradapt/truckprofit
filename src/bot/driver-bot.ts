@@ -344,19 +344,10 @@ function commandArguments(context: DriverBotContext, command: string): string[] 
 }
 
 export function createDriverBot(token: string, repository: DriverBotRepository): Bot<DriverBotContext> {
-  const bot = new Bot<DriverBotContext>(token);
+  const bot = new Bot<DriverBotContext>(token, { client: { timeoutSeconds: 10 } });
 
   bot.use(async (context, next) => {
-    const updateId = context.update.update_id;
-    const reserved = await repository.reserveIncomingUpdate(updateId);
-    if (!reserved) return;
-    try {
-      await next();
-      await repository.finishIncomingUpdate(updateId, "PROCESSED");
-    } catch (error) {
-      await repository.finishIncomingUpdate(updateId, "FAILED", "Telegram handler failed");
-      throw error;
-    }
+    await repository.processIncomingUpdate(context.update.update_id, context.chat?.id.toString() ?? `update:${context.update.update_id}`, next);
   });
 
   bot.use(session({

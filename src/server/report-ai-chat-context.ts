@@ -1,3 +1,4 @@
+import { fetchAllRows, fetchRowsByIds } from "@/server/paginated-query";
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -93,14 +94,14 @@ export async function buildReportAiChatContext(
     .is("deleted_at", null)
     .not("started_at", "is", null)
     .order("started_at", { ascending: false })
-    .limit(500);
+    .order("id");
   if (filters.dateFrom) tripsQuery = tripsQuery.gte("started_at", `${filters.dateFrom}T00:00:00.000Z`);
   if (filters.dateTo) tripsQuery = tripsQuery.lte("started_at", `${filters.dateTo}T23:59:59.999Z`);
   if (filters.driverId) tripsQuery = tripsQuery.eq("driver_id", filters.driverId);
   if (filters.vehicleId) tripsQuery = tripsQuery.eq("vehicle_id", filters.vehicleId);
   if (filters.tripStatus) tripsQuery = tripsQuery.eq("status", filters.tripStatus);
 
-  const { data: tripData, error: tripsError } = await tripsQuery;
+  const { data: tripData, error: tripsError } = await fetchAllRows(() => tripsQuery);
   if (tripsError) throw new Error("TRIPS_UNAVAILABLE");
   const trips = (tripData ?? []) as unknown as TripRow[];
   const tripIds = trips.map((trip) => trip.id);
@@ -111,25 +112,25 @@ export async function buildReportAiChatContext(
   let expenseRows: ExpenseRow[] = [];
   if (tripIds.length) {
     const [pnlResult, legsResult, incomesResult, expensesResult] = await Promise.all([
-      supabase.from("pnl_snapshots")
+      fetchRowsByIds(tripIds, (batch) => supabase.from("pnl_snapshots")
         .select("trip_id, driver_compensation_minor, total_km, loaded_km, empty_km")
-        .in("trip_id", tripIds)
-        .eq("is_current", true),
-      supabase.from("trip_legs")
+        .in("trip_id", batch).eq("organization_id", organizationId)
+        .eq("is_current", true).order("id")),
+      fetchRowsByIds(tripIds, (batch) => supabase.from("trip_legs")
         .select("trip_id, distance_km, load_state")
-        .in("trip_id", tripIds)
-        .is("deleted_at", null),
-      supabase.from("incomes")
+        .in("trip_id", batch).eq("organization_id", organizationId)
+        .is("deleted_at", null).order("id")),
+      fetchRowsByIds(tripIds, (batch) => supabase.from("incomes")
         .select("trip_id, reporting_amount_minor")
-        .in("trip_id", tripIds)
+        .in("trip_id", batch).eq("organization_id", organizationId)
         .neq("payment_status", "VOIDED")
-        .is("deleted_at", null),
-      supabase.from("expenses")
+        .is("deleted_at", null).order("id")),
+      fetchRowsByIds(tripIds, (batch) => supabase.from("expenses")
         .select("trip_id, reporting_amount_minor, quantity, unit, cost_behavior, include_in_normalized_cost, expense_categories(display_name, economic_group)")
-        .in("trip_id", tripIds)
+        .in("trip_id", batch).eq("organization_id", organizationId)
         .neq("review_status", "REJECTED")
         .eq("status", "RECORDED")
-        .is("deleted_at", null),
+        .is("deleted_at", null).order("id")),
     ]);
     if (pnlResult.error || legsResult.error || incomesResult.error || expensesResult.error) throw new Error("FINANCE_UNAVAILABLE");
     pnlRows = (pnlResult.data ?? []) as PnlRow[];
@@ -228,7 +229,7 @@ export async function buildReportAiChatContext(
       vehicleIdApplied: Boolean(filters.vehicleId),
       tripStatus: filters.tripStatus || null,
       maximumTripsLoaded: 500,
-      truncated: trips.length === 500,
+      truncated: false,
     },
     totals: summarize(tripFacts),
     monthly: [...byMonth.entries()].sort(([left], [right]) => left.localeCompare(right)).slice(-18)

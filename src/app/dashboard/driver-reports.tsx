@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type MouseEvent } from "react";
+import { useMemo, useState } from "react";
 
 import {
   aggregateManagementReport,
@@ -12,6 +12,7 @@ import {
 } from "@/domain/reports/management-report";
 import { AiReportAnalyst } from "./ai-report-analyst";
 import { AiReportChat } from "./ai-report-chat";
+import { ReportExportControls } from "./report-export-controls";
 import { DeviceDateTime } from "./device-date-time";
 
 type DriverReport = {
@@ -238,24 +239,6 @@ export function DriverReports({ organizationId, reports, trips, expenses, vehicl
     setDateTo(end.toISOString().slice(0, 10));
   }
 
-  function currentReportHref(format: "csv" | "print") {
-    const params = new URLSearchParams({ format });
-    if (driverId) params.set("driverId", driverId);
-    if (vehicleId) params.set("vehicleId", vehicleId);
-    if (tripStatus) params.set("tripStatus", tripStatus);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
-    return `/api/reports/export?${params.toString()}`;
-  }
-
-  function attachDeviceTimeZone(event: MouseEvent<HTMLAnchorElement>) {
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (!timeZone) return;
-    const url = new URL(event.currentTarget.href);
-    url.searchParams.set("timeZone", timeZone);
-    event.currentTarget.href = url.toString();
-  }
-
   return <section className="driver-reports">
     <div className="report-dashboard-intro">
       <div><p className="eyebrow">Управленческий дэшборд</p><h2>Экономика автопарка</h2><p>Факт показывает все затраты. Нормализованный результат отдельно убирает только отмеченные разовые и капитальные расходы.</p></div>
@@ -280,16 +263,11 @@ export function DriverReports({ organizationId, reports, trips, expenses, vehicl
     </div>
 
     <div className="report-export-toolbar" aria-label="Выгрузка отчёта">
-      <span><b>Скачать текущую выборку</b><small>Фильтры применяются к файлу. Выгрузка работает и во встроенном браузере Telegram.</small></span>
-      <div>
-        {matchingTrips.length ? <>
-          <a className="button-secondary" href={currentReportHref("print")} onClick={attachDeviceTimeZone}>Печать / PDF</a>
-          <a className="button" href={currentReportHref("csv")} onClick={attachDeviceTimeZone}>Скачать CSV</a>
-        </> : <>
-          <button type="button" className="button-secondary" disabled>Печать / PDF</button>
-          <button type="button" disabled>Скачать CSV</button>
-        </>}
-      </div>
+      <span><b>Скачать текущую выборку</b><small>Фильтры применяются к файлу. В Mini App файл приходит в ваш личный чат с ботом.</small></span>
+      <ReportExportControls disabled={!matchingTrips.length} filters={{
+        ...(driverId ? { driverId } : {}), ...(vehicleId ? { vehicleId } : {}),
+        ...(tripStatus ? { tripStatus } : {}), ...(dateFrom ? { dateFrom } : {}), ...(dateTo ? { dateTo } : {}),
+      }} />
     </div>
 
     {canViewFinance ? <AiReportAnalyst

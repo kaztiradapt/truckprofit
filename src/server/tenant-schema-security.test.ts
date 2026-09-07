@@ -27,7 +27,7 @@ describe("tenant database security", () => {
   });
 
   it("revokes direct anonymous access to tenant tables", () => {
-    const revokedTables = migrations.match(/revoke all privileges on table([\s\S]+?)from anon;/i)?.[1] ?? "";
+    const revokedTables = [...migrations.matchAll(/revoke all privileges on table([\s\S]+?)from anon;/gi)].map((match) => match[1]).join("\n");
     const tables = [...migrations.matchAll(/create table(?: if not exists)? public\.([a-z0-9_]+)/gi)].map((match) => match[1]);
     for (const table of tables) {
       expect(revokedTables, `public.${table} must be revoked from anon`).toContain(`public.${table}`);

@@ -139,8 +139,7 @@ export interface DriverBotRepository {
   loadConversation(conversationKey: string): Promise<object | undefined>;
   saveConversation(conversationKey: string, state: object): Promise<void>;
   deleteConversation(conversationKey: string): Promise<void>;
-  reserveIncomingUpdate(updateId: number): Promise<boolean>;
-  finishIncomingUpdate(updateId: number, outcome: "PROCESSED" | "FAILED", safeErrorSummary?: string): Promise<void>;
+  processIncomingUpdate(updateId: number, conversationKey: string, handler: () => Promise<void>): Promise<void>;
   claimInvitation(invitationCode: string, telegramUserId: number): Promise<DriverIdentity>;
   claimBetaInvitation(invitationCode: string, telegramUserId: number, telegramUsername: string | null): Promise<ClaimedBetaInvitation>;
   claimOwnerInvitation(invitationCode: string, telegramUserId: number): Promise<OwnerIdentity>;

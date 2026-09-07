@@ -6,6 +6,7 @@ import { SupabaseDriverBotRepository } from "@/server/supabase-driver-bot-reposi
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 let handler: ((request: Request) => Promise<Response>) | undefined;
 
@@ -14,8 +15,9 @@ function getHandler(): (request: Request) => Promise<Response> {
   const environment: TelegramWebhookEnvironment = readTelegramWebhookEnvironment();
   const bot = createDriverBot(environment.telegramBotToken, new SupabaseDriverBotRepository(environment));
   handler = webhookCallback(bot, "std/http", {
-    onTimeout: "return",
-    timeoutMilliseconds: 9_000,
+    // Never acknowledge unfinished work: Telegram must retry a timed-out update.
+    onTimeout: "throw",
+    timeoutMilliseconds: 45_000,
     secretToken: environment.telegramWebhookSecret,
   });
   return handler;

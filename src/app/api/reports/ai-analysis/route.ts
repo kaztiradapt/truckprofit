@@ -1,3 +1,4 @@
+import { fetchAllRows, fetchRowsByIds } from "@/server/paginated-query";
 import { createHash } from "node:crypto";
 
 import { z } from "zod";
@@ -253,11 +254,11 @@ export async function POST(request: Request): Promise<Response> {
     .not("started_at", "is", null)
     .gte("started_at", `${periods.previous.start}T00:00:00.000Z`)
     .lte("started_at", `${periods.current.end}T23:59:59.999Z`)
-    .limit(2_000);
+    .order("id");
   if (parsed.data.driverId) tripsQuery = tripsQuery.eq("driver_id", parsed.data.driverId);
   if (parsed.data.vehicleId) tripsQuery = tripsQuery.eq("vehicle_id", parsed.data.vehicleId);
   if (parsed.data.tripStatus) tripsQuery = tripsQuery.eq("status", parsed.data.tripStatus);
-  const { data: tripsData, error: tripsError } = await tripsQuery;
+  const { data: tripsData, error: tripsError } = await fetchAllRows(() => tripsQuery);
   if (tripsError) return Response.json({ error: "Не удалось собрать рейсы для анализа." }, { status: 500 });
   const trips = (tripsData ?? []) as TripRow[];
   const tripIds = trips.map((trip) => trip.id);
@@ -268,10 +269,10 @@ export async function POST(request: Request): Promise<Response> {
   let expenses: ExpenseRow[] = [];
   if (tripIds.length) {
     const [legsResult, incomesResult, pnlResult, expensesResult] = await Promise.all([
-      auth.supabase.from("trip_legs").select("trip_id, distance_km, load_state").in("trip_id", tripIds).is("deleted_at", null),
-      auth.supabase.from("incomes").select("trip_id, reporting_amount_minor").in("trip_id", tripIds).neq("payment_status", "VOIDED").is("deleted_at", null),
-      auth.supabase.from("pnl_snapshots").select("trip_id, driver_compensation_minor").in("trip_id", tripIds).eq("is_current", true),
-      auth.supabase.from("expenses").select("trip_id, reporting_amount_minor, quantity, unit, cost_behavior, include_in_normalized_cost, expense_categories(economic_group)").in("trip_id", tripIds).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null),
+      fetchRowsByIds(tripIds, (batch) => auth.supabase.from("trip_legs").select("trip_id, distance_km, load_state").in("trip_id", batch).eq("organization_id", parsed.data.organizationId).is("deleted_at", null).order("id")),
+      fetchRowsByIds(tripIds, (batch) => auth.supabase.from("incomes").select("trip_id, reporting_amount_minor").in("trip_id", batch).eq("organization_id", parsed.data.organizationId).neq("payment_status", "VOIDED").is("deleted_at", null).order("id")),
+      fetchRowsByIds(tripIds, (batch) => auth.supabase.from("pnl_snapshots").select("trip_id, driver_compensation_minor").in("trip_id", batch).eq("organization_id", parsed.data.organizationId).eq("is_current", true).order("id")),
+      fetchRowsByIds(tripIds, (batch) => auth.supabase.from("expenses").select("trip_id, reporting_amount_minor, quantity, unit, cost_behavior, include_in_normalized_cost, expense_categories(economic_group)").in("trip_id", batch).eq("organization_id", parsed.data.organizationId).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("id")),
     ]);
     if (legsResult.error || incomesResult.error || pnlResult.error || expensesResult.error) {
       return Response.json({ error: "Не удалось собрать показатели для анализа." }, { status: 500 });

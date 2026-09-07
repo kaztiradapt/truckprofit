@@ -1,0 +1,9 @@
+.build/
+deliverables/
+test-results/
+playwright-report/
+coverage/
+.env*
+.git/
+.next/
+node_modules/

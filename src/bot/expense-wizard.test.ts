@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { advanceExpenseWizard, beginExpenseWizard } from "./expense-wizard";
 
 describe("expense wizard", () => {
+  it.each(["KZT", "RUB", "USD", "CNY", "UZS"])("asks for and records the same company currency: %s", (currency) => {
+    const result = advanceExpenseWizard(beginExpenseWizard("trip-1", currency).state, "FUEL");
+    expect(result.prompt).toContain(`валюте компании: ${currency}`);
+    expect(result.state.draft.currency).toBe(currency);
+    expect(result.prompt).not.toContain("в тенге");
+  });
   it("collects a fuel expense without making a database write", () => {
     let result = beginExpenseWizard("trip-1");
     result = advanceExpenseWizard(result.state, "FUEL");
@@ -20,4 +26,3 @@ describe("expense wizard", () => {
     });
   });
 });
-

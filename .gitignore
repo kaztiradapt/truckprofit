@@ -7,5 +7,7 @@ coverage/
 supabase/.temp/
 supabase/.branches/
 .vercel
+/test-results/
+/playwright-report/
 .env*
 !.env.example
