@@ -31,7 +31,7 @@ export function formatTripAssignmentNotification(input: TripAssignmentNotificati
     `📦 Погрузка: ${input.originAddress}`,
     `🏁 Выгрузка: ${input.destinationAddress}`,
     "",
-    "Откройте «Мой рейс», чтобы посмотреть назначение и менять статус поездки.",
+    "Откройте «Мой рейс» и нажмите «Принять рейс» либо укажите причину отказа. Принятие назначения не означает начало движения.",
   ].join("\n");
 }
 

@@ -36,6 +36,8 @@ export type OwnerSummary = {
 };
 
 export type OwnerTripSummary = {
+  assignmentResponse?: string;
+  assignmentRefusalReason?: string | null;
   id: string;
   title: string;
   vehicleName: string;
@@ -61,6 +63,9 @@ export type OwnerExpenseSummary = {
 };
 
 export type ActiveTrip = {
+  assignmentToken?: string;
+  assignmentResponse?: string;
+  assignmentRefusalReason?: string | null;
   id: string;
   organizationId: string;
   driverId: string;
@@ -79,6 +84,8 @@ export type ActiveTrip = {
 };
 
 export type RecordExpenseInput = {
+  originalCurrency?: string;
+  exchangeRate?: number;
   organizationId: string;
   driverId: string;
   tripId: string;
@@ -135,6 +142,13 @@ export type ReceiptUpload = {
   originalFilename: string;
 };
 
+export type DriverExpense = {
+  id: string; tripId: string; categoryCode: string; categoryName: string;
+  amountMinor: number; currency: string; originalAmountMinor: number; originalCurrency: string;
+  exchangeRate: number; fuelLitres?: number; odometerKm?: number;
+  occurredAt: string; updatedAt: string; receiptCount: number; canEdit: boolean;
+};
+
 export interface DriverBotRepository {
   loadConversation(conversationKey: string): Promise<object | undefined>;
   saveConversation(conversationKey: string, state: object): Promise<void>;
@@ -153,6 +167,12 @@ export interface DriverBotRepository {
   listOwnerDrivers(scope: OrganizationScope): Promise<OwnerDriverSummary[]>;
   listOwnerRecentExpenses(scope: OrganizationScope): Promise<OwnerExpenseSummary[]>;
   findActiveTrip(driver: DriverIdentity): Promise<ActiveTrip | null>;
+  listDriverExpenses(driver: DriverIdentity, tripId: string, offset: number): Promise<DriverExpense[]>;
+  findDriverExpense(driver: DriverIdentity, expenseId: string): Promise<DriverExpense | null>;
+  getDriverExpenseHistory(driver: DriverIdentity, expenseId: string): Promise<Array<{ at: string; beforeAmount: number; afterAmount: number; currency: string }>>;
+  getDriverReceipt(driver: DriverIdentity, expenseId: string, index: number): Promise<{ content: Uint8Array; filename: string } | null>;
+  editDriverExpense(input: RecordExpenseInput & { expenseId: string; expectedUpdatedAt: string }): Promise<{ expenseId: string }>;
+  respondToAssignment(driver: DriverIdentity, assignmentToken: string, response: "ACCEPTED" | "DECLINED", reason?: string): Promise<void>;
   recordExpense(input: RecordExpenseInput): Promise<{ expenseId: string }>;
   recordOdometer(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm" | "occurredAt">): Promise<void>;
   startAssignedLeg(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm"> & { loadState: "LOADED" | "EMPTY" }): Promise<void>;

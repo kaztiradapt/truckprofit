@@ -6,6 +6,7 @@ import type {
   ClaimedBetaInvitation,
   DriverBotRepository,
   DriverIdentity,
+  DriverExpense,
   OwnerDriverSummary,
   OwnerExpenseSummary,
   OwnerIdentity,
@@ -62,6 +63,8 @@ type RawOwnerMembership = {
 };
 
 type RawOwnerTrip = {
+  assignment_response: string;
+  assignment_refusal_reason: string | null;
   id: string;
   title: string;
   started_at: string | null;
@@ -80,6 +83,9 @@ type RawOwnerExpense = {
 };
 
 type RawActiveTrip = {
+  assignment_token: string;
+  assignment_response: string;
+  assignment_refusal_reason: string | null;
   id: string;
   organization_id: string;
   driver_id: string;
@@ -367,7 +373,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   async listOwnerActiveTrips(owner: OrganizationScope): Promise<OwnerTripSummary[]> {
     const { data, error } = await this.client
       .from("trips")
-      .select("id, title, started_at, vehicles(display_name, plate_number), drivers(display_name)")
+      .select("id, title, started_at, assignment_response, assignment_refusal_reason, vehicles(display_name, plate_number), drivers(display_name)")
       .eq("organization_id", owner.organizationId)
       .eq("status", "ACTIVE")
       .is("deleted_at", null)
@@ -381,6 +387,8 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
         title: trip.title,
         vehicleName: vehicle ? `${vehicle.display_name} · ${vehicle.plate_number}` : "Машина не указана",
         driverName: asOne(trip.drivers)?.display_name ?? null,
+        assignmentResponse: trip.assignment_response,
+        assignmentRefusalReason: trip.assignment_refusal_reason,
         startedAt: trip.started_at,
       };
     });
@@ -428,7 +436,7 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   async findActiveTrip(driver: DriverIdentity): Promise<ActiveTrip | null> {
     const { data, error } = await this.client
       .from("trips")
-      .select("id, organization_id, driver_id, vehicle_id, title, trip_legs(origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude)")
+      .select("id, organization_id, driver_id, vehicle_id, title, assignment_token, assignment_response, assignment_refusal_reason, trip_legs(origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude)")
       .eq("organization_id", driver.organizationId)
       .eq("driver_id", driver.driverId)
       .eq("status", "ACTIVE")
@@ -457,6 +465,9 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
       vehicleId: trip.vehicle_id,
       title: trip.title,
       currency: driver.baseCurrency,
+      assignmentToken: trip.assignment_token,
+      assignmentResponse: trip.assignment_response,
+      assignmentRefusalReason: trip.assignment_refusal_reason,
       originCity: firstLeg.origin_city,
       destinationCity: firstLeg.destination_city,
       originAddress: firstLeg.origin_address,
@@ -470,24 +481,97 @@ export class SupabaseDriverBotRepository implements DriverBotRepository {
   }
 
   async recordExpense(input: RecordExpenseInput): Promise<{ expenseId: string }> {
-    const fuelPricePerLitre = input.fuelLitres ? toAmount(input.amountMinor) / input.fuelLitres : null;
-    const { data, error } = await this.telegramMutation("record_telegram_expense", {
-      p_organization_id: input.organizationId,
-      p_driver_id: input.driverId,
-      p_trip_id: input.tripId,
-      p_category_code: input.categoryCode,
-      p_amount: toAmount(input.amountMinor),
-      p_currency: input.currency,
-      p_occurred_at: input.occurredAt.toISOString(),
-      p_odometer_km: input.odometerKm ?? null,
-      p_quantity: input.fuelLitres ?? null,
-      p_unit: input.fuelLitres ? "L" : null,
-      p_price_per_unit: fuelPricePerLitre,
-      p_location_text: null,
-      p_comment: null,
+    const { data, error } = await this.driverWorkflow("create_expense", this.expenseArguments(input));
+    throwOnError(error);
+    return { expenseId: String(data) };
+  }
+
+  private expenseArguments(input: RecordExpenseInput) {
+    return { ...input, originalAmount: toAmount(input.amountMinor),
+      originalCurrency: input.originalCurrency ?? input.currency, exchangeRate: input.exchangeRate ?? 1,
+      occurredAt: input.occurredAt.toISOString() };
+  }
+
+  private driverWorkflow(action: string, args: Record<string, unknown>) {
+    const update = this.updateContext.getStore();
+    if (!update) throw new Error("Telegram mutation requires a leased update");
+    return this.client.rpc("execute_driver_workflow", {
+      p_update_id: update.updateId, p_token: update.token, p_action: action, p_args: args,
+    });
+  }
+
+  async editDriverExpense(input: RecordExpenseInput & { expenseId: string; expectedUpdatedAt: string }) {
+    const { data, error } = await this.driverWorkflow("edit_expense", {
+      ...this.expenseArguments(input), expenseId: input.expenseId, expectedUpdatedAt: input.expectedUpdatedAt,
     });
     throwOnError(error);
     return { expenseId: String(data) };
+  }
+
+  async respondToAssignment(driver: DriverIdentity, assignmentToken: string, response: "ACCEPTED" | "DECLINED", reason?: string) {
+    const { error } = await this.driverWorkflow("respond_assignment", { ...driver, assignmentToken, response, reason });
+    throwOnError(error);
+  }
+
+  private driverExpenseQuery(driver: DriverIdentity) {
+    return this.client.from("expenses")
+      .select("id, trip_id, amount, currency, receipt_amount, receipt_currency, receipt_fx_rate, quantity, odometer_km, occurred_at, updated_at, source, expense_categories(code, display_name), trips!inner(status, driver_id, deleted_at), attachments(id)")
+      .eq("organization_id", driver.organizationId).eq("driver_id", driver.driverId)
+      .eq("status", "RECORDED").is("deleted_at", null).is("trips.deleted_at", null);
+  }
+
+  private mapDriverExpense(value: unknown, driver: DriverIdentity): DriverExpense {
+    const row = value as { id: string; trip_id: string; amount: number; currency: string; receipt_amount: number | null; receipt_currency: string | null; receipt_fx_rate: number | null; quantity: number | null; odometer_km: number | null; occurred_at: string; updated_at: string; source: string; expense_categories: {code: string; display_name: string} | null; trips: {status: string; driver_id: string}; attachments: {id: string}[] };
+    return { id: row.id, tripId: row.trip_id, categoryCode: row.expense_categories?.code ?? "OTHER",
+      categoryName: row.expense_categories?.display_name ?? "Расход",
+      amountMinor: moneyToMinor(row.amount), currency: row.currency,
+      originalAmountMinor: moneyToMinor(row.receipt_amount ?? row.amount),
+      originalCurrency: row.receipt_currency ?? row.currency, exchangeRate: Number(row.receipt_fx_rate ?? 1),
+      fuelLitres: row.quantity === null ? undefined : Number(row.quantity),
+      odometerKm: row.odometer_km === null ? undefined : Number(row.odometer_km),
+      occurredAt: row.occurred_at, updatedAt: row.updated_at, receiptCount: row.attachments?.length ?? 0,
+      canEdit: row.source === "TELEGRAM" && row.trips.status === "ACTIVE" && row.trips.driver_id === driver.driverId };
+  }
+
+  async listDriverExpenses(driver: DriverIdentity, tripId: string, offset: number): Promise<DriverExpense[]> {
+    const start = Math.max(0, Math.min(100000, Math.trunc(offset)));
+    const { data, error } = await this.driverExpenseQuery(driver).eq("trip_id", tripId)
+      .order("occurred_at", { ascending: false }).order("id", { ascending: false }).range(start, start + 9);
+    throwOnError(error);
+    return (data ?? []).map(row => this.mapDriverExpense(row, driver));
+  }
+
+  async findDriverExpense(driver: DriverIdentity, expenseId: string): Promise<DriverExpense | null> {
+    const { data, error } = await this.driverExpenseQuery(driver).eq("id", expenseId).maybeSingle();
+    throwOnError(error);
+    return data ? this.mapDriverExpense(data, driver) : null;
+  }
+
+  async getDriverReceipt(driver: DriverIdentity, expenseId: string, index: number) {
+    if (!await this.findDriverExpense(driver, expenseId)) return null;
+    if (!Number.isInteger(index) || index < 0 || index > 1000) return null;
+    const { data, error } = await this.client.from("attachments")
+      .select("storage_path, original_filename, size_bytes")
+      .eq("organization_id", driver.organizationId).eq("expense_id", expenseId).eq("storage_bucket", "expense-receipts")
+      .order("created_at", { ascending: true }).order("id", { ascending: true }).range(index, index).maybeSingle();
+    throwOnError(error);
+    if (!data || Number(data.size_bytes) > 10 * 1024 * 1024
+      || !data.storage_path.startsWith(driver.organizationId + "/" + expenseId + "/")) return null;
+    const downloaded = await this.client.storage.from("expense-receipts").download(data.storage_path);
+    throwOnError(downloaded.error);
+    if (!downloaded.data || downloaded.data.size > 10 * 1024 * 1024) return null;
+    return { content: new Uint8Array(await downloaded.data.arrayBuffer()), filename: data.original_filename ?? "receipt.jpg" };
+  }
+
+  async getDriverExpenseHistory(driver: DriverIdentity, expenseId: string) {
+    if (!await this.findDriverExpense(driver, expenseId)) return [];
+    const { data, error } = await this.client.from("audit_events")
+      .select("created_at, before_data, after_data").eq("organization_id", driver.organizationId)
+      .eq("entity_type", "expense").eq("entity_id", expenseId).eq("action", "DRIVER_CORRECTED")
+      .order("created_at", { ascending: false }).limit(10);
+    throwOnError(error);
+    return (data ?? []).map(row => ({ at: row.created_at, beforeAmount: Number(row.before_data?.amount ?? 0),
+      afterAmount: Number(row.after_data?.amount ?? 0), currency: String(row.after_data?.currency ?? driver.baseCurrency) }));
   }
 
   async recordOdometer(input: Pick<RecordExpenseInput, "organizationId" | "driverId" | "tripId" | "odometerKm" | "occurredAt">): Promise<void> {

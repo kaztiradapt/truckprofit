@@ -56,6 +56,8 @@ export type DashboardData = {
     latestTripAt: string | null;
   }>;
   trips: Array<{
+    assignmentResponse?: string;
+    assignmentRefusalReason?: string | null;
     id: string;
     title: string;
     status: string;
@@ -124,6 +126,9 @@ export type DashboardData = {
     } | null;
   }>;
   recentExpenses: Array<{
+    originalAmount?: number | null;
+    originalCurrency?: string | null;
+    exchangeRate?: number | null;
     id: string;
     tripId: string | null;
     vehicleId: string;
@@ -224,6 +229,8 @@ type DriverRow = {
 };
 
 type TripRow = {
+  assignment_response: string;
+  assignment_refusal_reason: string | null;
   id: string;
   title: string;
   status: string;
@@ -318,7 +325,7 @@ export async function getDashboardData(scope: DashboardDataScope = "overview", f
   const emptyResult = () => Promise.resolve({ data: [], error: null });
 
   function tripsQuery() {
-    let query = supabase.from("trips").select("id, title, status, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km, route_geometry)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).order("id");
+    let query = supabase.from("trips").select("id, title, status, assignment_response, assignment_refusal_reason, vehicle_id, driver_id, started_at, vehicles(display_name), drivers(display_name), trip_legs(id, sequence_no, origin_city, destination_city, origin_address, destination_address, origin_latitude, origin_longitude, destination_latitude, destination_longitude, load_state, start_odometer_km, end_odometer_km, distance_km, route_geometry)").eq("organization_id", membership.organization_id).is("deleted_at", null).order("started_at", { ascending: false }).order("id");
     if (filters.dateFrom) query = query.gte("started_at", `${filters.dateFrom}T00:00:00.000Z`);
     if (filters.dateTo) query = query.lte("started_at", `${filters.dateTo}T23:59:59.999Z`);
     if (filters.driverId) query = query.eq("driver_id", filters.driverId);
@@ -333,7 +340,7 @@ export async function getDashboardData(scope: DashboardDataScope = "overview", f
     fetchAllRows(() => supabase.from("drivers").select("id, profile_id, display_name, status, telegram_user_id, assigned_vehicle_id").eq("organization_id", membership.organization_id).is("deleted_at", null).order("display_name").order("id")),
     needs.trips ? fetchAllRows(tripsQuery) : emptyResult(),
     needs.summaries ? fetchAllRows(() => supabase.from("trip_financial_summary").select("revenue, expenses, operating_profit, total_km, empty_km").eq("organization_id", membership.organization_id).order("trip_id")) : emptyResult(),
-    needs.expenses ? fetchAllRows(() => supabase.from("expenses").select("id, trip_id, vehicle_id, driver_id, amount, currency, reporting_amount_minor, quantity, unit, occurred_at, source, location_text, comment, cost_behavior, include_in_normalized_cost, expense_categories(display_name, economic_group), trips(title), drivers(display_name), attachments(id, original_filename, content_type)").eq("organization_id", membership.organization_id).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).order("id")) : emptyResult(),
+    needs.expenses ? fetchAllRows(() => supabase.from("expenses").select("id, trip_id, vehicle_id, driver_id, amount, currency, receipt_amount, receipt_currency, receipt_fx_rate, reporting_amount_minor, quantity, unit, occurred_at, source, location_text, comment, cost_behavior, include_in_normalized_cost, expense_categories(display_name, economic_group), trips(title), drivers(display_name), attachments(id, original_filename, content_type)").eq("organization_id", membership.organization_id).neq("review_status", "REJECTED").eq("status", "RECORDED").is("deleted_at", null).order("occurred_at", { ascending: false }).order("id")) : emptyResult(),
     needs.incomes ? fetchAllRows(() => supabase.from("incomes").select("id, trip_id, customer_name, amount, currency, reporting_currency, reporting_amount_minor, fx_rate_to_reporting, expected_payment_at, payment_status, comment").eq("organization_id", membership.organization_id).neq("payment_status", "VOIDED").is("deleted_at", null).order("created_at", { ascending: false }).order("id")) : emptyResult(),
     needs.pnl ? fetchAllRows(() => supabase.from("pnl_snapshots").select("trip_id, revenue_minor, total_expenses_minor, driver_compensation_minor, management_profit_minor, total_km, loaded_km, empty_km").eq("organization_id", membership.organization_id).eq("is_current", true).order("id")) : emptyResult(),
     needs.driverInvites ? supabase.from("telegram_driver_invites").select("driver_id, expires_at").eq("organization_id", membership.organization_id).is("used_at", null).gt("expires_at", new Date().toISOString()) : emptyResult(),
@@ -483,6 +490,8 @@ export async function getDashboardData(scope: DashboardDataScope = "overview", f
       status: trip.status,
       vehicleId: trip.vehicle_id,
       driverId: trip.driver_id,
+      assignmentResponse: trip.assignment_response,
+      assignmentRefusalReason: trip.assignment_refusal_reason,
       vehicleName: asOne(trip.vehicles)?.display_name ?? "Без машины",
       driverName: asOne(trip.drivers)?.display_name ?? null,
       startedAt: trip.started_at,
@@ -546,6 +555,9 @@ export async function getDashboardData(scope: DashboardDataScope = "overview", f
         tripTitle: asOne(expense.trips)?.title ?? null,
         driverName: asOne(expense.drivers)?.display_name ?? null,
         amount: Number(expense.amount),
+        originalAmount: expense.receipt_amount == null ? null : Number(expense.receipt_amount),
+        originalCurrency: expense.receipt_currency ?? null,
+        exchangeRate: expense.receipt_fx_rate == null ? null : Number(expense.receipt_fx_rate),
         currency: expense.currency,
         reportingAmountMinor: Number(expense.reporting_amount_minor),
         quantity: expense.quantity === null ? null : Number(expense.quantity),

@@ -1,10 +1,15 @@
-import { Bot, Context, InlineKeyboard, Keyboard, session, type SessionFlavor } from "grammy";
+import { Bot, Context, InlineKeyboard, InputFile, Keyboard, session, type SessionFlavor } from "grammy";
 
 import { MINI_APP_URL } from "../domain/telegram/mini-app";
 
 import {
   advanceExpenseWizard,
   beginExpenseWizard,
+  backExpenseWizard,
+  editExpenseWizard,
+  expenseCurrencies,
+  expensePrompt,
+  expenseSteps,
   type ExpenseWizardState,
 } from "./expense-wizard";
 import type {
@@ -20,7 +25,7 @@ import type {
   StaffIdentity,
 } from "./repository";
 
-type PendingExpense = { state: ExpenseWizardState; trip: ActiveTrip };
+type PendingExpense = { state: ExpenseWizardState; trip: ActiveTrip; expenseId?: string; expectedUpdatedAt?: string };
 type PendingReceipt = { expenseId: string; organizationId: string; driverId: string };
 type PendingOdometer = { trip: ActiveTrip };
 type PendingStatus = { trip: ActiveTrip; statusCode: RecordStatusInput["statusCode"]; loadState: RecordStatusInput["loadState"] };
@@ -32,6 +37,7 @@ type PendingLocation = {
 };
 
 type BotSession = {
+  assignmentRefusal?: { token: string };
   expense?: PendingExpense;
   receipt?: PendingReceipt;
   odometer?: PendingOdometer;
@@ -46,14 +52,24 @@ type BotSession = {
 
 type DriverBotContext = Context & SessionFlavor<BotSession>;
 
-const categoryLabels: Record<string, string> = {
-  FUEL: "Топливо",
-  TOLL: "Дорога",
-  REPAIR: "Ремонт",
-  PARKING: "Стоянка",
-  DAILY_ALLOWANCE: "Суточные",
-  OTHER: "Прочее",
-};
+function isWorkflowConflict(error: unknown): boolean {
+  return error instanceof Error && /Assignment is no longer|Assignment already|Expense changed|Expense is unavailable|No active trip|Driver identity|Odometer cannot/i.test(error.message);
+}
+
+export function expenseKeyboard(state: ExpenseWizardState): InlineKeyboard {
+  if (state.step === "CATEGORY") return categoriesMenu();
+  const keyboard = new InlineKeyboard();
+  if (state.step === "CURRENCY") {
+    for (const currency of expenseCurrencies) keyboard.text(currency, "expense:currency:" + currency);
+    keyboard.row();
+  }
+  if (state.step === "CONFIRM") {
+    keyboard.text(state.editing ? "Сохранить исправление" : "Сохранить расход", "expense:confirm").row();
+    const labels: Record<string, string> = { CATEGORY: "Категория", CURRENCY: "Валюта", AMOUNT: "Сумма", RATE: "Курс", FUEL_LITRES: "Литры", ODOMETER: "Одометр" };
+    for (const step of expenseSteps(state).filter(step => step !== "CONFIRM")) keyboard.text("✏️ " + labels[step], "expense:edit:" + step).row();
+  } else keyboard.text("← Назад", "expense:back");
+  return keyboard.text("Отмена", "flow:cancel");
+}
 
 const statusDefinitions: Record<string, { title: string; statusCode: RecordStatusInput["statusCode"]; loadState: RecordStatusInput["loadState"] }> = {
   WAITING_LOADING: { title: "Ожидаю погрузку", statusCode: "WAITING_LOADING", loadState: "UNKNOWN" },
@@ -99,6 +115,8 @@ function driverMenu(ownerAvailable = false): InlineKeyboard {
     .row()
     .text("Добавить расход", "menu:expense")
     .text("Пробег", "menu:odometer")
+    .row()
+    .text("Мои расходы", "expenses:page:0")
     .row()
     .text("📍 Геопозиция", "menu:location")
     .text("Моя зарплата", "menu:pay")
@@ -202,7 +220,12 @@ function betaRegistrationUrl(code: string): string {
 }
 
 function tripMenu(trip: ActiveTrip, ownerAvailable = false): InlineKeyboard {
-  const keyboard = new InlineKeyboard()
+  const keyboard = new InlineKeyboard();
+  if (trip.assignmentToken && trip.assignmentResponse === "PENDING") {
+    keyboard.text("✅ Принять рейс", "assignment:accept:" + trip.assignmentToken)
+      .text("Не могу принять", "assignment:decline:" + trip.assignmentToken).row();
+  }
+  keyboard
     .text("⏳ Ожидаю погрузку", "trip-status:WAITING_LOADING")
     .text("🏗 Погрузка", "trip-status:AT_LOADING")
     .row()
@@ -270,7 +293,8 @@ export function formatStaffSummary(summary: OwnerSummary, currency: string, canV
 export function formatOwnerTrips(trips: OwnerTripSummary[]): string {
   if (!trips.length) return "🚛 Активных рейсов сейчас нет.";
   return ["🚛 Активные рейсы", "", ...trips.map((trip, index) =>
-    `${index + 1}. ${trip.title}\n${trip.vehicleName} · ${trip.driverName ?? "водитель не назначен"} · ${dateLabel(trip.startedAt)}`,
+    `${index + 1}. ${trip.title}\n${trip.vehicleName} · ${trip.driverName ?? "водитель не назначен"} · ${dateLabel(trip.startedAt)}` +
+      (trip.driverName ? "\n" + (trip.assignmentResponse === "ACCEPTED" ? "✅ Рейс принят" : trip.assignmentResponse === "DECLINED" ? "Отказ: " + trip.assignmentRefusalReason : "Ожидает принятия") : ""),
   )].join("\n\n");
 }
 
@@ -291,6 +315,7 @@ export function formatDriverTrip(trip: ActiveTrip): string {
     `🏁 Выгрузка: ${trip.destinationAddress}`,
     "",
     `Текущий статус: ${status}`,
+    `Назначение: ${trip.assignmentResponse === "ACCEPTED" ? "принято водителем" : trip.assignmentResponse === "DECLINED" ? "отказ — " + (trip.assignmentRefusalReason ?? "") : "ожидает принятия"}`,
     "Выберите новый статус одной кнопкой.",
   ].join("\n");
 }
@@ -301,6 +326,8 @@ function parsePositiveNumber(value: string): number | null {
 }
 
 function resetFlow(context: DriverBotContext): void {
+  context.session.assignmentRefusal = undefined;
+  context.session.receipt = undefined;
   context.session.expense = undefined;
   context.session.odometer = undefined;
   context.session.status = undefined;
@@ -347,6 +374,10 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
   const bot = new Bot<DriverBotContext>(token, { client: { timeoutSeconds: 10 } });
 
   bot.use(async (context, next) => {
+    if (context.chat?.type !== "private") {
+      if (context.chat) await context.reply("Для работы с TruckProfit откройте личный чат с ботом.");
+      return;
+    }
     await repository.processIncomingUpdate(context.update.update_id, context.chat?.id.toString() ?? `update:${context.update.update_id}`, next);
   });
 
@@ -652,9 +683,8 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     try {
       await context.answerCallbackQuery();
     } catch {
-      // Telegram retries failed webhooks. A callback may already be too old by the
-      // time that retry arrives, so mark it processed without repeating its action.
-      return;
+      // An expired callback acknowledgement must not discard a valid leased action.
+      // Database operations are idempotent across webhook retries.
     }
     if (data === "flow:cancel") {
       resetFlow(context);
@@ -702,6 +732,9 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
         "4. Внутри «Мой рейс» меняйте статусы ожидания, погрузки и выгрузки одной кнопкой.",
         "5. В «📍 Геопозиция» выберите тип точки. Для «Прочее» напишите свой вариант, затем разрешите Telegram передать координаты.",
         "6. После расхода отправьте фото чека; предварительный расчёт смотрите в «Моя зарплата».",
+        "7. В расходе выберите валюту чека и курс к валюте компании. Перед сохранением можно вернуться назад или исправить поле.",
+        "8. В «Мои расходы» доступны ваши записи текущего рейса и чеки. Сумму, валюту, курс и литры можно исправить в активном рейсе; история сохраняется, одометр не меняется.",
+        "9. Назначение подтвердите кнопкой «Принять рейс» в «Мой рейс». Если не можете принять, напишите причину. Статус движения выбирается отдельно.",
         "7. Mini App водителю не нужен — все водительские действия доступны в чате.",
       ].join("\n"), helpMenu());
       return;
@@ -815,7 +848,93 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     const driver = await findDriver(context);
     if (!driver) return;
 
+    if (data.startsWith("assignment:")) {
+      const [, action, token] = data.split(":");
+      if (!token || !/^[0-9a-f-]{36}$/i.test(token)) return;
+      resetFlow(context);
+      if (action === "decline") {
+        context.session.assignmentRefusal = { token };
+        await replaceMenu(context, "Напишите причину отказа от назначения (3–500 символов). Рейс не будет удалён; причину увидит владелец.", new InlineKeyboard().text("Отмена", "flow:cancel"));
+      } else if (action === "accept") {
+        try {
+          await repository.respondToAssignment(driver, token, "ACCEPTED");
+        } catch (error) {
+          if (!isWorkflowConflict(error)) throw error;
+          await showDriverMenu(context, "Назначение уже изменилось или ответ был сохранён. Откройте «Мой рейс» заново.");
+          return;
+        }
+        await showDriverMenu(context, "✅ Рейс принят. Для начала движения отдельно выберите статус «В пути».");
+      }
+      return;
+    }
+
+    if (data.startsWith("expenses:page:")) {
+      resetFlow(context);
+      const trip = await findTrip(context, driver);
+      if (!trip) return;
+      const offset = Math.max(0, Math.min(100000, Number(data.split(":")[2]) || 0));
+      const expenses = await repository.listDriverExpenses(driver, trip.id, offset);
+      const keyboard = new InlineKeyboard();
+      for (const expense of expenses) keyboard.text(expense.categoryName + " · " + expense.originalAmountMinor / 100 + " " + expense.originalCurrency, "expenses:view:" + expense.id).row();
+      if (offset > 0) keyboard.text("← Назад", "expenses:page:" + Math.max(0, offset - 10));
+      if (expenses.length === 10) keyboard.text("Далее →", "expenses:page:" + (offset + 10));
+      keyboard.row().text("Главное меню", "trip:close");
+      await replaceMenu(context, "Мои расходы · " + trip.title + "\n" + (expenses.length ? "Выберите запись, чтобы открыть чеки или исправить сумму." : "На этой странице расходов нет."), keyboard);
+      return;
+    }
+
+    if (data.startsWith("expenses:view:") || data.startsWith("expenses:edit:") || data.startsWith("expenses:receipt:") || data.startsWith("expenses:history:")) {
+      const [, action, id, receiptIndex] = data.split(":");
+      if (!/^[0-9a-f-]{36}$/i.test(id ?? "")) return;
+      const expense = await repository.findDriverExpense(driver, id);
+      if (!expense) { await showDriverMenu(context, "Расход недоступен."); return; }
+      if (action === "history") {
+        const history = await repository.getDriverExpenseHistory(driver, id);
+        await replaceMenu(context, "Последние 10 исправлений\n" + (history.length
+          ? history.map(row => dateLabel(row.at) + " · " + row.beforeAmount + " → " + row.afterAmount + " " + row.currency).join("\n")
+          : "Исправлений водителем пока не было."), new InlineKeyboard().text("К расходу", "expenses:view:" + id));
+        return;
+      }
+      if (action === "receipt") {
+        const index = Number(receiptIndex ?? 0);
+        const receipt = await repository.getDriverReceipt(driver, id, index);
+        if (!receipt) { await context.reply("Чек недоступен."); return; }
+        const keyboard = new InlineKeyboard();
+        if (index + 1 < expense.receiptCount) keyboard.text("Следующий чек", "expenses:receipt:" + id + ":" + (index + 1));
+        keyboard.row().text("К расходу", "expenses:view:" + id);
+        await context.replyWithDocument(new InputFile(receipt.content, receipt.filename), { reply_markup: keyboard });
+        return;
+      }
+      const state: ExpenseWizardState = { step: "CONFIRM", editing: true, draft: {
+        tripId: expense.tripId, categoryCode: expense.categoryCode, currency: expense.currency,
+        originalCurrency: expense.originalCurrency, amountMinor: expense.originalAmountMinor,
+        exchangeRate: expense.exchangeRate, fuelLitres: expense.fuelLitres, odometerKm: expense.odometerKm,
+      } };
+      if (action === "edit") {
+        const trip = await repository.findActiveTrip(driver);
+        if (!expense.canEdit || !trip || trip.id !== expense.tripId) {
+          await showDriverMenu(context, "Исправления доступны только для своих расходов из Telegram в текущем активном рейсе.");
+          return;
+        }
+        resetFlow(context);
+        context.session.expense = { state, trip, expenseId: expense.id, expectedUpdatedAt: expense.updatedAt };
+        await replaceMenu(context, expensePrompt(state), expenseKeyboard(state));
+      } else {
+        resetFlow(context);
+        const keyboard = new InlineKeyboard();
+        if (expense.canEdit) keyboard.text("Исправить", "expenses:edit:" + id);
+        if (expense.receiptCount) keyboard.text("Открыть чек", "expenses:receipt:" + id + ":0");
+        keyboard.row().text("История исправлений", "expenses:history:" + id);
+        keyboard.row().text("Мои расходы", "expenses:page:0");
+        await replaceMenu(context, expense.categoryName + "\nПо чеку: " + expense.originalAmountMinor / 100 + " " + expense.originalCurrency
+          + "\nВ учёте: " + expense.amountMinor / 100 + " " + expense.currency
+          + "\nКурс: " + expense.exchangeRate + "\n" + dateLabel(expense.occurredAt), keyboard);
+      }
+      return;
+    }
+
     if (data === "menu:trip") {
+      resetFlow(context);
       const trip = await findTrip(context, driver);
       if (trip) await replaceMenu(context, formatDriverTrip(trip), tripMenu(trip, context.session.ownerAvailable));
       return;
@@ -847,23 +966,26 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     if (data === "menu:expense") {
       const trip = await findTrip(context, driver);
       if (!trip) return;
+      resetFlow(context);
       const started = beginExpenseWizard(trip.id, trip.currency);
       context.session.expense = { state: started.state, trip };
       await replaceMenu(context, started.prompt, categoriesMenu());
       return;
     }
 
-    if (data.startsWith("expense:category:")) {
+    if (data.startsWith("expense:category:") || data.startsWith("expense:currency:") || data === "expense:back" || data.startsWith("expense:edit:")) {
       const pending = context.session.expense;
-      const category = data.replace("expense:category:", "");
       if (!pending) {
         await showDriverMenu(context, "Срок ввода расхода истёк. Начните заново.");
         return;
       }
-      const result = advanceExpenseWizard(pending.state, category);
+      if (data.startsWith("expense:category:") && pending.state.step !== "CATEGORY") return;
+      if (data.startsWith("expense:currency:") && pending.state.step !== "CURRENCY") return;
+      const result = data === "expense:back" ? backExpenseWizard(pending.state)
+        : data.startsWith("expense:edit:") ? editExpenseWizard(pending.state, data.split(":")[2])
+        : advanceExpenseWizard(pending.state, data.split(":")[2]);
       context.session.expense = { ...pending, state: result.state };
-      await clearPreviousMenu(context);
-      await context.reply(result.prompt);
+      await replaceMenu(context, result.prompt, expenseKeyboard(result.state));
       return;
     }
 
@@ -874,18 +996,40 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
         return;
       }
       const draft = pending.state.draft;
-      const recorded = await repository.recordExpense({
+      if (pending.trip.organizationId !== driver.organizationId || pending.trip.driverId !== driver.driverId) {
+        resetFlow(context);
+        await showDriverMenu(context, "Профиль изменился. Начните расход заново.");
+        return;
+      }
+      const input = {
         organizationId: pending.trip.organizationId,
         driverId: pending.trip.driverId,
         tripId: pending.trip.id,
         categoryCode: draft.categoryCode!,
         amountMinor: draft.amountMinor!,
         currency: draft.currency,
+        originalCurrency: draft.originalCurrency,
+        exchangeRate: draft.exchangeRate,
         occurredAt: new Date(),
         odometerKm: draft.odometerKm,
         fuelLitres: draft.fuelLitres,
-      });
+      };
+      let recorded: { expenseId: string };
+      try {
+        recorded = pending.expenseId
+          ? await repository.editDriverExpense({ ...input, expenseId: pending.expenseId, expectedUpdatedAt: pending.expectedUpdatedAt! })
+          : await repository.recordExpense(input);
+      } catch (error) {
+        if (!isWorkflowConflict(error)) throw error;
+        resetFlow(context);
+        await showDriverMenu(context, "Запись или назначение изменились. Откройте расход заново. Если менялся одометр, проверьте последнее значение.");
+        return;
+      }
       context.session.expense = undefined;
+      if (pending.expenseId) {
+        await showDriverMenu(context, "✅ Исправление сохранено и записано в историю. Чеки остались прикреплены.");
+        return;
+      }
       context.session.receipt = {
         expenseId: recorded.expenseId,
         organizationId: pending.trip.organizationId,
@@ -979,6 +1123,24 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
     const driver = await findDriver(context);
     if (!driver) return;
 
+    if (context.session.assignmentRefusal) {
+      if (text.length < 3 || text.length > 500) {
+        await context.reply("Напишите причину от 3 до 500 символов или отмените ввод.");
+        return;
+      }
+      try {
+        await repository.respondToAssignment(driver, context.session.assignmentRefusal.token, "DECLINED", text);
+      } catch (error) {
+        if (!isWorkflowConflict(error)) throw error;
+        resetFlow(context);
+        await showDriverMenu(context, "Назначение изменилось или уже получен ответ. Откройте «Мой рейс» заново.");
+        return;
+      }
+      resetFlow(context);
+      await showDriverMenu(context, "Причина отказа сохранена и видна владельцу. Сам рейс не удалён.");
+      return;
+    }
+
     if (context.session.location?.step === "COMMENT") {
       const pending = context.session.location;
       if (pending.trip.driverId !== driver.driverId || pending.trip.organizationId !== driver.organizationId) {
@@ -1049,23 +1211,9 @@ export function createDriverBot(token: string, repository: DriverBotRepository):
       return;
     }
 
-    if (pending.state.step === "CONFIRM" && text.toUpperCase() === "CONFIRM") {
-      await replaceMenu(context, "Подтвердите запись кнопкой ниже.", new InlineKeyboard().text("Сохранить расход", "expense:confirm"));
-      return;
-    }
-
     const result = advanceExpenseWizard(pending.state, text);
     context.session.expense = { ...pending, state: result.state };
-    if (result.kind === "CONFIRM") {
-      const draft = result.state.draft;
-      await replaceMenu(
-        context,
-        `${result.prompt}\nКатегория: ${categoryLabels[draft.categoryCode ?? ""] ?? draft.categoryCode}.`,
-        new InlineKeyboard().text("Сохранить расход", "expense:confirm").text("Отменить", "flow:cancel"),
-      );
-      return;
-    }
-    await context.reply(result.prompt);
+    await replaceMenu(context, result.prompt, expenseKeyboard(result.state));
   });
 
   bot.on("message:location", async (context) => {

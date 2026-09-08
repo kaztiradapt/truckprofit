@@ -113,6 +113,7 @@ function TripExpensePanel({ trip, expenses, baseCurrency, canViewFinance }: {
         </span>
         <span className="expense-amount-actions">
           <strong>{formatMoney(expense.amount, expense.currency)}</strong>
+          {expense.originalAmount != null && expense.originalCurrency ? <small>По чеку: {formatMoney(expense.originalAmount, expense.originalCurrency)} · курс {expense.exchangeRate}</small> : null}
           {expense.receipt ? <ReceiptViewerButton expenseId={expense.id} filename={expense.receipt.originalFilename} contentType={expense.receipt.contentType} /> : null}
         </span>
       </li>)}
@@ -238,6 +239,7 @@ export function ActiveTripDetails({ organizationId, trips, expenses, incomes, ba
               <small>{trip.originCity || "Погрузка"} → {trip.destinationCity || "Выгрузка"}</small>
               <b>{trip.title}</b>
               <em>{trip.vehicleName} · {trip.driverName ?? "Водитель не назначен"} · <DeviceDateTime value={trip.startedAt} mode="date" /></em>
+              {trip.driverId ? <small>{trip.assignmentResponse === "ACCEPTED" ? "✅ Водитель принял рейс" : trip.assignmentResponse === "DECLINED" ? "Водитель отказался: " + trip.assignmentRefusalReason : "Ожидается принятие рейса водителем"}</small> : null}
               <span className={`driver-status-line ${driverStatus.tone}`}>
                 <i aria-hidden="true" />
                 <b>{driverStatus.label}</b>
